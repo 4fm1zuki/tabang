@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "141423348351",
+    "project_id": "auth-fa71c",
+    "storage_bucket": "auth-fa71c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141423348351:android:a25bf868d1c32346504d4a",
+        "android_client_info": {
+          "package_name": "ph.edu.cjc.tabang"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "141423348351-a53tjeff3m6qa4oh4hr4cil7p4fnlr5f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfBrF-6DIoPdl4n6Bk5gk9UaKwMJx2gvk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "141423348351-a53tjeff3m6qa4oh4hr4cil7p4fnlr5f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

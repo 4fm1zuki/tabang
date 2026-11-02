@@ -1,11 +1,12 @@
 name: tabang
-description: "TABANG - Blood Donation Locator & Community Platform"
-publish_to: 'none' # Remove this line if you plan to publish to pub.dev
+description: "TABANG - Transfusion Access, Blood Availability and Network Guidance. A centralized donor management system for Digos City."
+publish_to: 'none'
 
-version: 1.0.0+1
+version: 2.0.0+2
 
 environment:
-  sdk: ^3.5.0
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
 
 dependencies:
   flutter:
@@ -14,32 +15,29 @@ dependencies:
   # --- UI & Icons ---
   cupertino_icons: ^1.0.8
 
-  # --- Database & Backend ---
-  supabase_flutter: ^2.8.0
+  # --- Credential hashing for the local auth store ---
+  crypto: ^3.0.3
 
-  # --- Maps & Geolocation ---
-  google_maps_flutter: ^2.10.0
-  geolocator: ^13.0.0
+  # --- Maps ---
+  # No maps SDK is used. Find Donor renders the bundled barangay GeoJSON with
+  # a CustomPainter, so there is no API key, no tile traffic and no platform
+  # view. See lib/screens/donor/find_donor_page.dart.
+  firebase_core: ^5.1.0
+  firebase_auth: ^7.0.1
+
+  # Supabase is intentionally not a dependency in this simulated build. The
+  # backend migration is documented as a known gap instead of shipping an
+  # unused client that implies a live connection.
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  # Linter for recommended Flutter code style rules
   flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
 
-  # Asset management for local images, geojson files, or custom fonts
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
-
-  # Custom fonts configuration
-  # fonts:
-  #   - family: Arial
-  #     fonts:
-  #       - asset: fonts/Arial.ttf
-  #       - asset: fonts/Arial-Bold.ttf
-  #         weight: 700
+  assets:
+    - assets/maps/
+    - assets/images/
+    - assets/branding/

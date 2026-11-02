@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = shs_pesearch_project
+PRODUCT_NAME = TABANG
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.shsPesearchProject
+PRODUCT_BUNDLE_IDENTIFIER = ph.edu.cjc.tabang
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 Cor Jesu College, Inc. All rights reserved.
