@@ -5,6 +5,8 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/onboarding.dart';
+import '../../widgets/photo.dart';
+import '../donor/donor_shell.dart' show accountMenuItems;
 import '../shared/about_help_page.dart';
 import '../shared/profile_page.dart';
 import '../shared/settings_page.dart';
@@ -34,6 +36,21 @@ class _AdminShellState extends State<AdminShell> {
   int _index = 0;
   bool _hovering = false;
   bool _pinned = true;
+
+  /// Opens a destination that is not in the phone bottom bar.
+  void _pushStandalone(int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text(_destinations[index].label),
+            leading: const BackButton(),
+          ),
+          body: _pages.putIfAbsent(index, () => _buildPage(index)),
+        ),
+      ),
+    );
+  }
 
   /// Labels are only built after the rail finishes sliding, so the wordmark
   /// and nav labels never wrap inside a narrow, mid-animation rail.
@@ -85,11 +102,61 @@ class _AdminShellState extends State<AdminShell> {
     _Destination('About & Help', Icons.help_outline, Icons.help),
   ];
 
+  /// Bottom-bar slots on phones and small tablets. About & Help stays in the
+  /// account menu so the bar keeps six readable destinations.
+  static const _phoneIndices = <int>[0, 1, 2, 3, 4, 5];
+
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 1000;
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < TabangBreakpoints.navigationRail;
+    final wide = !compact;
     final railExpanded = wide && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
+
+    final content = IndexedStack(
+      index: _index,
+      children: List<Widget>.generate(
+        _destinations.length,
+        (i) => _pages[i] ?? const SizedBox.shrink(),
+      ),
+    );
+
+    // Staff and admins on a phone get the same bottom-bar shell as community
+    // users; the 68 px icon rail was unusable on a 390 px screen.
+    if (compact) {
+      return Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              _AdminPhoneHeader(
+                user: widget.user,
+                onOpenProfile: () => _pushStandalone(4),
+                onOpenSettings: () => _pushStandalone(5),
+                onOpenHelp: () => _pushStandalone(6),
+              ),
+              Expanded(child: content),
+              NavigationBar(
+                selectedIndex: _phoneIndices.contains(_index)
+                    ? _phoneIndices.indexOf(_index)
+                    : 0,
+                onDestinationSelected: (slot) =>
+                    _select(_phoneIndices[slot]),
+                destinations: [
+                  for (final index in _phoneIndices)
+                    NavigationDestination(
+                      icon: Icon(_destinations[index].icon),
+                      selectedIcon: Icon(_destinations[index].activeIcon),
+                      label: _destinations[index].label,
+                      tooltip: _destinations[index].label,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       body: Row(
@@ -117,20 +184,16 @@ class _AdminShellState extends State<AdminShell> {
               },
               onSelect: _select,
               onTogglePin: () => setState(() {
+                // Only drop the labels when the width actually animates;
+                // otherwise onSlideEnd never fires and they stay hidden.
+                final wasExpanded = wide && (_pinned || _hovering);
                 _pinned = !_pinned;
-                _railSettled = false;
+                final willExpand = wide && (_pinned || _hovering);
+                _railSettled = willExpand == wasExpanded;
               }),
             ),
           ),
-          Expanded(
-            child: IndexedStack(
-              index: _index,
-              children: List<Widget>.generate(
-                _destinations.length,
-                (i) => _pages[i] ?? const SizedBox.shrink(),
-              ),
-            ),
-          ),
+          Expanded(child: content),
         ],
       ),
     );
@@ -167,6 +230,110 @@ class _Destination {
   final String label;
   final IconData icon;
   final IconData activeIcon;
+}
+
+/// Compact identity bar for staff on phones: brand, identity and the account
+/// menu, matching the community shell's header.
+class _AdminPhoneHeader extends StatelessWidget {
+  const _AdminPhoneHeader({
+    required this.user,
+    required this.onOpenProfile,
+    required this.onOpenSettings,
+    required this.onOpenHelp,
+  });
+
+  final AppUser user;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onOpenHelp;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 58,
+      padding: const EdgeInsets.symmetric(horizontal: TabangSpace.md),
+      decoration: BoxDecoration(
+        color: context.surface,
+        border: Border(bottom: BorderSide(color: context.border)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: TabangGradients.brand,
+              borderRadius: BorderRadius.circular(TabangRadius.xs),
+            ),
+            padding: const EdgeInsets.all(2),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: const SizedBox(
+                width: 28,
+                height: 28,
+                child: TabangPhoto(
+                  'assets/branding/app_icon.png',
+                  semanticLabel: 'TABANG',
+                  creditLabel: 'TABANG launcher icon',
+                  fallbackIcon: Icons.water_drop,
+                  fallbackIconSize: 15,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: TabangSpace.sm),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Chapter console',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                  color: context.textColor,
+                ),
+              ),
+              Text(
+                '${user.alias} · ${user.role.label}',
+                style: TextStyle(fontSize: 11.5, color: context.textMuted),
+              ),
+            ],
+          ),
+          const Spacer(),
+          PopupMenuButton<String>(
+            tooltip: 'Account',
+            position: PopupMenuPosition.under,
+            onSelected: (value) {
+              switch (value) {
+                case 'profile':
+                  onOpenProfile();
+                case 'settings':
+                  onOpenSettings();
+                case 'help':
+                  onOpenHelp();
+                case 'signout':
+                  TabangRepository.instance.signOut();
+              }
+            },
+            itemBuilder: (context) => accountMenuItems(context, user),
+            child: ClipOval(
+              child: SizedBox(
+                width: 32,
+                height: 32,
+                child: TabangPhoto(
+                  user.photoAsset,
+                  semanticLabel: '${user.alias} profile illustration',
+                  creditLabel: user.alias,
+                  fallbackIcon: Icons.person_outline,
+                  fallbackIconSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AdminSidebar extends StatelessWidget {

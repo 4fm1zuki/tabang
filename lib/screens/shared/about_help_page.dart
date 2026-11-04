@@ -1147,16 +1147,16 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
   }
 
   Widget _buildCredits(BuildContext context) {
+    // Only photographs need attribution. Avatars, educational artwork and the
+    // app icon are original TABANG artwork with no external author, so they are
+    // not listed and no file paths are shown to users.
     final photos = kImageCredits.where((c) => c.kind == 'photo').toList();
-    final artwork = kImageCredits
-        .where((c) => c.kind == 'illustration' || c.kind == 'icon')
-        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Image credits',
+          'Photo credits',
           style: TextStyle(
             fontSize: 15.5,
             fontWeight: FontWeight.w800,
@@ -1166,8 +1166,8 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
         ),
         const SizedBox(height: 2),
         Text(
-          'Every file is bundled locally and credited individually. Tap a '
-          'credit for the full source.',
+          'Every photograph is bundled locally and credited to its author. '
+          'Tap a credit for the licence and source.',
           style: TextStyle(fontSize: 12.5, color: context.textMuted),
         ),
         const SizedBox(height: TabangSpace.md),
@@ -1177,58 +1177,36 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
             const gap = TabangSpace.md;
             final width =
                 (constraints.maxWidth - gap * (columns - 1)) / columns;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
               children: [
-                for (final group in [
-                  ('Photography', photos),
-                  ('Original artwork', artwork),
-                ]) ...[
-                  Text(
-                    group.$1.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.9,
-                      color: context.textMuted,
-                    ),
+                for (final credit in photos)
+                  SizedBox(
+                    width: width,
+                    child: _creditCard(context, credit),
                   ),
-                  const SizedBox(height: TabangSpace.sm),
-                  Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
-                    children: [
-                      for (final credit in group.$2)
-                        SizedBox(
-                          width: width,
-                          child: _creditCard(context, credit),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: TabangSpace.lg),
-                ],
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(TabangSpace.md),
-                  decoration: BoxDecoration(
-                    color: context.surfaceAlt,
-                    borderRadius: BorderRadius.circular(TabangSpace.sm),
-                  ),
-                  child: Text(
-                    'Profile illustrations are 48 unique original portraits '
-                    'generated for TABANG; each is identified by its own file '
-                    'name in the hover credit. Source links and the full list '
-                    'also live in tools/image_sources/CREDITS.md.',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      height: 1.5,
-                      color: context.textMuted,
-                    ),
-                  ),
-                ),
               ],
             );
           },
+        ),
+        const SizedBox(height: TabangSpace.md),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(TabangSpace.md),
+          decoration: BoxDecoration(
+            color: context.surfaceAlt,
+            borderRadius: BorderRadius.circular(TabangSpace.sm),
+          ),
+          child: Text(
+            'Profile portraits and educational illustrations are original '
+            'TABANG artwork, so there is no external credit to list.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.5,
+              color: context.textMuted,
+            ),
+          ),
         ),
       ],
     );
@@ -1279,13 +1257,11 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10.5,
+                      fontSize: 12,
                       height: 1.35,
                       color: context.textMuted,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  PhotoCredit(credit.asset),
                 ],
               ),
             ),
@@ -1327,33 +1303,21 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                PhotoCredit(credit.asset),
                 const SizedBox(height: TabangSpace.md),
-                Text(
-                  'Asset: ${credit.asset}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.5,
-                    fontFamily: 'monospace',
-                    color: context.textColor,
-                  ),
-                ),
-                const SizedBox(height: 4),
                 Text(
                   'Creator: ${credit.author}\nLicence: ${credit.license}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     height: 1.55,
                     color: context.textMuted,
                   ),
                 ),
                 if (credit.sourceUrl != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Source: ${credit.sourceUrl}',
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    credit.sourceUrl!,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       height: 1.45,
                       color: context.textMuted,
                     ),

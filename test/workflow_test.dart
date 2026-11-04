@@ -867,19 +867,14 @@ void main() {
       );
       expect(result.ok, isTrue);
 
+      // Registration is face-to-face: the app only records the intent to
+      // visit and whether the applicant already holds a donor card.
       final application = repo.submitDonorApplication(
         userId: result.user!.id,
+        hasExistingCard: false,
         bloodType: BloodType.oNeg,
-        birthDate: DateTime(2000, 1, 1),
-        weightKg: 60,
-        sex: 'Female',
-        contact: '+63 900 111 5555',
-        idType: 'School ID',
-        idNumber: '2026-0001',
-        medicalFlags: const [
-          'Tattoo, piercing or acupuncture in the last 12 months',
-        ],
-        declarationAccepted: true,
+        preferredVisit: DateTime.now().add(const Duration(days: 2)),
+        note: 'First donation',
       );
       expect(application, isNotNull);
       expect(application!.status, DonorApplicationStatus.pending);

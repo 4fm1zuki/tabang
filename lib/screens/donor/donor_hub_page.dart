@@ -147,17 +147,38 @@ class _DonorHubPageState extends State<DonorHubPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionLabel('What registering asks for'),
+                const SectionLabel('How donor registration works'),
                 Text(
-                  'The form covers personal data and the medical-history '
-                  'checklist from the PRC Blood Donor Interview Sheet. The '
-                  'rest happens in person and staff verifies it there.',
+                  'Registration is completed face-to-face at the chapter. '
+                  'Telling the app you are coming just lets staff prepare and '
+                  'expect you.',
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.5,
                     color: context.textMuted,
                   ),
                 ),
+                const SizedBox(height: TabangSpace.md),
+                for (final step in const [
+                  '1 · Send your registration interest from here',
+                  '2 · Visit the PRC chapter in Digos with your ID',
+                  '3 · Interview, examination, blood typing and screening',
+                  '4 · The chapter issues or renews your donor card',
+                  '5 · Staff verifies you here — you appear in the directory',
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      step,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.45,
+                        color: context.textColor,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: TabangSpace.md),
+                const SectionLabel('What to bring'),
                 const SizedBox(height: TabangSpace.md),
                 for (final requirement in kDonorRequirements)
                   Padding(
@@ -197,8 +218,8 @@ class _DonorHubPageState extends State<DonorHubPage> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: _registerAsDonor,
-                    icon: const Icon(Icons.edit_note_outlined, size: 18),
-                    label: const Text('Fill up the donor form'),
+                    icon: const Icon(Icons.how_to_reg_outlined, size: 18),
+                    label: const Text('Start donor registration'),
                   ),
                 ),
                 const SizedBox(height: TabangSpace.sm),
@@ -276,36 +297,43 @@ class _DonorHubPageState extends State<DonorHubPage> {
               color: context.textMuted,
             ),
           ),
-          if (application != null && application.medicalFlags.isNotEmpty) ...[
+          if (application != null) ...[
             const SizedBox(height: TabangSpace.md),
+            Wrap(
+              spacing: TabangSpace.sm,
+              runSpacing: 6,
+              children: [
+                StatusPill(
+                  application.hasExistingCard
+                      ? 'Has a PRC donor card'
+                      : 'Needs a new donor card',
+                  tone: application.hasExistingCard
+                      ? Tone.success
+                      : Tone.neutral,
+                  dense: true,
+                ),
+                if (application.cardNumber != null)
+                  StatusPill(
+                    'Card ${application.cardNumber}',
+                    tone: Tone.info,
+                    dense: true,
+                  ),
+                if (application.preferredVisit != null)
+                  StatusPill(
+                    'Visiting ${formatDate(application.preferredVisit!)}',
+                    tone: Tone.brand,
+                    dense: true,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
-              'Declared in the medical checklist',
+              'The medical interview, examination, blood typing and screening '
+              'are done by chapter staff on the day you visit — nothing '
+              'medical is answered in the app.',
               style: TextStyle(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: context.textColor,
-              ),
-            ),
-            const SizedBox(height: 4),
-            for (final flag in application.medicalFlags)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Text(
-                  '• $flag',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: context.textMuted,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 4),
-            Text(
-              'The chapter interviewer discusses these privately — a tick is '
-              'not an automatic refusal.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.4,
+                height: 1.45,
                 color: context.textMuted,
               ),
             ),
@@ -380,13 +408,13 @@ class _DonorHubPageState extends State<DonorHubPage> {
             child: application == null
                 ? FilledButton.icon(
                     onPressed: _registerAsDonor,
-                    icon: const Icon(Icons.edit_note_outlined, size: 17),
-                    label: const Text('Fill up the donor form'),
+                    icon: const Icon(Icons.how_to_reg_outlined, size: 17),
+                    label: const Text('Start donor registration'),
                   )
                 : OutlinedButton.icon(
                     onPressed: _registerAsDonor,
                     icon: const Icon(Icons.refresh_outlined, size: 17),
-                    label: const Text('Submit an updated form'),
+                    label: const Text('Update my registration'),
                   ),
           ),
         ],

@@ -689,22 +689,24 @@ enum DonorApplicationStatus {
   final String label;
 }
 
-/// One volunteer-donor registration submitted from Donor Hub.
+/// One volunteer-donor registration interest submitted from Donor Hub.
 ///
-/// The clinic does the actual interview and screening; the app records what
-/// was declared, what staff still asks for, and the verification outcome.
+/// Donor registration in the Philippines is completed face-to-face: the
+/// interview, physical examination, blood typing and screening all happen at
+/// the chapter, and the PRC interview sheet is filled in there. The app only
+/// records the intent to register, whether the applicant already holds a
+/// donor card, an optional preferred visit day, and what staff still asks for
+/// — everything medical stays with the clinic.
 class DonorApplication {
   const DonorApplication({
     required this.id,
     required this.userId,
     required this.submittedAt,
     required this.status,
-    required this.sex,
-    required this.contact,
-    required this.idType,
-    required this.idNumber,
-    required this.medicalFlags,
-    required this.declarationAccepted,
+    required this.hasExistingCard,
+    this.cardNumber,
+    this.preferredVisit,
+    this.note,
     this.requestedDocuments = const [],
     this.staffNote,
   });
@@ -713,15 +715,16 @@ class DonorApplication {
   final String userId;
   final DateTime submittedAt;
   final DonorApplicationStatus status;
-  final String sex;
-  final String contact;
-  final String idType;
-  final String idNumber;
 
-  /// The medical-history statements answered "yes". A "yes" does not
-  /// automatically disqualify anyone — it flags what staff must ask about.
-  final List<String> medicalFlags;
-  final bool declarationAccepted;
+  /// True when the applicant already holds a PRC blood donor card.
+  final bool hasExistingCard;
+
+  /// Donor-card number, when the applicant has one.
+  final String? cardNumber;
+
+  /// Day the applicant plans to visit the chapter, if they picked one.
+  final DateTime? preferredVisit;
+  final String? note;
 
   /// Requirements chapter staff has asked the applicant to present.
   final List<String> requestedDocuments;
@@ -738,12 +741,10 @@ class DonorApplication {
       userId: userId,
       submittedAt: submittedAt,
       status: status ?? this.status,
-      sex: sex,
-      contact: contact,
-      idType: idType,
-      idNumber: idNumber,
-      medicalFlags: medicalFlags,
-      declarationAccepted: declarationAccepted,
+      hasExistingCard: hasExistingCard,
+      cardNumber: cardNumber,
+      preferredVisit: preferredVisit,
+      note: note,
       requestedDocuments: requestedDocuments ?? this.requestedDocuments,
       staffNote: clearStaffNote ? null : (staffNote ?? this.staffNote),
     );

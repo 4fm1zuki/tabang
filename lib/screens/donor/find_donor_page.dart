@@ -31,10 +31,14 @@ class FindDonorPage extends StatefulWidget {
     this.onOpenRequests,
     this.onOpenChat,
     this.onOpenDiscover,
+    this.onOpenBloodBank,
   });
 
   /// Jumps to Discover, where the drive cards and the visit planner live.
   final VoidCallback? onOpenDiscover;
+
+  /// Jumps to the Blood Bank tab; used by the PRC chapter pin.
+  final VoidCallback? onOpenBloodBank;
 
   final AppUser user;
 
@@ -108,6 +112,92 @@ class _FindDonorPageState extends State<FindDonorPage> {
   List<BloodDrive> _drivesIn(String barangay) => _repo.drives
       .where((d) => d.barangay == barangay && d.status != 'Completed')
       .toList(growable: false);
+
+  /// Hospitals and the PRC chapter: what the pin is and where it sits.
+  void _showFacilitySheet(DigosFacilityPin pin) {
+    final isChapter = pin.kind == 'chapter';
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: context.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(TabangRadius.lg)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: context.pagePadding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isChapter ? Icons.bloodtype : Icons.local_hospital,
+                    size: 22,
+                    color: isChapter
+                        ? TabangColors.crimson
+                        : TabangColors.info,
+                  ),
+                  const SizedBox(width: TabangSpace.sm),
+                  Expanded(
+                    child: Text(
+                      pin.name,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: context.textColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                pin.note,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.45,
+                  color: context.textMuted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Pinned at an approximate location in this prototype.',
+                style: TextStyle(fontSize: 12, color: context.textMuted),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                  if (isChapter && widget.onOpenBloodBank != null) ...[
+                    const SizedBox(width: TabangSpace.sm),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          widget.onOpenBloodBank!.call();
+                        },
+                        icon: const Icon(Icons.inventory_2_outlined, size: 16),
+                        label: const Text('Open Blood Bank'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   /// Drives at a barangay pin: the map's route into the drive details.
   void _showDriveSheet(String barangay) {
@@ -480,6 +570,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                 onSelectBarangay: (name) =>
                     setState(() => _selectedBarangay = name),
                 onDriveTap: _showDriveSheet,
+                onFacilityTap: _showFacilitySheet,
               ),
             ),
 
@@ -767,8 +858,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
-  Color _fillFor(int count, bool selected) =>
-      digosHeatColor(count, dark: _mapDark, selected: selected);
+  Color _fillFor(int count) => digosHeatColor(count, dark: _mapDark);
 
   Widget _typeChip(BuildContext context, BloodType? type, String label) {
     final selected = _bloodType == type;
@@ -918,6 +1008,13 @@ class _FindDonorPageState extends State<FindDonorPage> {
           _layerRow(context, DigosMapColors.internalBorder,
               'Barangay boundaries',
               lineWidth: 2),
+          _layerRow(
+            context,
+            DigosMapColors.selectionBorder,
+            'Selected barangay',
+            lineWidth: 3,
+          ),
+          _layerRow(context, DigosMapColors.hospital, 'Hospital / blood bank'),
           const SizedBox(height: 6),
           Divider(height: 1, color: context.border),
           const SizedBox(height: 8),
@@ -974,7 +1071,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
           width: small ? 12 : 15,
           height: small ? 12 : 15,
           decoration: BoxDecoration(
-            color: _fillFor(count, false),
+            color: _fillFor(count),
             border: Border.all(
               color: context.isDark
                   ? Colors.white.withValues(alpha: 0.28)

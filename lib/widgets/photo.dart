@@ -72,10 +72,9 @@ class TabangPhoto extends StatelessWidget {
         ? image
         : ClipRRect(borderRadius: borderRadius!, child: image);
 
-    // Hovering any credited image reveals the exact file credit, including the
-    // source title. This is the "on hover" half of the attribution rule; the
-    // [PhotoCredit] caption below supplies the visible half.
-    final attributed = credit == null
+    // Hovering any credited photograph reveals the exact file credit. Original
+    // TABANG artwork is skipped: there is no external source to reveal.
+    final attributed = credit == null || credit.isOriginal
         ? clipped
         : Tooltip(
             message: '${credit.title}\n${credit.author} · ${credit.license}',
@@ -146,7 +145,10 @@ class PhotoCredit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final credit = creditForAsset(asset, label: label);
-    if (credit == null) return const SizedBox.shrink();
+    // Original TABANG artwork (avatars, educational illustrations, the app
+    // icon) has no external author to credit, so no chip is shown at all —
+    // file paths and "TABANG original artwork" lines are noise for users.
+    if (credit == null || credit.isOriginal) return const SizedBox.shrink();
 
     final prefix = switch (credit.kind) {
       'photo' => 'Photo',
@@ -252,31 +254,22 @@ Future<void> showImageCreditDialog(
                 '${credit.author} · ${credit.license}',
                 style: TextStyle(fontSize: 12.5, color: dialogContext.textMuted),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'File: ${credit.asset}',
-                style: TextStyle(
-                  fontSize: 12,
-                  height: 1.45,
-                  fontFamily: 'monospace',
-                  color: dialogContext.textMuted,
-                ),
-              ),
+              // No asset path here: file directories are implementation
+              // detail, not something a reader needs.
               if (credit.sourceUrl != null) ...[
                 const SizedBox(height: 12),
+                Text(
+                  'Source',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: dialogContext.textColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 SelectableText(
                   credit.sourceUrl!,
                   style: const TextStyle(fontSize: 12, height: 1.45),
-                ),
-              ] else ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Created for TABANG; no external source.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.45,
-                    color: dialogContext.textMuted,
-                  ),
                 ),
               ],
             ],

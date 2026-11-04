@@ -523,49 +523,36 @@ class TabangRepository {
       .toList(growable: false)
     ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
 
-  /// Submit a volunteer-donor registration.
+  /// Register interest in becoming a volunteer donor.
   ///
-  /// The account becomes a donor immediately but stays **unverified**, which
-  /// the eligibility engine treats as not yet donatable, and the application
-  /// enters the staff queue. Returns null when the basic age/weight rules fail
-  /// or the account cannot register.
+  /// The medical interview, physical examination, blood typing and screening
+  /// happen face-to-face at the chapter, so this only records the intent to
+  /// visit (plus whether the applicant already has a donor card). The account
+  /// becomes a donor immediately but stays **unverified**, which the
+  /// eligibility engine treats as not yet donatable, and the application enters
+  /// the staff queue for the in-person verification.
   DonorApplication? submitDonorApplication({
     required String userId,
-    required BloodType? bloodType,
-    required DateTime birthDate,
-    required double weightKg,
-    required String sex,
-    required String contact,
-    required String idType,
-    required String idNumber,
-    required List<String> medicalFlags,
-    required bool declarationAccepted,
+    required bool hasExistingCard,
+    String? cardNumber,
+    BloodType? bloodType,
+    DateTime? preferredVisit,
+    String? note,
   }) {
     final user = userById(userId);
-    if (user == null || !declarationAccepted) return null;
+    if (user == null) return null;
 
-    // A community user converts here; an unverified donor may re-submit an
-    // updated form, which is why this is not restricted to community accounts.
+    // A community user converts here; an unverified donor may re-submit,
+    // which is why this is not restricted to community accounts.
     final freshApplicant = user.role.canRegisterAsDonor;
     final resubmitting =
         user.role == UserRole.donor && !user.bloodCardVerified;
     if (!freshApplicant && !resubmitting) return null;
 
-    final age = DateTime.now().difference(birthDate).inDays ~/ 365;
-    if (age < EligibilityEngine.minimumAge ||
-        age > EligibilityEngine.maximumAge) {
-      return null;
-    }
-    if (weightKg < EligibilityEngine.minimumWeightKg || weightKg > 300) {
-      return null;
-    }
-
     if (freshApplicant) {
       updateUser(user.copyWith(
         role: UserRole.donor,
         bloodType: bloodType,
-        birthDate: birthDate,
-        weightKg: weightKg,
         status: AccountStatus.unverified,
         bloodCardVerified: false,
         isAvailable: true,
@@ -573,8 +560,6 @@ class TabangRepository {
     } else {
       updateUser(user.copyWith(
         bloodType: bloodType ?? user.bloodType,
-        birthDate: birthDate,
-        weightKg: weightKg,
         status: AccountStatus.unverified,
         bloodCardVerified: false,
       ));
@@ -586,17 +571,21 @@ class TabangRepository {
       userId: userId,
       submittedAt: DateTime.now(),
       status: DonorApplicationStatus.pending,
-      sex: sex,
-      contact: contact,
-      idType: idType,
-      idNumber: idNumber,
-      medicalFlags: List.unmodifiable(medicalFlags),
-      declarationAccepted: true,
-      requestedDocuments: const [
-        'Valid government or school ID',
-        'Chapter interview and physical examination',
-        'Blood typing and infection screening',
-      ],
+      hasExistingCard: hasExistingCard,
+      cardNumber: cardNumber,
+      preferredVisit: preferredVisit,
+      note: note,
+      requestedDocuments: hasExistingCard
+          ? const [
+              'PRC blood donor card',
+              'Valid government or school ID',
+              'Chapter screening before the next donation',
+            ]
+          : const [
+              'Valid government or school ID',
+              'Chapter interview and physical examination',
+              'Blood typing and infection screening',
+            ],
     );
     _donorApplications.add(application);
     _notify();
@@ -1474,7 +1463,9 @@ class TabangRepository {
         alias: 'Noel',
         email: 'noel.villanueva@tabang.app',
         phone: '+63 906 223 1199',
-        barangay: 'Aplaya',
+        // Seeded so the map shows a real heat spread: Zone 1, Matti and
+        // Zone 3 carry several donors while the outer barangays stay low.
+        barangay: 'Zone 1',
         role: UserRole.donor,
         bloodType: BloodType.aNeg,
         birthDate: DateTime(1993, 9, 14),
@@ -1524,7 +1515,7 @@ class TabangRepository {
         alias: 'Liza',
         email: 'liza.ocampo@tabang.app',
         phone: '+63 908 442 7711',
-        barangay: 'Dawis',
+        barangay: 'Matti',
         role: UserRole.donor,
         bloodType: BloodType.oNeg,
         birthDate: DateTime(1995, 8, 17),
@@ -1649,7 +1640,7 @@ class TabangRepository {
         alias: 'Jessa',
         email: 'jessa.tupas@tabang.app',
         phone: '+63 939 224 8801',
-        barangay: 'San Roque',
+        barangay: 'Matti',
         role: UserRole.donor,
         bloodType: BloodType.bNeg,
         birthDate: DateTime(2000, 3, 5),

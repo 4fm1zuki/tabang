@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/models.dart';
@@ -1295,6 +1296,25 @@ class _ContentRailState extends State<_ContentRail> {
     );
   }
 
+  /// Mouse-wheel over the rail scrolls the rail horizontally.
+  ///
+  /// Flutter maps a vertical wheel delta to the nearest vertical scrollable,
+  /// so hovering an event-card rail and spinning the wheel used to scroll the
+  /// whole page instead of the row under the cursor.
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.hasClients) return;
+    final delta = event.scrollDelta.dy != 0
+        ? event.scrollDelta.dy
+        : event.scrollDelta.dx;
+    if (delta == 0) return;
+    final position = _controller.position;
+    final target = (_controller.offset + delta)
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if (target == _controller.offset) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {});
+    _controller.jumpTo(target);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Arrows only while the rail is hovered. Always-on buttons sat on top of
@@ -1305,6 +1325,8 @@ class _ContentRailState extends State<_ContentRail> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
+      child: Listener(
+      onPointerSignal: _handlePointerSignal,
       child: Stack(
       children: [
         Scrollbar(
@@ -1362,6 +1384,7 @@ class _ContentRailState extends State<_ContentRail> {
             ),
           ),
       ],
+      ),
       ),
     );
   }

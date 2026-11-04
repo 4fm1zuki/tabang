@@ -113,10 +113,7 @@ const List<DigosFacilityPin> digosFacilityPins = [
 ];
 
 /// Sequential donor-density ramp, re-tuned to sit on the warm paper base.
-Color digosHeatColor(int count, {required bool dark, bool selected = false}) {
-  if (selected) {
-    return dark ? DigosMapColors.selectionDark : DigosMapColors.selection;
-  }
+Color digosHeatColor(int count, {required bool dark}) {
   if (dark) {
     if (count == 0) return const Color(0xFF241C1A);
     if (count <= 2) return const Color(0xFF5B2D26);
@@ -263,7 +260,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       builder: (context, constraints) {
         _mapSize = constraints.biggest;
         return Stack(
-          clipBehavior: Clip.none,
+          clipBehavior: Clip.hardEdge,
           children: [
             FlutterMap(
               mapController: widget.controller,
@@ -436,6 +433,16 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     return null;
   }
 
+  // Label placement is memoised: hovering a barangay must not re-measure all
+  // 26 labels, and panning must not rebuild them at all.
+  List<Marker>? _labelCache;
+  double _labelCacheZoom = -1;
+  String? _labelCacheSelected;
+  bool? _labelCacheDark;
+  Map<String, int>? _labelCacheDonors;
+  Map<String, int>? _labelCacheDrives;
+  Size? _labelCacheSize;
+
   /// Barangay label markers with greedy collision rejection in screen space.
   ///
   /// The old layer drew every candidate at its centroid, which piled "Zone 1
@@ -443,6 +450,23 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   /// city proper. Labels are sorted by area (biggest first), so the large
   /// barangays always win a slot.
   List<Marker> _labelMarkers(double labelSize) {
+    final cached = _labelCache;
+    if (cached != null &&
+        _labelCacheZoom == _zoom &&
+        _labelCacheSelected == widget.selectedBarangay &&
+        _labelCacheDark == widget.mapDark &&
+        identical(_labelCacheDonors, widget.donorCounts) &&
+        identical(_labelCacheDrives, widget.driveCounts) &&
+        _labelCacheSize == _mapSize) {
+      return cached;
+    }
+    _labelCacheZoom = _zoom;
+    _labelCacheSelected = widget.selectedBarangay;
+    _labelCacheDark = widget.mapDark;
+    _labelCacheDonors = widget.donorCounts;
+    _labelCacheDrives = widget.driveCounts;
+    _labelCacheSize = _mapSize;
+
     final camera = _cameraOrNull();
     final placed = <Rect>[];
     final markers = <Marker>[];
@@ -472,7 +496,8 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
 
       if (camera != null && bounds != null) {
         final rect = _screenRect(camera, feature.centroid, width, height);
-        if (!bounds.deflate(4).overlaps(rect)) continue;
+        final canvasRect = Offset.zero & bounds;
+        if (!canvasRect.deflate(4).overlaps(rect)) continue;
         if (placed.any((other) => other.overlaps(rect))) continue;
         placed.add(rect);
       }
@@ -492,6 +517,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
         ),
       );
     }
+    _labelCache = markers;
     return markers;
   }
 

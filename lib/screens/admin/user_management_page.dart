@@ -660,11 +660,33 @@ class _UserManagementPageState extends State<UserManagementPage> {
               ),
             ],
           ),
-          if (application.medicalFlags.isNotEmpty) ...[
-            const SizedBox(height: 6),
+          const SizedBox(height: 6),
+          Text(
+            application.hasExistingCard
+                ? 'Already has a PRC donor card'
+                    '${application.cardNumber == null ? '' : ' · ${application.cardNumber}'}'
+                    ' — verify the card on site'
+                : 'Needs a new donor card — full first-time process on site',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              color: context.textMuted,
+            ),
+          ),
+          if (application.preferredVisit != null)
             Text(
-              'Medical checklist: ${application.medicalFlags.length} flagged — '
-              '${application.medicalFlags.join('; ')}',
+              'Plans to visit ${formatDate(application.preferredVisit!)}',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: context.textMuted,
+              ),
+            ),
+          if (application.note != null && application.note!.isNotEmpty)
+            Text(
+              'Note: ${application.note}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -673,7 +695,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 color: context.textMuted,
               ),
             ),
-          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: TabangSpace.sm,
@@ -769,14 +790,25 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 _applicationDetail(
                     dialogContext, 'Barangay', user?.barangay ?? '—'),
                 _applicationDetail(dialogContext, 'Blood type',
-                    user?.bloodType?.label ?? '—'),
-                _applicationDetail(dialogContext, 'Sex', application.sex),
+                    user?.bloodType?.label ?? 'Not known yet'),
                 _applicationDetail(
-                    dialogContext, 'Contact', application.contact),
+                  dialogContext,
+                  'Donor card',
+                  application.hasExistingCard
+                      ? 'Has a card'
+                          '${application.cardNumber == null ? '' : ' · ${application.cardNumber}'}'
+                      : 'Needs a new card',
+                ),
                 _applicationDetail(
-                    dialogContext,
-                    'ID',
-                    '${application.idType} · ${application.idNumber}'),
+                  dialogContext,
+                  'Planned visit',
+                  application.preferredVisit == null
+                      ? 'Not set'
+                      : formatDate(application.preferredVisit!),
+                ),
+                if (application.note != null && application.note!.isNotEmpty)
+                  _applicationDetail(
+                      dialogContext, 'Applicant note', application.note!),
                 _applicationDetail(
                   dialogContext,
                   'Submitted',
@@ -786,35 +818,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     dialogContext, 'Status', application.status.label),
                 const SizedBox(height: 8),
                 Text(
-                  'Medical-history checklist',
+                  'Medical data is collected on the PRC interview sheet at the '
+                  'chapter — the app deliberately does not store it.',
                   style: TextStyle(
                     fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: dialogContext.textColor,
+                    height: 1.45,
+                    color: dialogContext.textMuted,
                   ),
                 ),
-                const SizedBox(height: 4),
-                if (application.medicalFlags.isEmpty)
-                  Text(
-                    'No statements flagged.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: dialogContext.textMuted,
-                    ),
-                  )
-                else
-                  for (final flag in application.medicalFlags)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Text(
-                        '• $flag',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          height: 1.4,
-                          color: dialogContext.textColor,
-                        ),
-                      ),
-                    ),
                 if (application.requestedDocuments.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(

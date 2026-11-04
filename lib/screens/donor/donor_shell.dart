@@ -145,6 +145,7 @@ class _DonorShellState extends State<DonorShell> {
           onOpenRequests: () => _select(3),
           onOpenChat: () => _select(4),
           onOpenDiscover: () => _select(0),
+          onOpenBloodBank: () => _select(1),
         );
       case 3:
         return RequestsPage(
@@ -261,9 +262,15 @@ class _DonorShellState extends State<DonorShell> {
                 },
                 onSelect: _select,
                 onTogglePin: () => setState(() {
+                  // If pinning does not change the rail's width (for example
+                  // while it is already open because of hover), no slide
+                  // animation runs and onSlideEnd never fires — so the labels
+                  // must not be hidden in that case. Resetting the flag
+                  // unconditionally is what made pinning "break" the rail.
+                  final wasExpanded = wide && (_pinned || _hovering);
                   _pinned = !_pinned;
-                  // Re-reveal only after the width animation finishes.
-                  _railSettled = false;
+                  final willExpand = wide && (_pinned || _hovering);
+                  _railSettled = willExpand == wasExpanded;
                 }),
                 onToggleExpand: null,
               ),
