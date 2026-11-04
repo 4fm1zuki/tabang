@@ -16,6 +16,12 @@ class TabangBreakpoints {
 
   static const double phone = 600;
   static const double tablet = 1024;
+
+  /// Below this width the sidebar becomes a bottom navigation bar. This is the
+  /// same 1024 px line as [tablet]: anything that Desktop Chrome would open
+  /// maximised on gets the persistent sidebar the desktop layout expects,
+  /// while tablets and split windows keep the bottom bar.
+  static const double navigationRail = 1024;
 }
 
 extension TabangLayout on BuildContext {

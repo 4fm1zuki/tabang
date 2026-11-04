@@ -19,9 +19,16 @@ import '../../widgets/illustrations.dart';
 /// donor, a private coordination thread is created, and only staff can mark the
 /// request fulfilled after the donation is recorded.
 class RequestsPage extends StatefulWidget {
-  const RequestsPage({super.key, required this.user});
+  const RequestsPage({
+    super.key,
+    required this.user,
+    this.onOpenDonorHub,
+  });
 
   final AppUser user;
+
+  /// Opens Donor Hub, where the donor form and verification live.
+  final VoidCallback? onOpenDonorHub;
 
   @override
   State<RequestsPage> createState() => _RequestsPageState();
@@ -31,6 +38,10 @@ class _RequestsPageState extends State<RequestsPage> {
   final TabangRepository _repo = TabangRepository.instance;
 
   RequestUrgency? _urgencyFilter;
+
+  /// Donors get a second tab: the requests they can serve, and the donation
+  /// side (drives, eligibility, what to bring).
+  bool _donateTab = false;
 
   @override
   void initState() {
@@ -125,26 +136,77 @@ class _RequestsPageState extends State<RequestsPage> {
                       ),
                   ],
                 ),
-                const SizedBox(height: TabangSpace.xl),
+                const SizedBox(height: TabangSpace.lg),
 
-                if (_isDonor) ...[
-                  Wrap(
-                    spacing: TabangSpace.sm,
-                    runSpacing: TabangSpace.sm,
+                if (_isDonor)
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        icon: Icon(Icons.campaign_outlined, size: 16),
+                        label: Text('Requests'),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        icon: Icon(Icons.volunteer_activism_outlined, size: 16),
+                        label: Text('Donate'),
+                      ),
+                    ],
+                    selected: {_donateTab},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) =>
+                        setState(() => _donateTab = selection.first),
+                  ),
+                const SizedBox(height: TabangSpace.lg),
+
+                if (_isDonor && !_donateTab)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _urgencyChip(context, null, 'All'),
-                      ...RequestUrgency.values.map(
-                        (u) => _urgencyChip(context, u, u.label),
+                      Expanded(
+                        child: Wrap(
+                          spacing: TabangSpace.sm,
+                          runSpacing: TabangSpace.sm,
+                          children: [
+                            _urgencyChip(context, null, 'All'),
+                            ...RequestUrgency.values.map(
+                              (u) => _urgencyChip(context, u, u.label),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const HelpTip(
+                        title: 'Urgency levels',
+                        message:
+                            'Critical — the patient needs units now; the '
+                            'request is released as soon as a compatible unit '
+                            'or donor is confirmed (minutes to a few hours).\n\n'
+                            'Urgent — needed within 24–48 hours; the chapter '
+                            'schedules the next available slot or drive.\n\n'
+                            'Routine — planned use (for example before '
+                            'surgery), usually three or more days out.\n\n'
+                            'Urgency is chosen when the request is posted and '
+                            'chapter staff can adjust it.',
                       ),
                     ],
                   ),
+                if (_isDonor && !_donateTab)
                   const SizedBox(height: TabangSpace.lg),
-                ],
               ],
             ),
           ),
         ),
-        if (requests.isEmpty)
+        if (_isDonor && _donateTab)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              TabangSpace.xl,
+              0,
+              TabangSpace.xl,
+              TabangSpace.xl,
+            ),
+            sliver: SliverToBoxAdapter(child: _buildDonateTab(context)),
+          )
+        else if (requests.isEmpty)
           SliverPadding(
             padding: context.pagePadding,
             sliver: SliverToBoxAdapter(
@@ -183,6 +245,237 @@ class _RequestsPageState extends State<RequestsPage> {
     );
   }
 
+  /// The donor side of the Requests page: drives to attend, eligibility
+  /// timing, and what staff asks for before a donation.
+  Widget _buildDonateTab(BuildContext context) {
+    final user = _user;
+    final eligibility = EligibilityEngine.evaluate(user);
+    final drives = _repo.drives
+        .where((d) => d.status != 'Completed')
+        .toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!user.bloodCardVerified)
+          SurfaceCard(
+            highlighted: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.verified_user_outlined,
+                      size: 18,
+                      color: TabangColors.crimson,
+                    ),
+                    const SizedBox(width: TabangSpace.sm),
+                    Expanded(
+                      child: Text(
+                        'Finish donor verification first',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: context.textColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'You can join a drive list now, but the chapter verifies '
+                  'your blood card before you donate. Bring your ID and finish '
+                  'the interview, examination and screening.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.5,
+                    color: context.textMuted,
+                  ),
+                ),
+                const SizedBox(height: TabangSpace.md),
+                if (widget.onOpenDonorHub != null)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: widget.onOpenDonorHub,
+                      icon: const Icon(Icons.edit_note_outlined, size: 17),
+                      label: const Text('Open Donor hub'),
+                    ),
+                  ),
+              ],
+            ),
+          )
+        else
+          SurfaceCard(
+            child: Row(
+              children: [
+                Icon(
+                  eligibility.isEligible
+                      ? Icons.check_circle_outline
+                      : Icons.schedule,
+                  size: 20,
+                  color: eligibility.isEligible
+                      ? TabangColors.success
+                      : TabangColors.warning,
+                ),
+                const SizedBox(width: TabangSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        eligibility.isEligible
+                            ? 'You are eligible to donate'
+                            : 'Not yet eligible',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: context.textColor,
+                        ),
+                      ),
+                      Text(
+                        eligibility.isEligible
+                            ? 'Whole blood, platelets and plasma can all be '
+                                'accepted at the chapter today.'
+                            : eligibility.daysRemaining > 0
+                                ? 'Next window opens in '
+                                    '${eligibility.daysRemaining} day'
+                                    '${eligibility.daysRemaining == 1 ? '' : 's'}.'
+                                : 'Chapter staff will confirm your next '
+                                    'donation window.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.45,
+                          color: context.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: TabangSpace.xl),
+        const SectionLabel('Blood drives you can join'),
+        if (drives.isEmpty)
+          const EmptyState(
+            art: TabangArt.inventory,
+            title: 'No drives scheduled',
+          )
+        else
+          for (final drive in drives)
+            Padding(
+              padding: const EdgeInsets.only(bottom: TabangSpace.md),
+              child: _buildDonateDriveCard(context, drive),
+            ),
+        const SizedBox(height: TabangSpace.lg),
+        const SectionLabel('What to bring'),
+        SurfaceCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final requirement in kDonorRequirements)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 16,
+                        color: TabangColors.crimson.withValues(alpha: 0.8),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          requirement,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: context.textColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDonateDriveCard(BuildContext context, BloodDrive drive) {
+    final interested = _repo.isInterestedInDrive(drive.id, _user.id);
+    final attending = _repo.driveInterestCount(drive.id);
+
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.place,
+                size: 18,
+                color: TabangColors.crimson,
+              ),
+              const SizedBox(width: TabangSpace.sm),
+              Expanded(
+                child: Text(
+                  drive.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+              StatusPill(
+                drive.status,
+                tone: drive.status == 'Ongoing' ? Tone.success : Tone.info,
+                dense: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${drive.venue} · ${formatDateTime(drive.startsAt)}',
+            style: TextStyle(fontSize: 12.5, color: context.textMuted),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$attending donor${attending == 1 ? '' : 's'} on the chapter list · '
+            'around ${drive.expectedDonors} expected',
+            style: TextStyle(fontSize: 12, color: context.textMuted),
+          ),
+          const SizedBox(height: TabangSpace.sm),
+          SizedBox(
+            width: double.infinity,
+            child: interested
+                ? OutlinedButton.icon(
+                    onPressed: () =>
+                        setState(() => _repo.toggleDriveInterest(drive.id, _user.id)),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('On the list — tap to leave'),
+                  )
+                : FilledButton.tonalIcon(
+                    onPressed: () =>
+                        setState(() => _repo.toggleDriveInterest(drive.id, _user.id)),
+                    icon: const Icon(Icons.volunteer_activism_outlined, size: 16),
+                    label: const Text('Join this drive'),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _urgencyChip(
     BuildContext context,
     RequestUrgency? urgency,
@@ -195,7 +488,7 @@ class _RequestsPageState extends State<RequestsPage> {
       showCheckmark: false,
       selectedColor: TabangColors.crimson,
       labelStyle: TextStyle(
-        fontSize: 11,
+        fontSize: 12.5,
         fontWeight: FontWeight.w600,
         color: selected ? Colors.white : context.textColor,
       ),
@@ -221,133 +514,202 @@ class _RequestsPageState extends State<RequestsPage> {
         )
         .length;
 
+    final open = request.status == RequestStatus.open;
+    final progress = request.unitsNeeded == 0
+        ? 0.0
+        : (request.unitsFulfilled / request.unitsNeeded).clamp(0.0, 1.0);
+
     return SurfaceCard(
-      highlighted: request.urgency == RequestUrgency.critical &&
-          request.status == RequestStatus.open,
+      highlighted: request.urgency == RequestUrgency.critical && open,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header: one chip, one title, one urgency marker. The old row packed
+          // up to four pills next to the patient alias and read as noise.
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              BloodTypeChip(request.bloodType, size: 40),
+              BloodTypeChip(request.bloodType, size: 44),
               const SizedBox(width: TabangSpace.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Row(
                       children: [
-                        Text(
-                          request.patientAlias,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: context.textColor,
+                        Flexible(
+                          child: Text(
+                            request.patientAlias,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              color: context.textColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        StatusPill(
-                          request.urgency.label,
-                          tone: toneForUrgency(request.urgency),
-                          dense: true,
-                        ),
-                        StatusPill(
-                          request.status.label,
-                          tone: request.status == RequestStatus.open
-                              ? Tone.info
-                              : Tone.neutral,
-                          dense: true,
-                        ),
-                        StatusPill(
-                          request.source.label,
-                          tone: request.source == RequestSource.bloodBank
-                              ? Tone.brand
-                              : Tone.neutral,
-                          dense: true,
-                        ),
-                        if (isOwn)
-                          const StatusPill(
-                            'YOURS',
-                            tone: Tone.brand,
-                            dense: true,
+                        if (isOwn) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '· your request',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: context.textMuted,
+                            ),
                           ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${request.component.label} · ${request.unitsNeeded} '
-                      'unit${request.unitsNeeded == 1 ? '' : 's'} · '
-                      '${request.hospital}',
+                      '${request.component.label} · '
+                      '${request.unitsNeeded} unit'
+                      '${request.unitsNeeded == 1 ? '' : 's'}',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                         color: context.textMuted,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Wrap(
-                      spacing: TabangSpace.md,
-                      runSpacing: 2,
-                      children: [
-                        _meta(
-                          context,
-                          Icons.place_outlined,
-                          request.barangay,
-                        ),
-                        _meta(
-                          context,
-                          Icons.schedule,
-                          formatRelative(request.createdAt),
-                        ),
-                        _meta(
-                          context,
-                          Icons.check_circle_outline,
-                          '${request.unitsFulfilled} of '
-                              '${request.unitsNeeded} fulfilled',
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: TabangSpace.sm),
+              StatusPill(
+                request.urgency.label,
+                tone: toneForUrgency(request.urgency),
+                dense: true,
+              ),
+              // Details live behind the three-dot menu so the card stays
+              // scannable; the menu is the only place the full record and the
+              // cancel action are repeated.
+              PopupMenuButton<String>(
+                tooltip: 'Request options',
+                icon: Icon(
+                  Icons.more_vert,
+                  size: 19,
+                  color: context.textMuted,
+                ),
+                onSelected: (value) {
+                  if (value == 'details') {
+                    _showRequestDetails(context, request, isOwn: isOwn);
+                  } else if (value == 'cancel') {
+                    final ok = _repo.cancelRequest(
+                      request.id,
+                      actorId: _user.id,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Request cancelled.'
+                              : 'This request can no longer be cancelled.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'details',
+                    child: Text('View details'),
+                  ),
+                  if (isOwn &&
+                      request.status != RequestStatus.fulfilled &&
+                      request.status != RequestStatus.cancelled)
+                    const PopupMenuItem(
+                      value: 'cancel',
+                      child: Text('Cancel request'),
+                    ),
+                ],
+              ),
             ],
           ),
+          const SizedBox(height: TabangSpace.md),
+
+          // Location and time get their own quiet line.
+          Row(
+            children: [
+              Expanded(
+                child: _meta(
+                  context,
+                  Icons.local_hospital_outlined,
+                  request.hospital,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Wrap(
+            spacing: TabangSpace.lg,
+            runSpacing: 4,
+            children: [
+              _meta(context, Icons.place_outlined, request.barangay),
+              _meta(context, Icons.schedule, formatRelative(request.createdAt)),
+            ],
+          ),
+
           if (request.note != null) ...[
             const SizedBox(height: TabangSpace.md),
             Container(
-              padding: const EdgeInsets.all(TabangSpace.sm),
+              width: double.infinity,
+              padding: const EdgeInsets.all(TabangSpace.md),
               decoration: BoxDecoration(
                 color: context.surfaceAlt,
-                borderRadius: BorderRadius.circular(TabangRadius.xs),
+                borderRadius: BorderRadius.circular(TabangRadius.sm),
               ),
               child: Text(
                 request.note!,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12.5,
                   height: 1.5,
-                  color: context.textMuted,
+                  color: context.textColor,
                 ),
               ),
             ),
           ],
+
           const SizedBox(height: TabangSpace.md),
-          if (request.source == RequestSource.bloodBank)
-            _sourceNotice(
-              context,
-              Icons.local_hospital_outlined,
-              '$compatibleUnits compatible unit'
-                  '${compatibleUnits == 1 ? '' : 's'} in stock. '
-                  'Chapter staff will process this request.',
-            )
-          else
-            _sourceNotice(
-              context,
-              Icons.people_outline,
-              '$compatibleDonors compatible eligible donor'
-                  '${compatibleDonors == 1 ? '' : 's'} can still respond.',
+          // Fulfilment is one line with a bar instead of a third meta pill.
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(TabangRadius.pill),
+                  child: LinearProgressIndicator(
+                    minHeight: 6,
+                    value: progress,
+                    color: progress >= 1
+                        ? TabangColors.success
+                        : TabangColors.crimson,
+                  ),
+                ),
+              ),
+              const SizedBox(width: TabangSpace.sm),
+              Text(
+                '${request.unitsFulfilled} of ${request.unitsNeeded} fulfilled',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: TabangSpace.md),
+          // Status and source read as a single sentence, not two pills.
+          Text(
+            '${request.status.label} · '
+            '${request.source == RequestSource.bloodBank ? 'Blood bank' : 'Donor network'}'
+            '${request.source == RequestSource.bloodBank ? ' · $compatibleUnits compatible unit${compatibleUnits == 1 ? '' : 's'} in stock, processed by chapter staff' : ' · $compatibleDonors compatible eligible donor${compatibleDonors == 1 ? '' : 's'} can respond'}',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              color: context.textMuted,
             ),
+          ),
           if (isOwn && responses.isNotEmpty) ...[
             const SizedBox(height: TabangSpace.md),
             Divider(color: context.border),
@@ -355,10 +717,10 @@ class _RequestsPageState extends State<RequestsPage> {
             Text(
               'Donor responses (${responses.length})',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w700,
-                color: context.textMuted,
-                letterSpacing: 0.4,
+                color: context.textColor,
+                letterSpacing: 0.2,
               ),
             ),
             const SizedBox(height: TabangSpace.sm),
@@ -435,29 +797,208 @@ class _RequestsPageState extends State<RequestsPage> {
     );
   }
 
+  /// Full record for one request, opened from the card's three-dot menu.
+  void _showRequestDetails(
+    BuildContext context,
+    BloodRequest request, {
+    required bool isOwn,
+  }) {
+    final responses = _repo.responsesFor(request.id);
+    final compatibleDonors = _repo.compatibleDonorsForRequest(request).length;
+    final compatibleUnits = _repo
+        .compatibleUnitsFor(
+          recipientType: request.bloodType,
+          component: request.component,
+        )
+        .length;
+    final myResponse =
+        _isDonor ? _repo.responseForDonor(request.id, _user.id) : null;
+    final canRespond = _isDonor &&
+        request.status == RequestStatus.open &&
+        request.source == RequestSource.donorNetwork &&
+        _canRespond(request);
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            BloodTypeChip(request.bloodType, size: 32),
+            const SizedBox(width: TabangSpace.md),
+            Expanded(
+              child: Text(
+                request.patientAlias,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            StatusPill(
+              request.urgency.label,
+              tone: toneForUrgency(request.urgency),
+              dense: true,
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _detail(dialogContext, 'Request ID', request.id),
+                _detail(dialogContext, 'Component', request.component.label),
+                _detail(
+                  dialogContext,
+                  'Units',
+                  '${request.unitsFulfilled} of ${request.unitsNeeded} '
+                      'fulfilled',
+                ),
+                _detail(dialogContext, 'Patient facility', request.hospital),
+                _detail(dialogContext, 'Barangay', request.barangay),
+                _detail(dialogContext, 'Urgency', request.urgency.label),
+                _detail(dialogContext, 'Status', request.status.label),
+                _detail(dialogContext, 'Posted',
+                    formatRelative(request.createdAt)),
+                _detail(
+                  dialogContext,
+                  'Channel',
+                  request.source == RequestSource.bloodBank
+                      ? 'Blood bank · $compatibleUnits compatible unit'
+                          '${compatibleUnits == 1 ? '' : 's'} in stock'
+                      : 'Donor network · $compatibleDonors compatible '
+                          'eligible donor'
+                          '${compatibleDonors == 1 ? '' : 's'}',
+                ),
+                if (request.note != null && request.note!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Clinical note',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: dialogContext.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(TabangSpace.md),
+                    decoration: BoxDecoration(
+                      color: dialogContext.surfaceAlt,
+                      borderRadius: BorderRadius.circular(TabangRadius.sm),
+                    ),
+                    child: Text(
+                      request.note!,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.5,
+                        color: dialogContext.textColor,
+                      ),
+                    ),
+                  ),
+                ],
+                if (isOwn && responses.isNotEmpty) ...[
+                  const SizedBox(height: TabangSpace.md),
+                  Text(
+                    'Donor responses (${responses.length})',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: dialogContext.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...responses.map(
+                    (response) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• ${response.donorAlias} · ${response.status.label} · '
+                        '${formatRelative(response.createdAt)}',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: dialogContext.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (myResponse != null) ...[
+                  const SizedBox(height: TabangSpace.md),
+                  Text(
+                    'Your response: ${myResponse.status.label}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: dialogContext.textColor,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          if (canRespond)
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _respondToRequest(context, request);
+              },
+              icon: const Icon(Icons.volunteer_activism, size: 16),
+              label: Text(_respondLabel(request)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detail(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 118,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: context.textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _meta(BuildContext context, IconData icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 11, color: context.textMuted),
-        const SizedBox(width: 3),
-        Text(
-          text,
-          style: TextStyle(fontSize: 11, color: context.textMuted),
-        ),
-      ],
-    );
-  }
-
-  Widget _sourceNotice(BuildContext context, IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 13, color: context.textMuted),
-        const SizedBox(width: 4),
-        Expanded(
+        Icon(icon, size: 14, color: context.textMuted),
+        const SizedBox(width: 5),
+        Flexible(
           child: Text(
             text,
-            style: TextStyle(fontSize: 11, color: context.textMuted),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: context.textMuted,
+            ),
           ),
         ),
       ],

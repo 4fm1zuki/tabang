@@ -78,7 +78,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
       case UserRole.admin:
         return true;
       case UserRole.staff:
-        return user.role == UserRole.donor || user.role == UserRole.recipient;
+        return user.role == UserRole.user ||
+            user.role == UserRole.donor ||
+            user.role == UserRole.recipient;
+      case UserRole.user:
       case UserRole.donor:
       case UserRole.recipient:
         return false;
@@ -132,7 +135,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         'TABANG generates a temporary password and shows it '
                         'once for you to hand over.',
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12.5,
                           height: 1.5,
                           color: context.textMuted,
                         ),
@@ -393,7 +396,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 'This password is shown once and is stored only as a hash. '
                 'Ask the user to change it after signing in.',
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11.5,
                   height: 1.5,
                   color: context.textMuted,
                 ),
@@ -454,6 +457,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
             ],
           ),
           const SizedBox(height: TabangSpace.xl),
+
+          // Donor registrations submitted from Donor Hub. They are a different
+          // queue from account status: the applicant is already a user, staff
+          // just has to verify the blood card before they can donate.
+          if (_repo.openDonorApplications.isNotEmpty) ...[
+            _buildApplicationsCard(context, _repo.openDonorApplications),
+            const SizedBox(height: TabangSpace.lg),
+          ],
 
           Wrap(
             spacing: TabangSpace.md,
@@ -542,6 +553,349 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
+  Widget _buildApplicationsCard(
+    BuildContext context,
+    List<DonorApplication> applications,
+  ) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.how_to_reg_outlined,
+                size: 18,
+                color: TabangColors.crimson,
+              ),
+              const SizedBox(width: TabangSpace.sm),
+              Expanded(
+                child: Text(
+                  'Donor registrations awaiting staff',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+              StatusPill(
+                '${applications.length}',
+                tone: Tone.warning,
+                dense: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'These users already have accounts; verifying the blood card is '
+            'what lets them donate and appear in the directory. Interview them '
+            'and complete the screening before verifying.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.5,
+              color: context.textMuted,
+            ),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          for (final application in applications)
+            _applicationRow(context, application),
+        ],
+      ),
+    );
+  }
+
+  Widget _applicationRow(BuildContext context, DonorApplication application) {
+    final user = _repo.userById(application.userId);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: TabangSpace.sm),
+      padding: const EdgeInsets.all(TabangSpace.md),
+      decoration: BoxDecoration(
+        color: context.surfaceAlt,
+        borderRadius: BorderRadius.circular(TabangRadius.sm),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              BloodTypeChip(user?.bloodType ?? BloodType.oPos, size: 30),
+              const SizedBox(width: TabangSpace.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.fullName ?? application.userId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                    ),
+                    Text(
+                      '${user?.alias ?? ''} · form ${application.id} · '
+                      '${formatRelative(application.submittedAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              StatusPill(
+                application.status.label,
+                tone: application.status ==
+                        DonorApplicationStatus.documentsRequested
+                    ? Tone.info
+                    : Tone.warning,
+                dense: true,
+              ),
+            ],
+          ),
+          if (application.medicalFlags.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Medical checklist: ${application.medicalFlags.length} flagged — '
+              '${application.medicalFlags.join('; ')}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: context.textMuted,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: TabangSpace.sm,
+            runSpacing: TabangSpace.sm,
+            children: [
+              FilledButton.icon(
+                onPressed: () => _decideApplication(
+                  context,
+                  application,
+                  DonorApplicationStatus.verified,
+                  note: 'Verified at the chapter.',
+                ),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 38),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: TabangSpace.md),
+                ),
+                icon: const Icon(Icons.verified_outlined, size: 16),
+                label: const Text('Verify donor'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _decideApplication(
+                  context,
+                  application,
+                  DonorApplicationStatus.documentsRequested,
+                  note: 'Please present your ID and complete the screening.',
+                  requestedDocuments: kDonorRequirements,
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 38),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: TabangSpace.md),
+                ),
+                icon: const Icon(Icons.request_page_outlined, size: 16),
+                label: const Text('Request documents'),
+              ),
+              TextButton.icon(
+                onPressed: () => _showApplicationDetails(context, application),
+                icon: const Icon(Icons.article_outlined, size: 16),
+                label: const Text('View form'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _decideApplication(
+    BuildContext context,
+    DonorApplication application,
+    DonorApplicationStatus status, {
+    String? note,
+    List<String>? requestedDocuments,
+  }) {
+    _repo.setDonorApplicationStatus(
+      application.userId,
+      status,
+      note: note,
+      requestedDocuments: requestedDocuments,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          status == DonorApplicationStatus.verified
+              ? 'Donor verified. They can donate from their next eligible date.'
+              : 'Applicant notified: ${status.label.toLowerCase()}.',
+        ),
+      ),
+    );
+  }
+
+  void _showApplicationDetails(
+    BuildContext context,
+    DonorApplication application,
+  ) {
+    final user = _repo.userById(application.userId);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Donor form ${application.id}'),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _applicationDetail(dialogContext, 'Applicant',
+                    user?.fullName ?? application.userId),
+                _applicationDetail(
+                    dialogContext, 'Alias', user?.alias ?? '—'),
+                _applicationDetail(
+                    dialogContext, 'Barangay', user?.barangay ?? '—'),
+                _applicationDetail(dialogContext, 'Blood type',
+                    user?.bloodType?.label ?? '—'),
+                _applicationDetail(dialogContext, 'Sex', application.sex),
+                _applicationDetail(
+                    dialogContext, 'Contact', application.contact),
+                _applicationDetail(
+                    dialogContext,
+                    'ID',
+                    '${application.idType} · ${application.idNumber}'),
+                _applicationDetail(
+                  dialogContext,
+                  'Submitted',
+                  formatRelative(application.submittedAt),
+                ),
+                _applicationDetail(
+                    dialogContext, 'Status', application.status.label),
+                const SizedBox(height: 8),
+                Text(
+                  'Medical-history checklist',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: dialogContext.textColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (application.medicalFlags.isEmpty)
+                  Text(
+                    'No statements flagged.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: dialogContext.textMuted,
+                    ),
+                  )
+                else
+                  for (final flag in application.medicalFlags)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Text(
+                        '• $flag',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: dialogContext.textColor,
+                        ),
+                      ),
+                    ),
+                if (application.requestedDocuments.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Requested documents',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: dialogContext.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  for (final document in application.requestedDocuments)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Text(
+                        '• $document',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: dialogContext.textMuted,
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _decideApplication(
+                context,
+                application,
+                DonorApplicationStatus.rejected,
+                note: 'Not accepted at this time.',
+              );
+            },
+            child: const Text(
+              'Not accepted',
+              style: TextStyle(color: TabangColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _applicationDetail(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: context.textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildUserCard(BuildContext context, AppUser user) {
     final eligibility = EligibilityEngine.evaluate(user);
     final isDonor = user.role == UserRole.donor;
@@ -608,7 +962,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     Text(
                       '${user.alias} · ${user.email} · ${user.barangay}',
                       style:
-                          TextStyle(fontSize: 11, color: context.textMuted),
+                          TextStyle(fontSize: 12, color: context.textMuted),
                     ),
                     if (isDonor) ...[
                       const SizedBox(height: 3),
@@ -620,7 +974,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             Text(
                               user.bloodType!.label,
                               style: const TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                                 color: TabangColors.crimson,
                               ),
@@ -629,7 +983,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             Text(
                               '${user.weightKg!.toStringAsFixed(0)} kg',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 11,
                                 color: context.textMuted,
                               ),
                             ),
@@ -637,7 +991,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             '${user.totalDonations} donations · '
                             'RBC: ${eligibility.summary}',
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 11.5,
                               color: eligibility.isEligible
                                   ? TabangColors.success
                                   : context.textMuted,
@@ -647,7 +1001,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             Text(
                               'last: ${user.lastDonationComponent!.label}',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 11,
                                 color: context.textMuted,
                               ),
                             ),
@@ -659,7 +1013,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       Text(
                         'Reason: ${user.suspensionReason}',
                         style: const TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 11.5,
                           color: TabangColors.danger,
                         ),
                       ),

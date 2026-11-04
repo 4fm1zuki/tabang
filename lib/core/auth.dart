@@ -92,6 +92,7 @@ class AuthService {
     _credentials['iverson.briones@tabang.app'] = _hash('donor1234');
     _credentials['tere.santos@tabang.app'] = _hash('donor1234');
     _credentials['maria.santos@tabang.app'] = _hash('recipient1234');
+    _credentials['community@tabang.app'] = _hash('community1234');
     _credentials['staff@tabang.app'] = _hash('staff1234');
     _credentials['admin@tabang.app'] = _hash('admin1234');
   }
@@ -134,7 +135,9 @@ class AuthService {
 
   /// Create an account and start a session.
   ///
-  /// Self-registration is limited to donor and recipient roles.
+  /// Self-registration always creates a [UserRole.user] community account.
+  /// Donor status is a later, opt-in upgrade so new users can request blood and
+  /// browse safely before exposing themselves in the donor directory.
   AuthResult register({
     required String fullName,
     required String alias,
@@ -142,7 +145,7 @@ class AuthService {
     required String password,
     required String phone,
     required String barangay,
-    required UserRole role,
+    UserRole role = UserRole.user,
     BloodType? bloodType,
     DateTime? birthDate,
     double? weightKg,
@@ -169,6 +172,12 @@ class AuthService {
       return AuthResult.failure(
         'Administrative accounts are provisioned by the Red Cross chapter '
         'and cannot be self-registered.',
+      );
+    }
+    if (role != UserRole.user) {
+      return AuthResult.failure(
+        'Create a community account first, then register as a donor from '
+        'your profile.',
       );
     }
     if (role == UserRole.donor && bloodType == null) {
@@ -328,6 +337,54 @@ class AuthService {
       (_) => alphabet[random.nextInt(alphabet.length)],
     ).join();
     return 'tab-$body';
+  }
+
+  /// Register the signed-in community user as a volunteer donor.
+  ///
+  /// The record starts unverified: chapter staff must review the blood card
+  /// before the donor becomes visible in matching.
+  AuthResult registerAsDonor({
+    required String userId,
+    required BloodType bloodType,
+    required DateTime birthDate,
+    required double weightKg,
+  }) {
+    final user = _repo.userById(userId);
+    if (user == null) {
+      return AuthResult.failure('Sign in before registering as a donor.');
+    }
+    if (user.role == UserRole.donor) {
+      return AuthResult.failure('This account is already a donor.');
+    }
+    if (!user.role.canRegisterAsDonor) {
+      return AuthResult.failure(
+        'Staff and administrator accounts cannot register as donors.',
+      );
+    }
+    final age = _ageOn(birthDate, DateTime.now());
+    if (age < EligibilityEngine.minimumAge) {
+      return AuthResult.failure(
+        'Donors must be at least ${EligibilityEngine.minimumAge} years old.',
+      );
+    }
+    if (age > EligibilityEngine.maximumAge) {
+      return AuthResult.failure(
+        'Donors must be ${EligibilityEngine.maximumAge} years old or younger.',
+      );
+    }
+    if (weightKg < EligibilityEngine.minimumWeightKg || weightKg > 300) {
+      return AuthResult.failure(
+        'Enter a weight of at least ${EligibilityEngine.minimumWeightKg.toInt()} kg.',
+      );
+    }
+    final ok = _repo.upgradeToDonor(
+      userId: userId,
+      bloodType: bloodType,
+      birthDate: birthDate,
+      weightKg: weightKg,
+    );
+    if (!ok) return AuthResult.failure('Could not update the donor profile.');
+    return AuthResult.success(_repo.userById(userId)!);
   }
 
   void signOut() => _repo.signOut();

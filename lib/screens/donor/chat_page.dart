@@ -6,6 +6,7 @@ import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
+import '../../widgets/photo.dart';
 
 /// Messaging between donors and recipients.
 ///
@@ -181,31 +182,49 @@ class _ChatPageState extends State<ChatPage> {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(TabangSpace.lg),
+            padding: const EdgeInsets.fromLTRB(
+              TabangSpace.lg,
+              TabangSpace.lg,
+              TabangSpace.lg,
+              TabangSpace.md,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Messages',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: context.textColor,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Conversations',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: context.textColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (threads.isNotEmpty)
+                      StatusPill(
+                        '${threads.length}',
+                        tone: Tone.neutral,
+                        dense: true,
+                      ),
+                  ],
                 ),
-                const SizedBox(height: TabangSpace.sm),
+                const SizedBox(height: TabangSpace.md),
                 TextField(
                   controller: _search,
                   onChanged: (v) => setState(() => _query = v),
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 13.5),
                   decoration: InputDecoration(
-                    hintText: 'Search conversations',
+                    hintText: 'Search people or messages',
                     isDense: true,
-                    prefixIcon: const Icon(Icons.search, size: 16),
+                    prefixIcon: const Icon(Icons.search, size: 17),
                     suffixIcon: _query.isEmpty
                         ? null
                         : IconButton(
-                            icon: const Icon(Icons.close, size: 14),
+                            tooltip: 'Clear search',
+                            icon: const Icon(Icons.close, size: 15),
                             onPressed: () {
                               _search.clear();
                               setState(() => _query = '');
@@ -237,29 +256,44 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildThreadTile(BuildContext context, ChatThread thread) {
     final active = _active?.id == thread.id;
     final last = thread.lastMessage;
+    final other = _otherUser(thread);
+    final type = other?.bloodType;
 
+    // A left accent bar marks the open thread. The old full-row pink fill made
+    // every conversation look selected once the page had focus.
     return Material(
       color: active
-          ? (context.isDark ? const Color(0xFF3A1917) : TabangColors.crimsonSoft)
+          ? (context.isDark
+              ? const Color(0xFF331715)
+              : TabangColors.crimsonSoft.withValues(alpha: 0.55))
           : Colors.transparent,
       child: InkWell(
         onTap: () => setState(() => _selectedThreadId = thread.id),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: TabangSpace.lg,
-            vertical: TabangSpace.md,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: active ? TabangColors.crimson : Colors.transparent,
+                width: 3,
+              ),
+              bottom: BorderSide(color: context.border.withValues(alpha: 0.6)),
+            ),
           ),
+          padding: const EdgeInsets.fromLTRB(13, TabangSpace.md, TabangSpace.lg,
+              TabangSpace.md),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: TabangColors.crimson,
-                child: Text(
-                  _displayName(thread).substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              ClipOval(
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: TabangPhoto(
+                    other?.photoAsset,
+                    semanticLabel: '${_displayName(thread)} profile illustration',
+                    creditLabel: _displayName(thread),
+                    fallbackIcon: Icons.person_outline,
+                    fallbackIconSize: 20,
                   ),
                 ),
               ),
@@ -270,35 +304,85 @@ class _ChatPageState extends State<ChatPage> {
                   children: [
                     Row(
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
                             _displayName(thread),
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: context.textColor,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (_isBlocked(thread))
+                        if (thread.identityRevealed) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.lock_open,
+                              size: 12, color: TabangColors.teal),
+                        ],
+                        if (_isBlocked(thread)) ...[
+                          const SizedBox(width: 4),
                           const Icon(Icons.block,
                               size: 12, color: TabangColors.danger),
-                        if (thread.hasFlaggedMessages)
+                        ],
+                        if (thread.hasFlaggedMessages) ...[
+                          const SizedBox(width: 4),
                           const StatusPill('!', tone: Tone.danger, dense: true),
+                        ],
                         if (thread.isMuted) ...[
                           const SizedBox(width: 4),
                           Icon(Icons.volume_off,
                               size: 12, color: context.textMuted),
                         ],
+                        const Spacer(),
+                        if (last != null)
+                          Text(
+                            formatRelative(last.sentAt),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.textMuted,
+                            ),
+                          ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       last?.text ?? 'No messages yet',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, color: context.textMuted),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: context.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        if (type != null) ...[
+                          BloodTypeChip(type, size: 20),
+                          const SizedBox(width: 6),
+                        ],
+                        StatusPill(
+                          thread.identityRevealed
+                              ? 'Identities shared'
+                              : 'Identity protected',
+                          tone: thread.identityRevealed
+                              ? Tone.success
+                              : Tone.neutral,
+                          dense: true,
+                        ),
+                        const Spacer(),
+                        if (last != null && last.senderId == widget.user.id)
+                          Text(
+                            'You',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: context.textMuted,
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -395,15 +479,17 @@ class _ChatPageState extends State<ChatPage> {
                   icon: const Icon(Icons.arrow_back, size: 18),
                   onPressed: onBack,
                 ),
-              CircleAvatar(
-                radius: 17,
-                backgroundColor: TabangColors.crimson,
-                child: Text(
-                  _displayName(thread).substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+              ClipOval(
+                child: SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: TabangPhoto(
+                    other?.photoAsset,
+                    semanticLabel:
+                        '${_displayName(thread)} profile illustration',
+                    creditLabel: _displayName(thread),
+                    fallbackIcon: Icons.person_outline,
+                    fallbackIconSize: 20,
                   ),
                 ),
               ),
@@ -412,13 +498,25 @@ class _ChatPageState extends State<ChatPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _displayName(thread),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: context.textColor,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _displayName(thread),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              color: context.textColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (other?.bloodType != null) ...[
+                          const SizedBox(width: 6),
+                          BloodTypeChip(other!.bloodType!, size: 20),
+                        ],
+                      ],
                     ),
                     Row(
                       children: [
@@ -426,10 +524,12 @@ class _ChatPageState extends State<ChatPage> {
                           thread.identityRevealed
                               ? Icons.lock_open
                               : Icons.lock_outline,
-                          size: 10,
-                          color: context.textMuted,
+                          size: 12,
+                          color: thread.identityRevealed
+                              ? TabangColors.teal
+                              : context.textMuted,
                         ),
-                        const SizedBox(width: 3),
+                        const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             thread.identityRevealed
@@ -442,7 +542,7 @@ class _ChatPageState extends State<ChatPage> {
                                         : 'Identity protected',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 11.5,
                               color: context.textMuted,
                             ),
                           ),
@@ -569,8 +669,11 @@ class _ChatPageState extends State<ChatPage> {
                     controller: _scroll,
                     padding: context.pagePadding,
                     itemCount: messages.length,
-                    itemBuilder: (context, i) =>
-                        _buildBubble(context, messages[i]),
+                    itemBuilder: (context, i) => _buildBubble(
+                      context,
+                      messages[i],
+                      previous: i > 0 ? messages[i - 1] : null,
+                    ),
                   ),
           ),
         ),
@@ -616,65 +719,93 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildBubble(BuildContext context, ChatMessage message) {
+  Widget _buildBubble(
+    BuildContext context,
+    ChatMessage message, {
+    ChatMessage? previous,
+  }) {
     final mine = message.senderId == widget.user.id;
     final flagged = message.flag != ModerationFlag.clean;
+    // Name the sender only when the speaker changes, the way chat apps group
+    // consecutive messages. It keeps the double-blind aliases visible without
+    // repeating them on every bubble.
+    final showAlias =
+        !mine && (previous == null || previous.senderId != message.senderId);
 
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: TabangSpace.md),
-        constraints: const BoxConstraints(maxWidth: 460),
-        padding: const EdgeInsets.symmetric(
-          horizontal: TabangSpace.md,
-          vertical: TabangSpace.sm,
-        ),
-        decoration: BoxDecoration(
-          color: mine ? TabangColors.crimson : context.surface,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(TabangRadius.md),
-            topRight: const Radius.circular(TabangRadius.md),
-            bottomLeft: Radius.circular(mine ? TabangRadius.md : 3),
-            bottomRight: Radius.circular(mine ? 3 : TabangRadius.md),
-          ),
-          border: mine ? null : Border.all(color: context.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.5,
-                color: mine ? Colors.white : context.textColor,
+      child: Column(
+        crossAxisAlignment:
+            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (showAlias) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 4),
+              child: Text(
+                message.senderAlias,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: context.textMuted,
+                ),
               ),
             ),
-            const SizedBox(height: 3),
-            Row(
-              mainAxisSize: MainAxisSize.min,
+          ],
+          Container(
+            margin: const EdgeInsets.only(bottom: TabangSpace.md),
+            constraints: const BoxConstraints(maxWidth: 460),
+            padding: const EdgeInsets.symmetric(
+              horizontal: TabangSpace.md,
+              vertical: 10,
+            ),
+            decoration: BoxDecoration(
+              color: mine ? TabangColors.crimson : context.surface,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(TabangRadius.md),
+                topRight: const Radius.circular(TabangRadius.md),
+                bottomLeft: Radius.circular(mine ? TabangRadius.md : 3),
+                bottomRight: Radius.circular(mine ? 3 : TabangRadius.md),
+              ),
+              border: mine ? null : Border.all(color: context.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  formatRelative(message.sentAt),
+                  message.text,
                   style: TextStyle(
-                    fontSize: 9,
-                    color: mine
-                        ? Colors.white.withValues(alpha: 0.7)
-                        : context.textMuted,
+                    fontSize: 13.5,
+                    height: 1.45,
+                    color: mine ? Colors.white : context.textColor,
                   ),
                 ),
-                if (flagged) ...[
-                  const SizedBox(width: 5),
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    size: 10,
-                    color: mine ? Colors.white : TabangColors.danger,
-                  ),
-                ],
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      formatRelative(message.sentAt),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: mine
+                            ? Colors.white.withValues(alpha: 0.78)
+                            : context.textMuted,
+                      ),
+                    ),
+                    if (flagged) ...[
+                      const SizedBox(width: 5),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 12,
+                        color: mine ? Colors.white : TabangColors.danger,
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

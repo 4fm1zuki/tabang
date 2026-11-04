@@ -33,10 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _birthDateController = TextEditingController();
-  final _weightController = TextEditingController();
 
-  UserRole _role = UserRole.donor;
-  BloodType? _bloodType;
   String? _barangay;
   DateTime? _birthDate;
   bool _obscure = true;
@@ -54,7 +51,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _phoneController.dispose();
     _birthDateController.dispose();
-    _weightController.dispose();
     super.dispose();
   }
 
@@ -97,12 +93,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       password: _passwordController.text,
       phone: _phoneController.text,
       barangay: _barangay!,
-      role: _role,
-      bloodType: _bloodType,
       birthDate: _birthDate,
-      weightKg: _role == UserRole.donor
-          ? double.tryParse(_weightController.text.trim())
-          : null,
     );
 
     if (!mounted) return;
@@ -157,6 +148,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: TabangPhoto(
                             'assets/branding/app_icon.png',
                             semanticLabel: 'TABANG app icon',
+                            creditLabel: 'TABANG launcher icon',
                             fallbackIcon: Icons.water_drop,
                             fallbackIconSize: 20,
                           ),
@@ -179,6 +171,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: PhotoCredit('assets/branding/app_icon.png'),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -228,34 +224,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
 
                   if (_step == 0) ...[
-                    _label(context, 'I am registering as'),
-                  const SizedBox(height: TabangSpace.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _roleCard(
-                          context,
-                          UserRole.donor,
-                          Icons.bloodtype_outlined,
-                          'Voluntary Donor',
-                          'I want to give blood',
+                    Container(
+                      padding: const EdgeInsets.all(TabangSpace.md),
+                      decoration: BoxDecoration(
+                        color: context.isDark
+                            ? TabangColors.crimson.withValues(alpha: 0.16)
+                            : TabangColors.crimsonSoft,
+                        borderRadius:
+                            BorderRadius.circular(TabangRadius.md),
+                        border: Border.all(
+                          color: TabangColors.crimson.withValues(alpha: 0.3),
                         ),
                       ),
-                      const SizedBox(width: TabangSpace.md),
-                      Expanded(
-                        child: _roleCard(
-                          context,
-                          UserRole.recipient,
-                          Icons.person_search_outlined,
-                          'Recipient',
-                          'I need blood for a patient',
-                        ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.groups_2_outlined,
+                            size: 20,
+                            color: TabangColors.crimson,
+                          ),
+                          const SizedBox(width: TabangSpace.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Community account',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: context.textColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'You can request blood, browse donors and '
+                                  'chat right away. You can register as a '
+                                  'volunteer donor later from your profile.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    height: 1.45,
+                                    color: context.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: TabangSpace.xl),
-
-                  _label(context, 'Personal details'),
+                    ),
+                    const SizedBox(height: TabangSpace.xl),
+                    _label(context, 'Personal details'),
                   const SizedBox(height: TabangSpace.sm),
                   TextFormField(
                     controller: _fullNameController,
@@ -360,49 +380,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     validator: (v) => v == null ? 'Select your barangay' : null,
                   ),
 
-                  if (_role == UserRole.donor) ...[
-                    const SizedBox(height: TabangSpace.md),
-                    DropdownButtonFormField<BloodType>(
-                      initialValue: _bloodType,
-                      decoration: const InputDecoration(
-                        labelText: 'Blood type',
-                        prefixIcon: Icon(Icons.water_drop_outlined, size: 18),
-                      ),
-                      items: BloodType.values
-                          .map((t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(t.label),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => _bloodType = v),
-                      validator: (v) =>
-                          v == null ? 'Select your blood type' : null,
-                    ),
-                    const SizedBox(height: TabangSpace.md),
-                    TextFormField(
-                      controller: _weightController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Weight (kg)',
-                        prefixIcon: Icon(
-                          Icons.monitor_weight_outlined,
-                          size: 18,
-                        ),
-                        helperText: 'At least 50 kg is required to donate',
-                      ),
-                      validator: (v) {
-                        if (_role != UserRole.donor) return null;
-                        final weight = double.tryParse(v?.trim() ?? '');
-                        if (weight == null) return 'Enter your weight';
-                        if (weight < 20 || weight > 300) {
-                          return 'Enter a weight between 20 and 300 kg';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
                   ],
 
                   if (_step == 2) ...[
@@ -572,30 +549,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: TabangSpace.sm),
-          _reviewRow(context, 'Registering as', _role.label),
+          _reviewRow(context, 'Account type', UserRole.user.label),
           _reviewRow(context, 'Full name', value(_fullNameController.text)),
           _reviewRow(context, 'Nickname (public)',
               value(_aliasController.text.trim())),
           _reviewRow(context, 'Email', value(_emailController.text.trim())),
           _reviewRow(context, 'Contact', value(_phoneController.text.trim())),
           _reviewRow(context, 'Barangay', value(_barangay)),
-          if (_role == UserRole.donor) ...[
-            _reviewRow(context, 'Blood type', value(_bloodType?.label)),
-            _reviewRow(
-              context,
-              'Birth date',
-              _birthDate == null ? '—' : formatDate(_birthDate!),
-            ),
-            _reviewRow(
-              context,
-              'Weight',
-              value(
-                _weightController.text.trim().isEmpty
-                    ? null
-                    : '${_weightController.text.trim()} kg',
-              ),
-            ),
-          ],
+          _reviewRow(
+            context,
+            'Birth date',
+            _birthDate == null ? '—' : formatDate(_birthDate!),
+          ),
         ],
       ),
     );
@@ -641,59 +606,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _roleCard(
-    BuildContext context,
-    UserRole role,
-    IconData icon,
-    String title,
-    String subtitle,
-  ) {
-    final selected = _role == role;
-    return InkWell(
-      borderRadius: BorderRadius.circular(TabangRadius.sm),
-      onTap: () => setState(() {
-        _role = role;
-        if (role == UserRole.recipient) _bloodType = null;
-      }),
-      child: Container(
-        padding: const EdgeInsets.all(TabangSpace.md),
-        decoration: BoxDecoration(
-          color: selected
-              ? (context.isDark
-                  ? const Color(0xFF3A1917)
-                  : TabangColors.crimsonSoft)
-              : context.surfaceAlt,
-          borderRadius: BorderRadius.circular(TabangRadius.sm),
-          border: Border.all(
-            color: selected ? TabangColors.crimson : context.border,
-            width: selected ? 1.6 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: selected ? TabangColors.crimson : context.textMuted,
-            ),
-            const SizedBox(height: TabangSpace.sm),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: context.textColor,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 10.5, color: context.textMuted),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/image_credits.dart';
 import '../theme.dart';
 
 /// A locally bundled TABANG photograph with a themed fallback.
@@ -21,6 +22,7 @@ class TabangPhoto extends StatelessWidget {
     this.fallbackIconSize = 28,
     this.width,
     this.height,
+    this.creditLabel,
   });
 
   /// Bundled asset path, or `null` to render the fallback directly.
@@ -38,8 +40,12 @@ class TabangPhoto extends StatelessWidget {
   final double? width;
   final double? height;
 
+  /// Optional person/place name used to identify an avatar in its credit.
+  final String? creditLabel;
+
   @override
   Widget build(BuildContext context) {
+    final credit = creditForAsset(asset, label: creditLabel);
     final image = asset == null
         ? _fallback(context)
         : Image.asset(
@@ -66,12 +72,23 @@ class TabangPhoto extends StatelessWidget {
         ? image
         : ClipRRect(borderRadius: borderRadius!, child: image);
 
-    if (overlay == null) return clipped;
+    // Hovering any credited image reveals the exact file credit, including the
+    // source title. This is the "on hover" half of the attribution rule; the
+    // [PhotoCredit] caption below supplies the visible half.
+    final attributed = credit == null
+        ? clipped
+        : Tooltip(
+            message: '${credit.title}\n${credit.author} · ${credit.license}',
+            waitDuration: const Duration(milliseconds: 350),
+            child: clipped,
+          );
+
+    if (overlay == null) return attributed;
 
     return Stack(
       fit: StackFit.passthrough,
       children: [
-        clipped,
+        attributed,
         Positioned.fill(child: overlay!),
       ],
     );
@@ -102,4 +119,176 @@ class TabangPhoto extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A compact, tappable per-image attribution chip.
+///
+/// The full source (file, creator, licence and, for photographs, a link) opens
+/// on tap or long-press instead of printing a raw URL under every picture. The
+/// author and licence still stay visible beneath the image, so attribution is
+/// never hidden behind an interaction.
+class PhotoCredit extends StatelessWidget {
+  const PhotoCredit(
+    this.asset, {
+    super.key,
+    this.label,
+    this.onImage = false,
+    this.alignment = TextAlign.start,
+  });
+
+  final String? asset;
+  final String? label;
+
+  /// Renders a translucent chip for use directly over a photograph.
+  final bool onImage;
+  final TextAlign alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final credit = creditForAsset(asset, label: label);
+    if (credit == null) return const SizedBox.shrink();
+
+    final prefix = switch (credit.kind) {
+      'photo' => 'Photo',
+      'avatar' => 'Illustration',
+      'icon' => 'Icon',
+      _ => 'Artwork',
+    };
+    final foreground = onImage ? Colors.white : context.textMuted;
+
+    final chip = Material(
+      color: onImage
+          ? Colors.black.withValues(alpha: 0.34)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(TabangRadius.pill),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(TabangRadius.pill),
+        onTap: () => showImageCreditDialog(context, credit),
+        onLongPress: () => showImageCreditDialog(context, credit),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: onImage ? 10 : 6,
+            vertical: onImage ? 5 : 3,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                credit.isOriginal
+                    ? Icons.brush_outlined
+                    : Icons.photo_camera_outlined,
+                size: 12,
+                color: foreground,
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  '$prefix: ${credit.author} · ${credit.license}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.3,
+                    fontWeight: FontWeight.w600,
+                    color: foreground,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Icon(Icons.info_outline, size: 11, color: foreground),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Align(
+      alignment: alignment == TextAlign.center
+          ? Alignment.center
+          : alignment == TextAlign.end
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+      child: chip,
+    );
+  }
+}
+
+/// Full provenance for one image.
+///
+/// Photographs show the exact Commons-style source link. Original TABANG
+/// artwork has no external source to link to, so that row is omitted entirely
+/// rather than showing an empty or misleading URL.
+Future<void> showImageCreditDialog(
+  BuildContext context,
+  ImageCredit credit,
+) {
+  final prefix = switch (credit.kind) {
+    'photo' => 'Photo',
+    'avatar' => 'Illustration',
+    'icon' => 'Icon',
+    _ => 'Artwork',
+  };
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('$prefix credit'),
+      content: SizedBox(
+        width: 440,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                credit.title,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${credit.author} · ${credit.license}',
+                style: TextStyle(fontSize: 12.5, color: dialogContext.textMuted),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'File: ${credit.asset}',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  fontFamily: 'monospace',
+                  color: dialogContext.textMuted,
+                ),
+              ),
+              if (credit.sourceUrl != null) ...[
+                const SizedBox(height: 12),
+                SelectableText(
+                  credit.sourceUrl!,
+                  style: const TextStyle(fontSize: 12, height: 1.45),
+                ),
+              ] else ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Created for TABANG; no external source.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
 }

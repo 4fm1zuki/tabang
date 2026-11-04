@@ -31,6 +31,36 @@ void main() {
 
   setUp(repo.resetForTesting);
 
+  group('Seed data', () {
+    test('provides 15 available donors, 15 recipients and a community demo',
+        () {
+      final eligibleDonors = repo.users
+          .where((u) =>
+              u.role == UserRole.donor &&
+              EligibilityEngine.evaluate(u).isEligible)
+          .toList();
+      expect(eligibleDonors, hasLength(15));
+
+      final recipients = repo.users
+          .where((u) => u.role == UserRole.recipient)
+          .toList();
+      expect(recipients, hasLength(15));
+
+      final community =
+          repo.users.where((u) => u.email == 'community@tabang.app').toList();
+      expect(community, hasLength(1));
+      expect(community.single.role, UserRole.user);
+
+      // Profiles must be individually illustrated rather than sharing a
+      // placeholder.
+      final avatars = repo.users
+          .map((u) => u.photoAsset)
+          .whereType<String>()
+          .toSet();
+      expect(avatars.length, repo.users.length);
+    });
+  });
+
   group('Component-aware compatibility', () {
     test('plasma uses the reverse ABO rule', () {
       expect(
@@ -259,6 +289,54 @@ void main() {
       expect(
         repo.requests.firstWhere((r) => r.id == request.id).status,
         RequestStatus.matched,
+      );
+    });
+
+    test('selection requires reciprocal chat before choosing a donor', () {
+      final request = addRequest(repo, patientAlias: 'Chat first');
+      final response = repo.respondToRequest(
+        requestId: request.id,
+        donorId: 'USR-017', // O- eligible, no seeded thread with the requester
+      )!;
+
+      // A raw donor offer is not enough; the requester must open a real
+      // conversation first.
+      expect(repo.hasReciprocalChat('USR-009', 'USR-017'), isFalse);
+      expect(
+        repo.selectResponse(
+          responseId: response.id,
+          selectedById: 'USR-009',
+        ),
+        isNull,
+      );
+      expect(
+        repo.responsesFor(request.id).single.status,
+        ResponseStatus.pending,
+      );
+
+      // One message is also not enough: both sides must take part.
+      final thread = repo.startConversation(
+        initiatorId: 'USR-009',
+        otherId: 'USR-017',
+        firstMessage: 'Hello Arnel, are you free to donate this week?',
+      )!;
+      expect(repo.hasReciprocalChat('USR-009', 'USR-017'), isFalse);
+      expect(
+        repo.selectResponse(
+          responseId: response.id,
+          selectedById: 'USR-009',
+        ),
+        isNull,
+      );
+
+      repo.sendMessage(thread.id, 'USR-017', 'Yes, I can donate on Friday.');
+      expect(repo.hasReciprocalChat('USR-009', 'USR-017'), isTrue);
+      expect(
+        repo.selectResponse(
+          responseId: response.id,
+          selectedById: 'USR-009',
+        ),
+        isNotNull,
       );
     });
 
@@ -566,6 +644,78 @@ void main() {
     });
   });
 
+  group('Inventory holds and appointments', () {
+    test('a usable unit can be held once and released by its holder', () {
+      final unit = repo.availableUnits.first;
+      expect(
+        repo.reserveUnit(
+          barcode: unit.barcode,
+          userId: 'USR-038',
+          note: 'Test hold',
+        ),
+        isTrue,
+      );
+      expect(
+        repo.reservedUnitsFor('USR-038').map((u) => u.barcode),
+        contains(unit.barcode),
+      );
+
+      // A second person cannot claim the same bag.
+      expect(
+        repo.reserveUnit(barcode: unit.barcode, userId: 'USR-009'),
+        isFalse,
+      );
+      expect(
+        repo.cancelReservation(barcode: unit.barcode, userId: 'USR-009'),
+        isFalse,
+      );
+      expect(
+        repo.cancelReservation(barcode: unit.barcode, userId: 'USR-038'),
+        isTrue,
+      );
+      expect(repo.reservedUnitsFor('USR-038'), isEmpty);
+    });
+
+    test('appointment-with-blood starts pending and staff confirm it', () {
+      final appointment = repo.addAppointment(
+        requesterId: 'USR-009',
+        patientName: 'Patient 118',
+        bloodType: BloodType.oNeg,
+        component: BloodComponent.packedRbc,
+        hospital: DigosFacilities.names.first,
+        ward: 'Ward 3',
+        units: 2,
+        scheduledAt: DateTime.now().add(const Duration(days: 1)),
+      );
+
+      expect(appointment, isNotNull);
+      expect(appointment!.status, 'Pending confirmation');
+      // Look the appointment up by id: the seeded APT-001 can sort ahead of it
+      // depending on the wall-clock time the suite runs at, so "first" is not
+      // a stable way to find the appointment just created.
+      expect(
+        repo.appointmentsFor('USR-009').map((a) => a.id),
+        contains(appointment.id),
+      );
+      expect(
+        repo.confirmAppointment(appointment.id, actorId: 'USR-009'),
+        isFalse,
+        reason: 'requesters cannot confirm their own appointment',
+      );
+      expect(
+        repo.confirmAppointment(appointment.id, actorId: 'USR-010'),
+        isTrue,
+      );
+      expect(
+        repo
+            .appointmentsFor('USR-009')
+            .firstWhere((a) => a.id == appointment.id)
+            .status,
+        'Confirmed',
+      );
+    });
+  });
+
   group('Account creation and privacy', () {
     test('registration rejects a nickname that is already taken', () {
       final result = AuthService.instance.register(
@@ -575,6 +725,20 @@ void main() {
         password: 'password123',
         phone: '+63 900 111 2222',
         barangay: 'Zone 1',
+      );
+
+      expect(result.ok, isFalse);
+      expect(result.error, contains('nickname'));
+    });
+
+    test('self-registration always creates a community account', () {
+      final result = AuthService.instance.register(
+        fullName: 'Direct Donor',
+        alias: 'Direct 01',
+        email: 'direct01@tabang.app',
+        password: 'password123',
+        phone: '+63 900 111 5555',
+        barangay: 'Zone 1',
         role: UserRole.donor,
         bloodType: BloodType.oPos,
         birthDate: DateTime(2000, 1, 1),
@@ -582,7 +746,7 @@ void main() {
       );
 
       expect(result.ok, isFalse);
-      expect(result.error, contains('nickname'));
+      expect(result.error, contains('community account first'));
     });
 
     test('registration rejects a nickname equal to the full name', () {
@@ -593,7 +757,6 @@ void main() {
         password: 'password123',
         phone: '+63 900 111 3333',
         barangay: 'Zone 2',
-        role: UserRole.recipient,
       );
 
       expect(result.ok, isFalse);
@@ -662,7 +825,7 @@ void main() {
       expect(adminCreatesStaff.ok, isTrue);
     });
 
-    test('new accounts start with the guide unseen and can complete it', () {
+    test('new accounts start as community users and can become donors', () {
       // Seeded demo accounts have already completed onboarding.
       expect(repo.userById('USR-001')!.onboardingCompleted, isTrue);
 
@@ -673,16 +836,94 @@ void main() {
         password: 'password123',
         phone: '+63 900 111 4444',
         barangay: 'Zone 4',
-        role: UserRole.donor,
-        bloodType: BloodType.bPos,
-        birthDate: DateTime(1999, 9, 9),
-        weightKg: 58,
       );
       expect(result.ok, isTrue);
+      expect(result.user!.role, UserRole.user);
+      expect(result.user!.role.canRequestBlood, isTrue);
       expect(result.user!.onboardingCompleted, isFalse);
 
       repo.completeOnboarding(result.user!.id);
       expect(repo.userById(result.user!.id)!.onboardingCompleted, isTrue);
+
+      final upgrade = AuthService.instance.registerAsDonor(
+        userId: result.user!.id,
+        bloodType: BloodType.bPos,
+        birthDate: DateTime(1999, 9, 9),
+        weightKg: 58,
+      );
+      expect(upgrade.ok, isTrue);
+      expect(upgrade.user!.role, UserRole.donor);
+      expect(upgrade.user!.bloodType, BloodType.bPos);
+    });
+
+    test('donor registrations stay unverified until staff decides', () {
+      final result = AuthService.instance.register(
+        fullName: 'Form Filler',
+        alias: 'Form 01',
+        email: 'form01@tabang.app',
+        password: 'password123',
+        phone: '+63 900 111 6666',
+        barangay: 'Zone 4',
+      );
+      expect(result.ok, isTrue);
+
+      final application = repo.submitDonorApplication(
+        userId: result.user!.id,
+        bloodType: BloodType.oNeg,
+        birthDate: DateTime(2000, 1, 1),
+        weightKg: 60,
+        sex: 'Female',
+        contact: '+63 900 111 5555',
+        idType: 'School ID',
+        idNumber: '2026-0001',
+        medicalFlags: const [
+          'Tattoo, piercing or acupuncture in the last 12 months',
+        ],
+        declarationAccepted: true,
+      );
+      expect(application, isNotNull);
+      expect(application!.status, DonorApplicationStatus.pending);
+      expect(
+        repo.openDonorApplications.map((a) => a.userId),
+        contains(result.user!.id),
+      );
+
+      // The account is a donor but unverified, so matching must refuse it.
+      final asDonor = repo.userById(result.user!.id)!;
+      expect(asDonor.role, UserRole.donor);
+      expect(asDonor.bloodCardVerified, isFalse);
+      expect(
+        EligibilityEngine.evaluate(asDonor).isEligible,
+        isFalse,
+        reason: 'an unverified donor is never matched yet',
+      );
+
+      // Staff asks for documents, then verifies.
+      repo.setDonorApplicationStatus(
+        result.user!.id,
+        DonorApplicationStatus.documentsRequested,
+        requestedDocuments: kDonorRequirements,
+      );
+      expect(
+        repo.donorApplicationFor(result.user!.id)!.status,
+        DonorApplicationStatus.documentsRequested,
+      );
+      expect(
+        repo.openDonorApplications.map((a) => a.userId),
+        contains(result.user!.id),
+      );
+
+      repo.setDonorApplicationStatus(
+        result.user!.id,
+        DonorApplicationStatus.verified,
+      );
+      final verified = repo.userById(result.user!.id)!;
+      expect(verified.bloodCardVerified, isTrue);
+      expect(verified.status, AccountStatus.verified);
+      expect(
+        repo.openDonorApplications.map((a) => a.userId),
+        isNot(contains(result.user!.id)),
+      );
     });
   });
 }

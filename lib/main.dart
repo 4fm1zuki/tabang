@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'core/auth.dart';
@@ -29,7 +30,11 @@ class TabangApp extends StatefulWidget {
 
 class _TabangAppState extends State<TabangApp> {
   final TabangRepository _repo = TabangRepository.instance;
-  ThemeMode _themeMode = ThemeMode.system;
+
+  /// Light is the product default. System tracking follows the OS, which on a
+  /// desktop with an evening dark schedule made the app flip themes without
+  /// the user ever choosing one.
+  ThemeMode _themeMode = ThemeMode.light;
 
   @override
   void initState() {
@@ -61,11 +66,25 @@ class _TabangAppState extends State<TabangApp> {
       theme: TabangTheme.light,
       darkTheme: TabangTheme.dark,
       themeMode: _themeMode,
+      // Flutter's default web scroll behaviour only accepts touch drags. That
+      // left every horizontal rail impossible to move with a mouse, which is
+      // the "can't scroll" failure users hit on desktop.
+      scrollBehavior: const TabangScrollBehavior(),
+      // Non-edge-to-edge by design: reserve the system status and gesture/nav
+      // insets around the whole navigator. Text never sits under the clock,
+      // and the bottom bar never collides with gesture navigation.
+      builder: (context, child) => ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: SafeArea(
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
       home: _buildHome(user),
     );
   }
 
   Widget _buildHome(AppUser? user) {
+
     if (user == null) {
       return LoginScreen(
         themeMode: _themeMode,
@@ -89,4 +108,20 @@ class _TabangAppState extends State<TabangApp> {
       onThemeModeChanged: _setThemeMode,
     );
   }
+}
+
+/// Allows click-and-drag scrolling with a mouse or trackpad on every
+/// scrollable, including the horizontal Discover rails. Flutter only enables
+/// touch drags by default on web.
+class TabangScrollBehavior extends MaterialScrollBehavior {
+  const TabangScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+      };
 }

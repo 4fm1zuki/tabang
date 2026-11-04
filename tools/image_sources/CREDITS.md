@@ -1,9 +1,13 @@
 # Image credits and licences
 
-TABANG ships a small set of locally bundled photographs so the interface works
-offline and the app makes no third-party image requests at runtime. Every source
-below is public domain or CC0; none requires attribution, but the provenance is
-recorded here for auditability.
+TABANG ships every photograph and illustration inside the application package,
+so the interface works offline and the app makes no third-party image requests
+at runtime. This file is the audit copy of `lib/core/image_credits.dart`, the
+single registry the UI reads. Each displayed image gets its own visible caption
+under the image and a hover/detail credit naming the exact file, creator,
+licence and source link.
+
+## Photography
 
 | Bundled asset | Source (Wikimedia Commons) | Licence | Author / credit |
 | --- | --- | --- | --- |
@@ -19,10 +23,37 @@ recorded here for auditability.
 The photographs are illustrative. They do not depict TABANG users or patients,
 and the people shown have no connection to the simulated records in the app.
 
-`assets/images/content_privacy.jpg` and all launcher icons are original artwork
-drawn by `tools/make_media_assets.py`. The source photographs are kept in this
-folder so the processed assets can be regenerated:
+## Original TABANG artwork
+
+These files are generated for TABANG by the scripts in `tools/`. They are the
+project's own work and are released under the same CC0-style terms as the rest
+of the prototype assets.
+
+| Bundled asset | Title | Creator | Licence |
+| --- | --- | --- | --- |
+| `assets/images/content_privacy.jpg` | Privacy and identity protection artwork | TABANG original artwork (`tools/make_media_assets.py`) | Original / CC0 |
+| `assets/branding/app_icon.png` | TABANG launcher icon | TABANG original artwork (`tools/make_media_assets.py`) | Original / CC0 |
+| `assets/images/educational/edu_benefits.png` | One donation, three lives | TABANG original artwork (`tools/make_edu_art.py`) | Original / CC0 |
+| `assets/images/educational/edu_help.png` | Donation supports patients and families | TABANG original artwork (`tools/make_edu_art.py`) | Original / CC0 |
+| `assets/images/educational/edu_prepare.png` | Preparing for a donation | TABANG original artwork (`tools/make_edu_art.py`) | Original / CC0 |
+| `assets/images/educational/edu_aftercare.png` | Rest and recovery after donating | TABANG original artwork (`tools/make_edu_art.py`) | Original / CC0 |
+| `assets/images/educational/edu_facts.png` | Blood components and compatibility facts | TABANG original artwork (`tools/make_edu_art.py`) | Original / CC0 |
+| `assets/images/educational/edu_eligibility.png` | Donor eligibility checklist | TABANG original artwork (`tools/make_edu_art.py`) | Original / CC0 |
+| `assets/images/educational/drive_locator.png` | Find a nearby blood drive | TABANG original artwork (`tools/make_edu_art.py`) | Original / CC0 |
+
+## Profile portraits
+
+`assets/images/avatars/avatar_001.png` through `avatar_048.png` are 48 unique
+original portraits generated for TABANG by `tools/make_avatars.py`. No portrait
+is reused across the seeded accounts. The UI identifies the individual file in
+the hover credit (for example, *Profile illustration for Liza
+(avatar_012.png)*) rather than showing a single generic avatar credit.
 
 ```bash
-python tools/make_media_assets.py
+python tools/make_media_assets.py   # photographs, privacy art and launcher icons
+python tools/make_avatars.py        # 48 profile portraits
+python tools/make_edu_art.py        # seven educational illustrations
 ```
+
+The source photographs are kept in this folder so the processed assets can be
+regenerated. No image in this repository is fetched at runtime.

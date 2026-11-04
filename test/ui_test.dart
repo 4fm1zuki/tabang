@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tabang/core/image_credits.dart';
 import 'package:tabang/core/repository.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/find_donor_page.dart';
 import 'package:tabang/theme.dart';
 import 'package:tabang/widgets/common.dart';
+import 'package:tabang/widgets/digos_vector_map.dart';
 import 'package:tabang/widgets/illustrations.dart';
 import 'package:tabang/widgets/photo.dart';
 
 void main() {
   final repo = TabangRepository.instance;
 
-  setUp(repo.resetForTesting);
+  setUp(() {
+    repo.resetForTesting();
+    // Widget tests must not attempt OpenStreetMap tile requests.
+    DigosVectorMap.tilesEnabled = false;
+  });
 
   testWidgets('discover shows quick actions above the full feed',
       (tester) async {
@@ -25,15 +31,22 @@ void main() {
       ),
     );
 
-    // Single unified interface: obvious actions first, feed below.
-    expect(find.text('Donate blood'), findsOneWidget);
-    expect(find.text('Find donation sites'), findsOneWidget);
-    expect(find.text('Quick guide'), findsOneWidget);
-    expect(find.text('Featured updates'), findsOneWidget);
+    // Single unified interface: hero, then the two primary actions, then the
+    // organised feed. The old four-button + summary stack is gone.
+    expect(find.text('View blood requests'), findsOneWidget);
+    expect(find.text('Find donors near you'), findsOneWidget);
+    expect(find.text('Donor guide'), findsOneWidget);
+    expect(find.text('Upcoming blood drives'), findsOneWidget);
+    expect(find.text('Announcements & stories'), findsOneWidget);
   });
 
   testWidgets('find donor map loads the real boundaries and stays tappable',
       (tester) async {
+    // Phone layout: the map stacks above the collapsible donor list.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
     final donor = repo.userById('USR-001')!;
 
     await tester.pumpWidget(
@@ -44,14 +57,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The GeoJSON loaded: no error overlay, and the painter is mounted.
-    expect(find.text('DIGOS CITY · 26 BARANGAYS'), findsOneWidget);
-    expect(find.text('Barangay map unavailable'), findsNothing);
-    expect(find.byType(InteractiveViewer), findsOneWidget);
+    // The vector map is mounted with the simplified-map header format.
+    expect(find.text('Digos City Barangay Map'), findsOneWidget);
+    expect(find.text('DAVAO DEL SUR · PHILIPPINES'), findsOneWidget);
+    expect(find.byType(DigosVectorMap), findsOneWidget);
 
-    // Taps must be handled by the raw listener without throwing, and repeated
-    // taps must not wedge the page.
-    final mapCentre = tester.getCenter(find.byType(InteractiveViewer));
+    // Repeated taps must not wedge the page.
+    final mapCentre = tester.getCenter(find.byType(DigosVectorMap));
     for (var i = 0; i < 3; i++) {
       await tester.tapAt(mapCentre + Offset(i * 24.0, 0));
       await tester.pumpAndSettle();
@@ -62,10 +74,11 @@ void main() {
     // The donor list collapses to a tap bar and comes back.
     await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_up));
+    expect(find.text('Show list'), findsOneWidget);
+    await tester.tap(find.text('Show list'));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.keyboard_arrow_up), findsNothing);
+    expect(find.text('Show list'), findsNothing);
+    expect(find.textContaining('Available donors'), findsOneWidget);
   });
 
   testWidgets('find donor desktop layout keeps its overlays and controls',
@@ -87,7 +100,9 @@ void main() {
     expect(find.text('ALL'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsOneWidget);
     expect(find.byIcon(Icons.remove), findsOneWidget);
-    expect(find.text('AVAILABLE DONORS'), findsOneWidget);
+    // Legend now documents the base map layers plus donor density.
+    expect(find.text('MAP LAYERS'), findsOneWidget);
+    expect(find.text('DONOR DENSITY'), findsOneWidget);
     expect(find.textContaining('Available donors'), findsOneWidget);
 
     // The overlay controls must be tappable.
@@ -97,7 +112,7 @@ void main() {
     // Tapping a barangay filters the donor list. The exact polygon under the
     // centre depends on the fitted bounds, so try a few points and require at
     // least one hit.
-    final mapCentre = tester.getCenter(find.byType(InteractiveViewer));
+    final mapCentre = tester.getCenter(find.byType(DigosVectorMap));
     var selected = false;
     for (final offset in <Offset>[
       Offset.zero,
@@ -107,6 +122,13 @@ void main() {
     ]) {
       await tester.tapAt(mapCentre + offset);
       await tester.pumpAndSettle();
+      // A tap that lands on a drive pin opens the drives sheet instead of
+      // selecting the barangay; dismiss it and try the next point.
+      if (find.textContaining('Blood drives ·').evaluate().isNotEmpty) {
+        await tester.tapAt(const Offset(8, 8));
+        await tester.pumpAndSettle();
+        continue;
+      }
       if (find.textContaining('Available donors in').evaluate().isNotEmpty) {
         selected = true;
         break;
@@ -166,7 +188,12 @@ void main() {
 
     final title = tester.getSize(find.text('Discover'));
     expect(title.height, lessThan(50));
-    expect(find.text('Updates and drives across Digos City.'), findsOneWidget);
+    // Headers are one compact line now: the description is exposed as a
+    // hover/label tooltip instead of a second grey paragraph.
+    expect(
+      find.byTooltip('Updates and drives across Digos City.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('every content item ships a bundled photo asset',
@@ -190,6 +217,10 @@ void main() {
     final distinct = repo.content.map((c) => c.imageAsset).toSet();
     expect(distinct.length, greaterThanOrEqualTo(8));
 
+    // Every bundled image resolves to its own credit entry.
+    final credited = distinct.where((asset) => creditForAsset(asset) != null);
+    expect(credited.length, distinct.length);
+
     final icon = await rootBundle.load('assets/branding/app_icon.png');
     expect(icon.lengthInBytes, greaterThan(1000));
   });
@@ -208,13 +239,21 @@ void main() {
 
     // Hero, content cards and the two drive cards all use TabangPhoto.
     expect(find.byType(TabangPhoto), findsWidgets);
+    // Attribution is visible under the image, not hidden in a settings pane.
+    expect(find.byType(PhotoCredit), findsWidgets);
 
-    await tester.ensureVisible(find.text('Read more'));
+    await tester.ensureVisible(find.text('Read the story'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Read more'));
+    await tester.tap(find.text('Read the story'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Photo: public-domain / CC0'), findsOneWidget);
     expect(find.byType(TabangPhoto), findsWidgets);
+
+    // Attribution stays visible under the image as a chip; the raw source URL
+    // only appears after tapping it, instead of being printed in the dialog.
+    await tester.tap(find.byType(PhotoCredit).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Photo credit'), findsOneWidget);
+    expect(find.textContaining('File: assets/images/'), findsOneWidget);
   });
 
   testWidgets('a missing photo renders the themed fallback, not an error box',

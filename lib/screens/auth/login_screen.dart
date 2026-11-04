@@ -246,6 +246,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: TabangPhoto(
                   'assets/branding/app_icon.png',
                   semanticLabel: 'TABANG app icon',
+                  creditLabel: 'TABANG launcher icon',
                   fallbackIcon: Icons.water_drop,
                   fallbackIconSize: 22,
                 ),
@@ -263,6 +264,8 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 2),
+        const PhotoCredit('assets/branding/app_icon.png'),
         const SizedBox(height: TabangSpace.xl),
         Text(
           'Sign in',
@@ -435,6 +438,7 @@ class _BrandPanel extends StatelessWidget {
             'assets/images/hero_donation.jpg',
             alignment: Alignment.centerRight,
             semanticLabel: 'A donor giving blood at a community drive',
+            creditLabel: 'Community blood donation',
             fallbackIcon: Icons.volunteer_activism_outlined,
             fallbackIconSize: 96,
           ),
@@ -500,12 +504,9 @@ class _BrandPanel extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  'Photography: public domain / CC0 · credits in About & Help',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.45),
-                    fontSize: 9.5,
-                  ),
+                const PhotoCredit(
+                  'assets/images/hero_donation.jpg',
+                  onImage: true,
                 ),
               ],
             ),

@@ -5,7 +5,6 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
-import '../../widgets/onboarding.dart';
 
 /// Settings.
 ///
@@ -15,6 +14,9 @@ import '../../widgets/onboarding.dart';
 /// eligibility and request matching; the barangay switch controls whether the
 /// donor's barangay is shown in the directory. Push delivery is outside this
 /// simulated build, so the notification switches drive in-app summaries.
+///
+/// Guides and About live in their own destination (About & Help). They are not
+/// buried here as a single "Show the welcome guide" tile.
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
@@ -62,43 +64,41 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           const PageHeader(
             title: 'Settings',
-            subtitle: 'Appearance, notifications and privacy controls.',
+            subtitle: 'Appearance, notifications, privacy and account controls.',
+            actions: [
+              HelpTip(
+                title: 'About these settings',
+                message:
+                    'Preferences are saved on your TABANG account and apply '
+                    'immediately. Guides, FAQs and image credits are available '
+                    'under About & Help in the navigation.',
+              ),
+            ],
           ),
           const SizedBox(height: TabangSpace.xl),
 
           _section(
             context,
             'Appearance',
-            'Choose how TABANG displays.',
-            [
-              _themeOption(context, ThemeMode.system, Icons.brightness_auto,
-                  'System', 'Follow your device setting'),
+            'Choose how TABANG displays on this device.',
+            help:
+                'Light is the default so the app looks the same for everyone. '
+                'System follows your device; the map keeps a light base even '
+                'in dark mode, with its own map-style toggle, because '
+                'cartography reads better on a light surface.',
+            children: [
               _themeOption(context, ThemeMode.light, Icons.light_mode_outlined,
-                  'Light', 'Always use the light theme'),
+                  'Light', 'Default · always use the light theme'),
               _themeOption(context, ThemeMode.dark, Icons.dark_mode_outlined,
                   'Dark', 'Always use the dark theme'),
-            ],
-          ),
-          const SizedBox(height: TabangSpace.lg),
-
-          _section(
-            context,
-            'Guides & help',
-            'New here, or want a refresher?',
-            [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.school_outlined, size: 18),
-                title: const Text(
-                  'Show the welcome guide',
-                  style: TextStyle(fontSize: 13),
-                ),
-                subtitle: const Text(
-                  'A short walkthrough of the three things to do first',
-                  style: TextStyle(fontSize: 10.5),
-                ),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: () => showWelcomeGuide(context, user, markSeen: false),
+              _themeOption(context, ThemeMode.system, Icons.brightness_auto,
+                  'System', 'Follow your device setting'),
+              const SizedBox(height: TabangSpace.sm),
+              _note(
+                context,
+                Icons.contrast,
+                'TABANG uses Material 3 typography and surfaces. Dark mode '
+                    'raises secondary-text contrast instead of dimming it.',
               ),
             ],
           ),
@@ -107,8 +107,13 @@ class _SettingsPageState extends State<SettingsPage> {
           _section(
             context,
             'Notifications',
-            'What TABANG should alert you about.',
-            [
+            'What TABANG should summarise for you.',
+            help:
+                'This prototype shows in-app summaries only. Push '
+                'notifications need a deployed backend and are listed as a '
+                'known gap in the README. Turning a category off hides it from '
+                'the Discover summary immediately.',
+            children: [
               _switchRow(
                 context,
                 'Blood request alerts',
@@ -137,26 +142,35 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               const SizedBox(height: TabangSpace.sm),
-              Text(
-                'This simulated build shows in-app summaries only. Push '
-                'notifications require a deployed backend and are listed as a '
-                'known gap in the README.',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  height: 1.5,
-                  color: context.textMuted,
-                ),
+              _note(
+                context,
+                Icons.notifications_none,
+                'Notifications are in-app only. TABANG never sends SMS or '
+                    'email in this build.',
               ),
             ],
           ),
           const SizedBox(height: TabangSpace.lg),
 
-          _section(
-            context,
-            'Privacy & data',
-            'Controls aligned with RA 10173 (Data Privacy Act).',
-            [
-              if (user.role == UserRole.donor) ...[
+          if (user.role == UserRole.donor) ...[
+            _section(
+              context,
+              'Donor availability',
+              'Control whether the donor directory can show you.',
+              help:
+                  'TABANG hides you automatically during a donation cooldown '
+                  'even when the directory switch is on. Exact addresses are '
+                  'never shown; the barangay switch controls the only location '
+                  'other users see.',
+              children: [
+                _switchRow(
+                  context,
+                  'List me in the public donor directory',
+                  'When off, you are hidden from the directory and marked '
+                      'unavailable for request matching',
+                  user.isAvailable,
+                  (v) => _repo.setDonorAvailability(user.id, v),
+                ),
                 _switchRow(
                   context,
                   'Show my barangay to other users',
@@ -167,41 +181,44 @@ class _SettingsPageState extends State<SettingsPage> {
                     user.copyWith(shareBarangay: v),
                   ),
                 ),
-                _switchRow(
-                  context,
-                  'List me in the public donor directory',
-                  'When off, you are hidden from the directory and marked '
-                      'unavailable for request matching',
-                  user.isAvailable,
-                  (v) => _repo.setDonorAvailability(user.id, v),
-                ),
               ],
+            ),
+            const SizedBox(height: TabangSpace.lg),
+          ],
+
+          _section(
+            context,
+            'Privacy & data',
+            'Controls aligned with RA 10173 (Data Privacy Act).',
+            help:
+                'Your real name and exact address are never shown to other '
+                'users. Donors and recipients appear as aliases until both '
+                'sides agree to reveal their identity. Staff can see real names '
+                'only for verified care coordination.',
+            children: [
+              _note(
+                context,
+                Icons.shield_outlined,
+                'Your real name and exact address are never shown to other '
+                    'users. Donors and recipients appear as aliases until both '
+                    'sides agree to reveal their identity.',
+              ),
               const SizedBox(height: TabangSpace.sm),
-              Container(
-                padding: const EdgeInsets.all(TabangSpace.md),
-                decoration: BoxDecoration(
-                  color: context.surfaceAlt,
-                  borderRadius: BorderRadius.circular(TabangRadius.sm),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.shield_outlined,
-                        size: 15, color: context.textMuted),
-                    const SizedBox(width: TabangSpace.sm),
-                    Expanded(
-                      child: Text(
-                        'Your real name and exact address are never shown to '
-                        'other users. Donors and recipients appear as aliases '
-                        'until both sides agree to reveal their identity.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1.6,
-                          color: context.textMuted,
-                        ),
-                      ),
-                    ),
-                  ],
+              _dataRow(context, 'Public identity', user.alias),
+              _dataRow(context, 'Account type', user.role.label),
+              _dataRow(context, 'Account status', user.status.label),
+              _dataRow(context, 'Barangay', user.barangay),
+              if (user.bloodType != null)
+                _dataRow(context, 'Blood type', user.bloodType!.label),
+              const SizedBox(height: TabangSpace.sm),
+              Text(
+                'TABANG stores simulated records on this device only. No real '
+                'hospital, Red Cross or EHR system is connected. You can sign '
+                'out at any time to clear the active session.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.55,
+                  color: context.textMuted,
                 ),
               ),
             ],
@@ -211,15 +228,24 @@ class _SettingsPageState extends State<SettingsPage> {
           _section(
             context,
             'Account',
-            'Session and data controls.',
-            [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.logout, size: 18),
-                title: const Text('Sign out',
-                    style: TextStyle(fontSize: 13)),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: () => _repo.signOut(),
+            'Session and identity details.',
+            children: [
+              _dataRow(context, 'Email', user.email),
+              _dataRow(context, 'Registered', formatDate(user.registeredOn)),
+              const SizedBox(height: TabangSpace.sm),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmSignOut(context),
+                  icon: const Icon(Icons.logout, size: 17),
+                  label: const Text('Sign out'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: TabangColors.danger,
+                    side: BorderSide(
+                      color: TabangColors.danger.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -230,7 +256,7 @@ class _SettingsPageState extends State<SettingsPage> {
               'Simulated data build — not connected to live blood services.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 height: 1.7,
                 color: context.textMuted,
               ),
@@ -241,31 +267,134 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _confirmSignOut(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: Text(
+          'Your simulated records stay on this device. You can sign back in '
+          'with the same account.',
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.5,
+            color: context.textMuted,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _repo.signOut();
+            },
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _section(
     BuildContext context,
     String title,
-    String subtitle,
-    List<Widget> children,
-  ) {
+    String subtitle, {
+    required List<Widget> children,
+    String? help,
+  }) {
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              color: context.textColor,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            subtitle,
-            style: TextStyle(fontSize: 11.5, color: context.textMuted),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style:
+                          TextStyle(fontSize: 12.5, color: context.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              if (help != null)
+                HelpTip(title: title, message: help),
+            ],
           ),
           const SizedBox(height: TabangSpace.lg),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _note(BuildContext context, IconData icon, String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(TabangSpace.md),
+      decoration: BoxDecoration(
+        color: context.surfaceAlt,
+        borderRadius: BorderRadius.circular(TabangRadius.sm),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: context.textMuted),
+          const SizedBox(width: TabangSpace.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.6,
+                color: context.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dataRow(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 124,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: context.textColor,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -282,8 +411,26 @@ class _SettingsPageState extends State<SettingsPage> {
     return InkWell(
       borderRadius: BorderRadius.circular(TabangRadius.sm),
       onTap: () => widget.onThemeModeChanged(mode),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: TabangSpace.sm),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(
+          horizontal: TabangSpace.sm,
+          vertical: TabangSpace.sm,
+        ),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: selected
+              ? (context.isDark
+                  ? TabangColors.crimson.withValues(alpha: 0.16)
+                  : TabangColors.crimsonSoft)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(TabangRadius.sm),
+          border: Border.all(
+            color: selected
+                ? TabangColors.crimson.withValues(alpha: 0.35)
+                : Colors.transparent,
+          ),
+        ),
         child: Row(
           children: [
             Icon(
@@ -306,7 +453,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   Text(
                     subtitle,
-                    style: TextStyle(fontSize: 10.5, color: context.textMuted),
+                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
                   ),
                 ],
               ),
@@ -351,7 +498,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(fontSize: 10.5, color: context.textMuted),
+                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
                 ),
               ],
             ),

@@ -35,6 +35,10 @@ class _AdminShellState extends State<AdminShell> {
   bool _hovering = false;
   bool _pinned = true;
 
+  /// Labels are only built after the rail finishes sliding, so the wordmark
+  /// and nav labels never wrap inside a narrow, mid-animation rail.
+  bool _railSettled = true;
+
   /// Pages created so far, kept alive across tab switches so filters, scroll
   /// positions and form state survive navigation.
   final Map<int, Widget> _pages = {};
@@ -84,22 +88,38 @@ class _AdminShellState extends State<AdminShell> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 1000;
-    final expanded = wide && (_pinned || _hovering);
+    final railExpanded = wide && (_pinned || _hovering);
+    final showLabels = railExpanded && _railSettled;
 
     return Scaffold(
       body: Row(
         children: [
           MouseRegion(
-            onEnter: (_) => setState(() => _hovering = true),
-            onExit: (_) => setState(() => _hovering = false),
+            onEnter: wide ? (_) => setState(() => _hovering = true) : null,
+            onExit: wide
+                ? (_) => setState(() {
+                      _hovering = false;
+                      if (!_pinned) _railSettled = false;
+                    })
+                : null,
             child: _AdminSidebar(
               user: widget.user,
               destinations: _destinations,
               selectedIndex: _index,
-              expanded: expanded,
+              railExpanded: railExpanded,
+              expanded: showLabels,
               pinned: _pinned,
+              onSlideEnd: () {
+                if (!mounted) return;
+                if (_railSettled != railExpanded) {
+                  setState(() => _railSettled = railExpanded);
+                }
+              },
               onSelect: _select,
-              onTogglePin: () => setState(() => _pinned = !_pinned),
+              onTogglePin: () => setState(() {
+                _pinned = !_pinned;
+                _railSettled = false;
+              }),
             ),
           ),
           Expanded(
@@ -154,8 +174,10 @@ class _AdminSidebar extends StatelessWidget {
     required this.user,
     required this.destinations,
     required this.selectedIndex,
+    required this.railExpanded,
     required this.expanded,
     required this.pinned,
+    required this.onSlideEnd,
     required this.onSelect,
     required this.onTogglePin,
   });
@@ -163,8 +185,14 @@ class _AdminSidebar extends StatelessWidget {
   final AppUser user;
   final List<_Destination> destinations;
   final int selectedIndex;
+
+  /// Width target of the slide animation.
+  final bool railExpanded;
+
+  /// Labels are laid out only once the slide has finished.
   final bool expanded;
   final bool pinned;
+  final VoidCallback onSlideEnd;
   final ValueChanged<int> onSelect;
   final VoidCallback onTogglePin;
 
@@ -173,7 +201,8 @@ class _AdminSidebar extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      width: expanded ? 232 : 68,
+      width: railExpanded ? 232 : 68,
+      onEnd: onSlideEnd,
       decoration: BoxDecoration(
         color: context.isDark
             ? TabangColors.darkSurface
@@ -209,6 +238,9 @@ class _AdminSidebar extends StatelessWidget {
                       children: [
                         Text(
                           'TABANG',
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -218,8 +250,11 @@ class _AdminSidebar extends StatelessWidget {
                         ),
                         Text(
                           'Chapter console',
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: 12,
                             color: Colors.white70,
                           ),
                         ),
@@ -327,7 +362,7 @@ class _AdminSidebar extends StatelessWidget {
                           user.initials,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -342,7 +377,7 @@ class _AdminSidebar extends StatelessWidget {
                               Text(
                                 user.alias,
                                 style: const TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
@@ -351,7 +386,7 @@ class _AdminSidebar extends StatelessWidget {
                               Text(
                                 user.role.label,
                                 style: const TextStyle(
-                                  fontSize: 9,
+                                  fontSize: 12,
                                   color: Colors.white70,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -395,7 +430,7 @@ class _AdminSidebar extends StatelessWidget {
             ),
             Text(
               '${user.role.label} · ${user.email}',
-              style: TextStyle(fontSize: 11.5, color: context.textMuted),
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
             ),
             const SizedBox(height: TabangSpace.lg),
             const Divider(),

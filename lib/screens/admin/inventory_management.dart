@@ -4,6 +4,7 @@ import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
+import '../../widgets/barcode.dart';
 import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
 
@@ -127,7 +128,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 9.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: selected ? Colors.white : context.textMuted,
                 ),
@@ -201,138 +202,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             padding: EdgeInsets.zero,
             child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: TabangSpace.lg,
-                    vertical: TabangSpace.md,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.surfaceAlt,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(TabangRadius.md - 1),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      _head(context, 'BARCODE', 3),
-                      _head(context, 'TYPE', 1),
-                      _head(context, 'COMPONENT', 3),
-                      _head(context, 'STORAGE', 3),
-                      _head(context, 'EXPIRES', 2),
-                      _head(context, 'STATUS', 2),
-                      _head(context, 'ACTION', 2),
-                    ],
-                  ),
-                ),
-                ...units.map((unit) {
-                  final days = unit.daysUntilExpiry(now);
-                  final effective = unit.effectiveStatus(now);
-                  final expiring =
-                      days >= 0 && days <= 5 && unit.isUsableAt(now);
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TabangSpace.lg,
-                      vertical: TabangSpace.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: context.border)),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            unit.barcode,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.w600,
-                              color: context.textColor,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: BloodTypeChip(unit.bloodType, size: 24),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            unit.product,
-                            style: TextStyle(
-                                fontSize: 11, color: context.textColor),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            unit.storageBay,
-                            style: TextStyle(
-                                fontSize: 10.5, color: context.textMuted),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            unit.timeLeft(now),
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: expiring
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: expiring
-                                  ? TabangColors.danger
-                                  : context.textMuted,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: StatusPill(
-                              effective.label,
-                              tone: toneForUnit(effective),
-                              dense: true,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: PopupMenuButton<UnitStatus>(
-                              tooltip: 'Change status',
-                              icon: Icon(Icons.more_horiz,
-                                  size: 16, color: context.textMuted),
-                              onSelected: (status) =>
-                                  _repo.setUnitStatus(unit.barcode, status),
-                              itemBuilder: (context) => UnitStatus.values
-                                  .where((s) =>
-                                      s != effective &&
-                                      !(s == UnitStatus.available &&
-                                          unit.isExpiredAt(now)))
-                                  .map((s) => PopupMenuItem(
-                                        value: s,
-                                        child: Text(
-                                          'Mark ${s.label.toLowerCase()}',
-                                          style:
-                                              const TextStyle(fontSize: 12),
-                                        ),
-                                      ))
-                                  .toList(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                for (var i = 0; i < units.length; i++)
+                  _buildUnitRow(context, units[i], now, first: i == 0),
               ],
             ),
           ),
@@ -340,17 +211,216 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     );
   }
 
-  Widget _head(BuildContext context, String text, int flex) {
-    return Expanded(
-      flex: flex,
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-          color: context.textMuted,
+  /// One inventory row. The list shows only what staff scan for — product,
+  /// ID, expiry and status. Selecting the row opens the full record, including
+  /// the barcode graphic and the name of the person holding the unit.
+  Widget _buildUnitRow(
+    BuildContext context,
+    BloodUnit unit,
+    DateTime now, {
+    required bool first,
+  }) {
+    final days = unit.daysUntilExpiry(now);
+    final effective = unit.effectiveStatus(now);
+    final expiring = days >= 0 && days <= 5 && unit.isUsableAt(now);
+    final holder = unit.reservedBy == null
+        ? null
+        : _repo.userById(unit.reservedBy!);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: first
+            ? null
+            : Border(top: BorderSide(color: context.border)),
+      ),
+      child: InkWell(
+        onTap: () => _showUnitDetails(context, unit, now),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: TabangSpace.lg,
+            vertical: TabangSpace.md,
+          ),
+          child: Row(
+            children: [
+              BloodTypeChip(unit.bloodType, size: 32),
+              const SizedBox(width: TabangSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      unit.product,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'ID ${unit.barcode}'
+                      '${holder == null ? '' : ' · held by ${holder.alias}'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: context.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: TabangSpace.sm),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    unit.timeLeft(now),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          expiring ? FontWeight.w700 : FontWeight.w600,
+                      color: expiring
+                          ? TabangColors.danger
+                          : context.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  StatusPill(
+                    effective.label,
+                    tone: toneForUnit(effective),
+                    dense: true,
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<UnitStatus>(
+                tooltip: 'Change status',
+                icon: Icon(Icons.more_horiz,
+                    size: 18, color: context.textMuted),
+                onSelected: (status) =>
+                    _repo.setUnitStatus(unit.barcode, status),
+                itemBuilder: (context) => UnitStatus.values
+                    .where((s) =>
+                        s != effective &&
+                        !(s == UnitStatus.available && unit.isExpiredAt(now)))
+                    .map((s) => PopupMenuItem(
+                          value: s,
+                          child: Text(
+                            'Mark ${s.label.toLowerCase()}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _showUnitDetails(
+    BuildContext context,
+    BloodUnit unit,
+    DateTime now,
+  ) {
+    final effective = unit.effectiveStatus(now);
+    final holder =
+        unit.reservedBy == null ? null : _repo.userById(unit.reservedBy!);
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            BloodTypeChip(unit.bloodType, size: 32),
+            const SizedBox(width: TabangSpace.md),
+            const Expanded(child: Text('Unit details')),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(TabangSpace.md),
+                  decoration: BoxDecoration(
+                    color: dialogContext.surfaceAlt,
+                    borderRadius: BorderRadius.circular(TabangRadius.sm),
+                  ),
+                  child: UnitBarcode(unit.barcode),
+                ),
+                const SizedBox(height: TabangSpace.lg),
+                _detail(dialogContext, 'Component', unit.product),
+                _detail(dialogContext, 'Status', effective.label),
+                _detail(dialogContext, 'Storage', unit.storageBay),
+                _detail(
+                    dialogContext, 'Collected', formatDate(unit.collectedOn)),
+                _detail(dialogContext, 'Expires', formatDate(unit.expiresOn)),
+                _detail(dialogContext, 'Remaining', unit.timeLeft(now)),
+                _detail(
+                  dialogContext,
+                  'Reserved by',
+                  holder == null
+                      ? 'No one — available for allocation'
+                      : '${holder.alias} (${holder.role.label})',
+                ),
+                if (unit.reservedAt != null)
+                  _detail(
+                    dialogContext,
+                    'Hold placed',
+                    formatDateTime(unit.reservedAt!),
+                  ),
+                if (unit.reservationNote != null &&
+                    unit.reservationNote!.isNotEmpty)
+                  _detail(
+                      dialogContext, 'Hold note', unit.reservationNote!),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detail(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: context.textColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -373,7 +443,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           'requester selects a donor in the community app, and staff mark the '
           'request fulfilled after the donation is recorded.',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             height: 1.5,
             color: context.textMuted,
           ),
@@ -433,59 +503,53 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
+                            // One pill, one title. Three stacked pills beside
+                            // every request made the staff queue read as noise;
+                            // status and source now sit in the sentence below.
+                            Row(
                               children: [
-                                Text(
-                                  request.patientAlias,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: context.textColor,
+                                Flexible(
+                                  child: Text(
+                                    request.patientAlias,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.2,
+                                      color: context.textColor,
+                                    ),
                                   ),
                                 ),
+                                const SizedBox(width: 6),
                                 StatusPill(
                                   request.urgency.label,
                                   tone: toneForUrgency(request.urgency),
                                   dense: true,
                                 ),
-                                StatusPill(
-                                  request.status.label,
-                                  tone: request.status == RequestStatus.open
-                                      ? Tone.info
-                                      : Tone.neutral,
-                                  dense: true,
-                                ),
-                                StatusPill(
-                                  request.source.label,
-                                  tone:
-                                      request.source == RequestSource.bloodBank
-                                          ? Tone.brand
-                                          : Tone.neutral,
-                                  dense: true,
-                                ),
                               ],
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 4),
                             Text(
                               '${request.component.label} · '
                               '${request.unitsOutstanding} of '
                               '${request.unitsNeeded} units outstanding · '
                               '${request.hospital}',
                               style: TextStyle(
-                                  fontSize: 11, color: context.textMuted),
+                                  fontSize: 12.5,
+                                  color: context.textMuted),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 3),
                             Text(
-                              'Posted by ${requester?.alias ?? 'unknown'} · '
-                              '${request.barangay} · '
-                              '${formatRelative(request.createdAt)}',
+                              '${request.status.label} · '
+                              '${request.source == RequestSource.bloodBank ? 'Blood bank' : 'Donor network'}'
+                              ' · posted by ${requester?.alias ?? 'unknown'}'
+                              ' · ${request.barangay}'
+                              ' · ${formatRelative(request.createdAt)}',
                               style: TextStyle(
-                                  fontSize: 10.5, color: context.textMuted),
+                                  fontSize: 12,
+                                  color: context.textMuted),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 3),
                             Text(
                               request.source == RequestSource.bloodBank
                                   ? '$compatibleUnits compatible units in '
@@ -495,17 +559,17 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                                       'donors · ${responses.length} responses '
                                       '($selected selected)',
                               style: TextStyle(
-                                fontSize: 10.5,
+                                fontSize: 12,
                                 color: context.textMuted,
                               ),
                             ),
                             if (responses.isNotEmpty) ...[
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Text(
                                 'Responders: '
                                 '${responses.map((r) => r.donorAlias).join(', ')}',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 12,
                                   color: context.textMuted,
                                 ),
                               ),

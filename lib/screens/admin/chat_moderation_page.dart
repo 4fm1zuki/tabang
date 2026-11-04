@@ -119,7 +119,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                         Text(
                           'Flagged only',
                           style: TextStyle(
-                              fontSize: 11, color: context.textMuted),
+                              fontSize: 12, color: context.textMuted),
                         ),
                         const SizedBox(width: 6),
                         Switch(
@@ -203,7 +203,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        fontSize: 10.5,
+                                        fontSize: 11.5,
                                         color: context.textMuted,
                                       ),
                                     ),
@@ -273,7 +273,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                 children: [
                   Text(
                     'Flagged only',
-                    style: TextStyle(fontSize: 11, color: context.textMuted),
+                    style: TextStyle(fontSize: 12, color: context.textMuted),
                   ),
                   const SizedBox(width: 6),
                   Switch(
@@ -351,7 +351,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11.5,
                                   color: context.textMuted,
                                 ),
                               ),
@@ -407,7 +407,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                       'Room ${thread.id} · ${thread.messages.length} messages · '
                       '${thread.flaggedCount} flagged',
                       style:
-                          TextStyle(fontSize: 10.5, color: context.textMuted),
+                          TextStyle(fontSize: 11.5, color: context.textMuted),
                     ),
                   ],
                 ),
@@ -482,7 +482,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
               Text(
                 message.senderAlias,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: context.textColor,
                 ),
@@ -490,7 +490,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
               const SizedBox(width: TabangSpace.sm),
               Text(
                 formatRelative(message.sentAt),
-                style: TextStyle(fontSize: 10, color: context.textMuted),
+                style: TextStyle(fontSize: 11, color: context.textMuted),
               ),
               const Spacer(),
               StatusPill(
@@ -610,7 +610,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                 '${formatRelative(report.createdAt)}'
                                 '${report.threadId == null ? '' : ' · ${report.threadId}'}',
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11.5,
                                   color: context.textMuted,
                                 ),
                               ),

@@ -70,6 +70,30 @@ List<GuideStep> guideStepsFor(AppUser user) {
               'contact details are shared only if you both accept a reveal.',
         ),
       ];
+    case UserRole.user:
+      return const [
+        GuideStep(
+          icon: Icons.explore_outlined,
+          title: 'Start with Discover',
+          body:
+              'Browse updates, donation drives and guides. Everything is '
+              'available before you decide to donate.',
+        ),
+        GuideStep(
+          icon: Icons.add_circle_outline,
+          title: 'Request blood when needed',
+          body:
+              'You can post a request for a patient at any time. TABANG checks '
+              'participating blood banks before posting to donors.',
+        ),
+        GuideStep(
+          icon: Icons.volunteer_activism_outlined,
+          title: 'Become a donor later',
+          body:
+              'Open your profile and choose Register as a donor. Chapter staff '
+              'verify your blood card before you appear in the directory.',
+        ),
+      ];
     case UserRole.recipient:
       return const [
         GuideStep(

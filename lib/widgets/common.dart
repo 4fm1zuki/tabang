@@ -55,7 +55,66 @@ class SurfaceCard extends StatelessWidget {
   }
 }
 
-/// Page title + optional subtitle + trailing actions.
+/// Small contextual help affordance: a "?" that opens a short explanation.
+///
+/// Used beside settings sections and guide titles so help lives next to the
+/// control it explains instead of being buried in a separate manual.
+class HelpTip extends StatelessWidget {
+  const HelpTip({
+    super.key,
+    required this.title,
+    required this.message,
+    this.size = 17,
+  });
+
+  final String title;
+  final String message;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'What is this?',
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      icon: Icon(
+        Icons.help_outline,
+        size: size,
+        color: context.textMuted,
+      ),
+      onPressed: () => showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 380,
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.65,
+                color: context.textColor,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One-line page toolbar: title on the left, actions on the right.
+///
+/// The tab bar and sidebar already name every page, so the previous two-line
+/// title + grey description block was redundant: it pushed real content below
+/// the fold and made every tab open with the same-looking heading. The
+/// description is still available on hover and to screen readers.
 class PageHeader extends StatelessWidget {
   const PageHeader({
     super.key,
@@ -70,50 +129,49 @@ class PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final heading = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.4,
-              ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle!,
-            style: TextStyle(fontSize: 12.5, color: context.textMuted),
-          ),
-        ],
-      ],
+    final titleText = Text(
+      title,
+      style: TextStyle(
+        fontSize: 21,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.4,
+        color: context.textColor,
+      ),
     );
+
+    final heading = subtitle == null
+        ? titleText
+        : Tooltip(
+            message: subtitle!,
+            waitDuration: const Duration(milliseconds: 400),
+            child: Semantics(header: true, label: '$title. ${subtitle!}',
+                child: ExcludeSemantics(child: titleText)),
+          );
 
     if (actions.isEmpty) return heading;
 
     final actionWrap = Wrap(
       spacing: TabangSpace.sm,
       runSpacing: TabangSpace.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: actions,
     );
 
     // On phones a fixed-width action (the Discover search box, for example)
     // would otherwise squeeze the title into a few characters. Stack the
-    // actions under the heading instead of shrinking it.
+    // actions under the title instead of shrinking it.
     if (context.isPhone) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           heading,
-          const SizedBox(height: TabangSpace.lg),
+          const SizedBox(height: TabangSpace.md),
           actionWrap,
         ],
       );
     }
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: heading),
         const SizedBox(width: TabangSpace.lg),

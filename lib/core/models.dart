@@ -69,6 +69,9 @@ class BloodUnit {
     required this.status,
     required this.collectedOn,
     required this.expiresOn,
+    this.reservedBy,
+    this.reservationNote,
+    this.reservedAt,
   });
 
   final String barcode;
@@ -78,6 +81,34 @@ class BloodUnit {
   final UnitStatus status;
   final DateTime collectedOn;
   final DateTime expiresOn;
+
+  /// Community user who placed a hold on this unit, if any. Staff still confirm
+  /// the clinical release; a hold is not a transfusion order.
+  final String? reservedBy;
+  final String? reservationNote;
+  final DateTime? reservedAt;
+
+  BloodUnit copyWith({
+    UnitStatus? status,
+    String? reservedBy,
+    String? reservationNote,
+    DateTime? reservedAt,
+    bool clearReservation = false,
+  }) {
+    return BloodUnit(
+      barcode: barcode,
+      bloodType: bloodType,
+      component: component,
+      storageBay: storageBay,
+      status: status ?? this.status,
+      collectedOn: collectedOn,
+      expiresOn: expiresOn,
+      reservedBy: clearReservation ? null : (reservedBy ?? this.reservedBy),
+      reservationNote:
+          clearReservation ? null : (reservationNote ?? this.reservationNote),
+      reservedAt: clearReservation ? null : (reservedAt ?? this.reservedAt),
+    );
+  }
 
   String get product => component.label;
 
@@ -133,6 +164,7 @@ enum AccountStatus {
 /// Role determines which dashboard a session lands on. There is no
 /// self-service path to [admin] — see `AuthService`.
 enum UserRole {
+  user('Community User'),
   donor('Voluntary Donor'),
   recipient('Recipient / Patient Representative'),
   staff('Clinical Personnel'),
@@ -142,6 +174,16 @@ enum UserRole {
   final String label;
 
   bool get isAdminSide => this == UserRole.admin || this == UserRole.staff;
+
+  /// Community members can post a blood request. This intentionally includes
+  /// donors: donating and needing blood are not mutually exclusive.
+  bool get canRequestBlood =>
+      this == UserRole.user ||
+      this == UserRole.donor ||
+      this == UserRole.recipient;
+
+  bool get canRegisterAsDonor =>
+      this == UserRole.user || this == UserRole.recipient;
 
   static UserRole? tryParse(String? raw) {
     if (raw == null) return null;
@@ -184,6 +226,7 @@ class AppUser {
     this.notifyChat = true,
     this.notifyNews = true,
     this.onboardingCompleted = false,
+    this.photoAsset,
   });
 
   final String id;
@@ -193,6 +236,10 @@ class AppUser {
   final String phone;
   final String barangay;
   final UserRole role;
+
+  /// Bundled, uniquely generated profile illustration. Avatars are original
+  /// TABANG artwork so fictional profiles never borrow a real person's face.
+  final String? photoAsset;
   final DateTime registeredOn;
   final BloodType? bloodType;
   final DateTime? birthDate;
@@ -246,6 +293,8 @@ class AppUser {
     return years;
   }
 
+  bool get isDonor => role == UserRole.donor;
+
   AppUser copyWith({
     AccountStatus? status,
     int? warningCount,
@@ -262,6 +311,10 @@ class AppUser {
     String? phone,
     String? barangay,
     String? fullName,
+    String? email,
+    String? photoAsset,
+    UserRole? role,
+    DateTime? birthDate,
     bool? shareBarangay,
     bool? notifyRequests,
     bool? notifyChat,
@@ -272,14 +325,15 @@ class AppUser {
       id: id,
       fullName: fullName ?? this.fullName,
       alias: alias ?? this.alias,
-      email: email,
+      email: email ?? this.email,
       phone: phone ?? this.phone,
       barangay: barangay ?? this.barangay,
-      role: role,
+      role: role ?? this.role,
       registeredOn: registeredOn,
       bloodType: bloodType ?? this.bloodType,
-      birthDate: birthDate,
+      birthDate: birthDate ?? this.birthDate,
       weightKg: weightKg ?? this.weightKg,
+      photoAsset: photoAsset ?? this.photoAsset,
       status: status ?? this.status,
       warningCount: warningCount ?? this.warningCount,
       suspensionReason: clearSuspensionReason
@@ -600,6 +654,102 @@ class ChatThread {
   }
 }
 
+/// The medical-history statements asked in the donor interview. Kept in one
+/// list so the form, the stored application and the staff review always agree.
+const List<String> kDonorMedicalQuestions = [
+  'Fever, cough or an infection in the last 7 days',
+  'Alcohol in the last 24 hours',
+  'Aspirin or pain relievers in the last 3 days',
+  'Medication or a vaccine in the last 4 weeks',
+  'Tattoo, piercing or acupuncture in the last 12 months',
+  'Surgery or dental extraction in the last 12 months',
+  'Pregnant or breastfeeding (female donors)',
+  'Hepatitis B/C, HIV or a positive screening test',
+  'Cancer, heart disease or a bleeding disorder',
+  'Travel outside the Philippines in the last 12 months',
+];
+
+/// What a donor presents to chapter staff. Verification happens in person;
+/// the app only tracks which requirements are still outstanding.
+const List<String> kDonorRequirements = [
+  'Valid government or school ID',
+  'PRC blood donor card, if you have one',
+  'List of current medications',
+  'Chapter interview and physical examination',
+  'Blood typing and infection screening',
+];
+
+enum DonorApplicationStatus {
+  pending('Pending staff verification'),
+  documentsRequested('Documents requested'),
+  verified('Verified'),
+  rejected('Not accepted');
+
+  const DonorApplicationStatus(this.label);
+  final String label;
+}
+
+/// One volunteer-donor registration submitted from Donor Hub.
+///
+/// The clinic does the actual interview and screening; the app records what
+/// was declared, what staff still asks for, and the verification outcome.
+class DonorApplication {
+  const DonorApplication({
+    required this.id,
+    required this.userId,
+    required this.submittedAt,
+    required this.status,
+    required this.sex,
+    required this.contact,
+    required this.idType,
+    required this.idNumber,
+    required this.medicalFlags,
+    required this.declarationAccepted,
+    this.requestedDocuments = const [],
+    this.staffNote,
+  });
+
+  final String id;
+  final String userId;
+  final DateTime submittedAt;
+  final DonorApplicationStatus status;
+  final String sex;
+  final String contact;
+  final String idType;
+  final String idNumber;
+
+  /// The medical-history statements answered "yes". A "yes" does not
+  /// automatically disqualify anyone — it flags what staff must ask about.
+  final List<String> medicalFlags;
+  final bool declarationAccepted;
+
+  /// Requirements chapter staff has asked the applicant to present.
+  final List<String> requestedDocuments;
+  final String? staffNote;
+
+  DonorApplication copyWith({
+    DonorApplicationStatus? status,
+    List<String>? requestedDocuments,
+    String? staffNote,
+    bool clearStaffNote = false,
+  }) {
+    return DonorApplication(
+      id: id,
+      userId: userId,
+      submittedAt: submittedAt,
+      status: status ?? this.status,
+      sex: sex,
+      contact: contact,
+      idType: idType,
+      idNumber: idNumber,
+      medicalFlags: medicalFlags,
+      declarationAccepted: declarationAccepted,
+      requestedDocuments: requestedDocuments ?? this.requestedDocuments,
+      staffNote: clearStaffNote ? null : (staffNote ?? this.staffNote),
+    );
+  }
+}
+
 /// A blood drive / donation event.
 class BloodDrive {
   const BloodDrive({
@@ -717,4 +867,38 @@ class BarangayStat {
   final String barangay;
   final int donationCount;
   final int donorCount;
+}
+
+/// A request for a blood-bank appointment.
+///
+/// The checklist asks for an "appointment with blood" form covering the blood
+/// type, patient name, donation type, patient hospital/ward and amount. This
+/// record is deliberately a *booking request*: chapter staff confirm the slot
+/// and perform the clinical screening before any unit is allocated.
+class DonationAppointment {
+  const DonationAppointment({
+    required this.id,
+    required this.requesterId,
+    required this.patientName,
+    required this.bloodType,
+    required this.component,
+    required this.hospital,
+    required this.ward,
+    required this.units,
+    required this.scheduledAt,
+    this.status = 'Pending confirmation',
+    this.note,
+  });
+
+  final String id;
+  final String requesterId;
+  final String patientName;
+  final BloodType bloodType;
+  final BloodComponent component;
+  final String hospital;
+  final String ward;
+  final int units;
+  final DateTime scheduledAt;
+  final String status;
+  final String? note;
 }

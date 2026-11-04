@@ -128,6 +128,12 @@ class TabangRepository {
   final List<UserReport> _reports = [];
   final List<BloodDrive> _drives = [];
   final List<ContentItem> _content = [];
+  final List<DonationAppointment> _appointments = [];
+  final List<DonorApplication> _donorApplications = [];
+
+  /// `<driveId>|<userId>` keys for donors who told the chapter they are
+  /// attending a drive.
+  final Set<String> _driveInterests = {};
 
   /// Directed block pairs, keyed `blockerId|blockedId`.
   final Set<String> _blocks = {};
@@ -158,6 +164,8 @@ class TabangRepository {
   List<UserReport> get reports => List.unmodifiable(_reports);
   List<BloodDrive> get drives => List.unmodifiable(_drives);
   List<ContentItem> get content => List.unmodifiable(_content);
+  List<DonationAppointment> get appointments =>
+      List.unmodifiable(_appointments);
 
   AppUser? userById(String id) {
     for (final u in _users) {
@@ -317,6 +325,18 @@ class TabangRepository {
     return null;
   }
 
+  /// Appointments belonging to one requester, newest first.
+  List<DonationAppointment> appointmentsFor(String userId) => _appointments
+      .where((a) => a.requesterId == userId)
+      .toList(growable: false)
+    ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+
+  /// Units currently on hold by [userId].
+  List<BloodUnit> reservedUnitsFor(String userId) => _units
+      .where((u) =>
+          u.reservedBy == userId && !u.isExpiredAt(DateTime.now()))
+      .toList(growable: false);
+
   bool isBlocked(String blockerId, String blockedId) =>
       _blocks.contains('$blockerId|$blockedId');
 
@@ -404,6 +424,41 @@ class TabangRepository {
     _notify();
   }
 
+  /// Promote a community user to a volunteer donor.
+  ///
+  /// A new donor is deliberately left unverified so chapter staff review the
+  /// blood card before the profile appears in the matching directory. The
+  /// method refuses accounts that are already donors or are staff/admin.
+  bool upgradeToDonor({
+    required String userId,
+    // Nullable: many walk-in applicants do not know their type yet and are
+    // typed at the chapter during screening.
+    required BloodType? bloodType,
+    required DateTime birthDate,
+    required double weightKg,
+  }) {
+    final user = userById(userId);
+    if (user == null || !user.role.canRegisterAsDonor) return false;
+    final age = DateTime.now().difference(birthDate).inDays ~/ 365;
+    if (age < EligibilityEngine.minimumAge ||
+        age > EligibilityEngine.maximumAge) {
+      return false;
+    }
+    if (weightKg < EligibilityEngine.minimumWeightKg || weightKg > 300) {
+      return false;
+    }
+    updateUser(user.copyWith(
+      role: UserRole.donor,
+      bloodType: bloodType,
+      birthDate: birthDate,
+      weightKg: weightKg,
+      status: AccountStatus.unverified,
+      bloodCardVerified: false,
+      isAvailable: true,
+    ));
+    return true;
+  }
+
   void setDonorAvailability(String userId, bool isAvailable) {
     final user = userById(userId);
     if (user == null) return;
@@ -446,6 +501,145 @@ class TabangRepository {
       bloodCardVerified: true,
     ));
   }
+
+  // ------------------------------------------------- donor applications
+
+  /// Every donor registration, newest first.
+  List<DonorApplication> get donorApplications =>
+      List.unmodifiable(_donorApplications.reversed);
+
+  DonorApplication? donorApplicationFor(String userId) {
+    for (final application in _donorApplications.reversed) {
+      if (application.userId == userId) return application;
+    }
+    return null;
+  }
+
+  /// Registrations staff still has to act on.
+  List<DonorApplication> get openDonorApplications => _donorApplications
+      .where((a) =>
+          a.status == DonorApplicationStatus.pending ||
+          a.status == DonorApplicationStatus.documentsRequested)
+      .toList(growable: false)
+    ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+
+  /// Submit a volunteer-donor registration.
+  ///
+  /// The account becomes a donor immediately but stays **unverified**, which
+  /// the eligibility engine treats as not yet donatable, and the application
+  /// enters the staff queue. Returns null when the basic age/weight rules fail
+  /// or the account cannot register.
+  DonorApplication? submitDonorApplication({
+    required String userId,
+    required BloodType? bloodType,
+    required DateTime birthDate,
+    required double weightKg,
+    required String sex,
+    required String contact,
+    required String idType,
+    required String idNumber,
+    required List<String> medicalFlags,
+    required bool declarationAccepted,
+  }) {
+    final user = userById(userId);
+    if (user == null || !declarationAccepted) return null;
+
+    // A community user converts here; an unverified donor may re-submit an
+    // updated form, which is why this is not restricted to community accounts.
+    final freshApplicant = user.role.canRegisterAsDonor;
+    final resubmitting =
+        user.role == UserRole.donor && !user.bloodCardVerified;
+    if (!freshApplicant && !resubmitting) return null;
+
+    final age = DateTime.now().difference(birthDate).inDays ~/ 365;
+    if (age < EligibilityEngine.minimumAge ||
+        age > EligibilityEngine.maximumAge) {
+      return null;
+    }
+    if (weightKg < EligibilityEngine.minimumWeightKg || weightKg > 300) {
+      return null;
+    }
+
+    if (freshApplicant) {
+      updateUser(user.copyWith(
+        role: UserRole.donor,
+        bloodType: bloodType,
+        birthDate: birthDate,
+        weightKg: weightKg,
+        status: AccountStatus.unverified,
+        bloodCardVerified: false,
+        isAvailable: true,
+      ));
+    } else {
+      updateUser(user.copyWith(
+        bloodType: bloodType ?? user.bloodType,
+        birthDate: birthDate,
+        weightKg: weightKg,
+        status: AccountStatus.unverified,
+        bloodCardVerified: false,
+      ));
+    }
+
+    _donorApplications.removeWhere((a) => a.userId == userId);
+    final application = DonorApplication(
+      id: 'DNA-${(_donorApplications.length + 1).toString().padLeft(3, '0')}',
+      userId: userId,
+      submittedAt: DateTime.now(),
+      status: DonorApplicationStatus.pending,
+      sex: sex,
+      contact: contact,
+      idType: idType,
+      idNumber: idNumber,
+      medicalFlags: List.unmodifiable(medicalFlags),
+      declarationAccepted: true,
+      requestedDocuments: const [
+        'Valid government or school ID',
+        'Chapter interview and physical examination',
+        'Blood typing and infection screening',
+      ],
+    );
+    _donorApplications.add(application);
+    _notify();
+    return application;
+  }
+
+  /// Staff decision on a donor application.
+  void setDonorApplicationStatus(
+    String userId,
+    DonorApplicationStatus status, {
+    String? note,
+    List<String>? requestedDocuments,
+  }) {
+    final index = _donorApplications.indexWhere((a) => a.userId == userId);
+    if (index == -1) return;
+    _donorApplications[index] = _donorApplications[index].copyWith(
+      status: status,
+      staffNote: note,
+      requestedDocuments: requestedDocuments,
+    );
+    if (status == DonorApplicationStatus.verified) {
+      // verifyUser notifies, so this path must not notify twice.
+      verifyUser(userId);
+      return;
+    }
+    _notify();
+  }
+
+  // --------------------------------------------------------- drive interest
+
+  bool isInterestedInDrive(String driveId, String userId) =>
+      _driveInterests.contains('$driveId|$userId');
+
+  bool toggleDriveInterest(String driveId, String userId) {
+    final key = '$driveId|$userId';
+    final added = _driveInterests.add(key);
+    if (!added) _driveInterests.remove(key);
+    _notify();
+    return added;
+  }
+
+  int driveInterestCount(String driveId) =>
+      _driveInterests.where((key) => key.startsWith('$driveId|')).length;
 
   void warnUser(String userId) {
     final user = userById(userId);
@@ -561,6 +755,11 @@ class TabangRepository {
     final donor = userById(response.donorId);
     final requester = userById(request.requesterId);
     if (donor == null || requester == null) return null;
+
+    // Chat-first rule: selection is only allowed after the requester and donor
+    // have both exchanged at least one message. This prevents choosing a donor
+    // based on a one-line offer without any human coordination.
+    if (!hasReciprocalChat(requester.id, donor.id)) return null;
 
     // Re-check at selection time: a donor may have become unavailable,
     // suspended, or entered a cooldown after responding.
@@ -689,6 +888,187 @@ class TabangRepository {
       expiresOn: u.expiresOn,
     );
     _notify();
+  }
+
+  /// Place a hold on a usable unit. A reservation is not a transfusion order:
+  /// chapter staff still confirm release after clinical screening. Reserving an
+  /// already-held unit fails so two people cannot claim the same bag.
+  bool reserveUnit({
+    required String barcode,
+    required String userId,
+    String? note,
+  }) {
+    final index = _units.indexWhere((u) => u.barcode == barcode);
+    if (index == -1) return false;
+    final unit = _units[index];
+    final actor = userById(userId);
+    if (actor == null || !unit.isUsable) return false;
+    if (unit.effectiveStatus(DateTime.now()) != UnitStatus.available) {
+      return false;
+    }
+    if (unit.reservedBy != null) return false;
+
+    _units[index] = unit.copyWith(
+      status: UnitStatus.reserved,
+      reservedBy: userId,
+      reservationNote:
+          note == null || note.trim().isEmpty ? null : note.trim(),
+      reservedAt: DateTime.now(),
+    );
+    _notify();
+    return true;
+  }
+
+  bool cancelReservation({
+    required String barcode,
+    required String userId,
+  }) {
+    final index = _units.indexWhere((u) => u.barcode == barcode);
+    if (index == -1) return false;
+    final unit = _units[index];
+    final actor = userById(userId);
+    if (actor == null) return false;
+    final allowed = unit.reservedBy == userId || actor.role.isAdminSide;
+    if (!allowed || unit.reservedBy == null) return false;
+    if (unit.isExpiredAt(DateTime.now())) return false;
+
+    _units[index] = unit.copyWith(
+      status: UnitStatus.available,
+      clearReservation: true,
+    );
+    _notify();
+    return true;
+  }
+
+  /// Staff release or dispatch a held bag after screening.
+  bool releaseUnit(String barcode, {required String actorId}) {
+    final actor = userById(actorId);
+    if (actor == null || !actor.role.isAdminSide) return false;
+    if (cancelReservation(barcode: barcode, userId: actorId)) return true;
+    setUnitStatus(barcode, UnitStatus.available);
+    return true;
+  }
+
+  /// Book a blood-bank appointment. Staff confirm the slot; the record does not
+  /// allocate a unit by itself.
+  DonationAppointment? addAppointment({
+    required String requesterId,
+    required String patientName,
+    required BloodType bloodType,
+    required BloodComponent component,
+    required String hospital,
+    required String ward,
+    required int units,
+    required DateTime scheduledAt,
+    String? note,
+  }) {
+    final requester = userById(requesterId);
+    if (requester == null || !requester.role.canRequestBlood) return null;
+    if (units < 1 || units > 20) return null;
+    final appointment = DonationAppointment(
+      id: 'APT-${(_appointments.length + 1).toString().padLeft(3, '0')}',
+      requesterId: requesterId,
+      patientName: patientName.trim(),
+      bloodType: bloodType,
+      component: component,
+      hospital: hospital,
+      ward: ward.trim(),
+      units: units,
+      scheduledAt: scheduledAt,
+      note: note == null || note.trim().isEmpty ? null : note.trim(),
+    );
+    _appointments.insert(0, appointment);
+    _notify();
+    return appointment;
+  }
+
+  bool confirmAppointment(String appointmentId, {required String actorId}) {
+    final actor = userById(actorId);
+    if (actor == null || !actor.role.isAdminSide) return false;
+    final index = _appointments.indexWhere((a) => a.id == appointmentId);
+    if (index == -1) return false;
+    final current = _appointments[index];
+    if (current.status == 'Confirmed') return false;
+    _appointments[index] = DonationAppointment(
+      id: current.id,
+      requesterId: current.requesterId,
+      patientName: current.patientName,
+      bloodType: current.bloodType,
+      component: current.component,
+      hospital: current.hospital,
+      ward: current.ward,
+      units: current.units,
+      scheduledAt: current.scheduledAt,
+      status: 'Confirmed',
+      note: current.note,
+    );
+    _notify();
+    return true;
+  }
+
+  // ------------------------------------------------------------ messaging
+
+  /// Open (or reuse) a private thread between two community accounts.
+  ///
+  /// Starting a conversation is the explicit step the paper requires before a
+  /// recipient can choose a donor. It is safe to call repeatedly: an existing
+  /// thread is returned rather than duplicated.
+  ChatThread? startConversation({
+    required String initiatorId,
+    required String otherId,
+    String? firstMessage,
+  }) {
+    if (initiatorId == otherId) return null;
+    final initiator = userById(initiatorId);
+    final other = userById(otherId);
+    if (initiator == null || other == null) return null;
+    if (isBlockedBetween(initiatorId, otherId)) return null;
+
+    var thread = threadBetween(initiatorId, otherId);
+    if (thread == null) {
+      thread = ChatThread(
+        id: 'ROOM-${(_threads.length + 101).toString().padLeft(3, '0')}',
+        participantAId: initiatorId,
+        participantAAlias: initiator.alias,
+        participantBId: otherId,
+        participantBAlias: other.alias,
+        messages: const [],
+      );
+      _threads.insert(0, thread);
+    }
+
+    final trimmed = firstMessage?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      final index = _threads.indexWhere((t) => t.id == thread!.id);
+      _threads[index] = thread.copyWith(
+        messages: [
+          ...thread.messages,
+          ChatMessage(
+            id: 'MSG-${DateTime.now().microsecondsSinceEpoch}',
+            senderId: initiatorId,
+            senderAlias: initiator.alias,
+            text: trimmed,
+            sentAt: DateTime.now(),
+            flag: _classify(trimmed),
+          ),
+        ],
+      );
+      thread = _threads[index];
+    }
+    _notify();
+    return thread;
+  }
+
+  /// True when both participants have sent at least one human message. System
+  /// notices do not count, so simply opening a thread is not enough.
+  bool hasReciprocalChat(String a, String b) {
+    final thread = threadBetween(a, b);
+    if (thread == null) return false;
+    final fromA =
+        thread.messages.any((m) => m.senderId == a && m.senderId != 'system');
+    final fromB =
+        thread.messages.any((m) => m.senderId == b && m.senderId != 'system');
+    return fromA && fromB;
   }
 
   void sendMessage(String threadId, String senderId, String text) {
@@ -947,6 +1327,7 @@ class TabangRepository {
     _reports.clear();
     _drives.clear();
     _content.clear();
+    _appointments.clear();
     _blocks.clear();
     _unblockedAt.clear();
     currentUser = null;
@@ -1154,6 +1535,199 @@ class TabangRepository {
         totalDonations: 2,
         bloodCardVerified: true,
       ),
+
+      // ---- additional available donors ---------------------------------
+      // The directory needs enough depth to demonstrate matching across every
+      // blood type. These donors are eligible today; the cooldown, suspended
+      // and unverified fixtures above are kept deliberately so blocker states
+      // remain testable.
+      AppUser(
+        id: 'USR-013',
+        fullName: 'Paolo Reyes',
+        alias: 'Paolo',
+        email: 'paolo.reyes@tabang.app',
+        phone: '+63 917 481 2201',
+        barangay: 'Zone 3',
+        role: UserRole.donor,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(1998, 4, 16),
+        weightKg: 74,
+        registeredOn: daysAgo(340),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(100),
+        totalDonations: 6,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-014',
+        fullName: 'Shamira Ampatuan',
+        alias: 'Mira',
+        email: 'shamira.ampatuan@tabang.app',
+        phone: '+63 918 220 4477',
+        barangay: 'San Jose',
+        role: UserRole.donor,
+        bloodType: BloodType.aPos,
+        birthDate: DateTime(1995, 12, 2),
+        weightKg: 58,
+        registeredOn: daysAgo(290),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(150),
+        totalDonations: 7,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-015',
+        fullName: 'Dominic Fuentes',
+        alias: 'Dom',
+        email: 'dominic.fuentes@tabang.app',
+        phone: '+63 927 553 1180',
+        barangay: 'Aplaya',
+        role: UserRole.donor,
+        bloodType: BloodType.bPos,
+        birthDate: DateTime(1993, 6, 27),
+        weightKg: 81,
+        registeredOn: daysAgo(210),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(96),
+        totalDonations: 4,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-016',
+        fullName: 'Grace Villamor',
+        alias: 'Grace',
+        email: 'grace.villamor@tabang.app',
+        phone: '+63 906 781 9922',
+        barangay: 'Kiagot',
+        role: UserRole.donor,
+        bloodType: BloodType.abPos,
+        birthDate: DateTime(1997, 9, 8),
+        weightKg: 56,
+        registeredOn: daysAgo(260),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(170),
+        totalDonations: 3,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-017',
+        fullName: 'Arnel Bautista',
+        alias: 'Arnel',
+        email: 'arnel.bautista@tabang.app',
+        phone: '+63 915 330 6614',
+        barangay: 'Binaton',
+        role: UserRole.donor,
+        bloodType: BloodType.oNeg,
+        birthDate: DateTime(1990, 2, 21),
+        weightKg: 77,
+        registeredOn: daysAgo(380),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(120),
+        totalDonations: 11,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-018',
+        fullName: 'Fatima Macabangon',
+        alias: 'Fati',
+        email: 'fatima.macabangon@tabang.app',
+        phone: '+63 920 118 7744',
+        barangay: 'Colorado',
+        role: UserRole.donor,
+        bloodType: BloodType.aNeg,
+        birthDate: DateTime(1994, 8, 30),
+        weightKg: 61,
+        registeredOn: daysAgo(190),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(130),
+        totalDonations: 5,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-019',
+        fullName: 'Jessa Mae Tupas',
+        alias: 'Jessa',
+        email: 'jessa.tupas@tabang.app',
+        phone: '+63 939 224 8801',
+        barangay: 'San Roque',
+        role: UserRole.donor,
+        bloodType: BloodType.bNeg,
+        birthDate: DateTime(2000, 3, 5),
+        weightKg: 53,
+        registeredOn: daysAgo(160),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(140),
+        totalDonations: 2,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-020',
+        fullName: 'Mark Anthony Salazar',
+        alias: 'Mark',
+        email: 'mark.salazar@tabang.app',
+        phone: '+63 917 662 3318',
+        barangay: 'Cogon',
+        role: UserRole.donor,
+        bloodType: BloodType.abNeg,
+        birthDate: DateTime(1987, 10, 12),
+        weightKg: 84,
+        registeredOn: daysAgo(450),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(160),
+        totalDonations: 14,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-021',
+        fullName: 'Amando Lumibao',
+        alias: 'Amando',
+        email: 'amando.lumibao@tabang.app',
+        phone: '+63 908 991 2277',
+        barangay: 'Mahayahay',
+        role: UserRole.donor,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(1985, 5, 18),
+        weightKg: 79,
+        registeredOn: daysAgo(520),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(200),
+        totalDonations: 18,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-022',
+        fullName: 'Rina Mae Lanticse',
+        alias: 'Rina',
+        email: 'rina.lanticse@tabang.app',
+        phone: '+63 927 447 5533',
+        barangay: 'Soong',
+        role: UserRole.donor,
+        bloodType: BloodType.aPos,
+        birthDate: DateTime(1999, 11, 23),
+        weightKg: 57,
+        registeredOn: daysAgo(130),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(95),
+        totalDonations: 3,
+        bloodCardVerified: true,
+      ),
+      AppUser(
+        id: 'USR-023',
+        fullName: 'Kevin Paul Abellera',
+        alias: 'Kevin',
+        email: 'kevin.abellera@tabang.app',
+        phone: '+63 918 880 4420',
+        barangay: 'Zone 2',
+        role: UserRole.donor,
+        bloodType: BloodType.bPos,
+        birthDate: DateTime(1996, 7, 14),
+        weightKg: 72,
+        registeredOn: daysAgo(240),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(110),
+        totalDonations: 6,
+        bloodCardVerified: true,
+      ),
       AppUser(
         id: 'USR-009',
         fullName: 'Maria Santos',
@@ -1163,6 +1737,193 @@ class TabangRepository {
         barangay: 'Zone 2',
         role: UserRole.recipient,
         registeredOn: daysAgo(40),
+        status: AccountStatus.verified,
+      ),
+
+      // ---- additional recipients ---------------------------------------
+      // Recipients are community members representing a patient. They have no
+      // donor weight/cooldown fields, but a recorded blood type helps prefill
+      // request forms and keeps the directory realistic.
+      AppUser(
+        id: 'USR-024',
+        fullName: 'Ana Liza Dizon',
+        alias: 'Ana',
+        email: 'ana.dizon@tabang.app',
+        phone: '+63 917 230 1144',
+        barangay: 'Zone 3',
+        role: UserRole.recipient,
+        bloodType: BloodType.aPos,
+        birthDate: DateTime(1982, 6, 11),
+        registeredOn: daysAgo(75),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-025',
+        fullName: 'Rodel Cabrera',
+        alias: 'Rodel',
+        email: 'rodel.cabrera@tabang.app',
+        phone: '+63 918 552 0091',
+        barangay: 'Matti',
+        role: UserRole.recipient,
+        bloodType: BloodType.bPos,
+        birthDate: DateTime(1979, 1, 27),
+        registeredOn: daysAgo(64),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-026',
+        fullName: 'Celeste Padilla',
+        alias: 'Celeste',
+        email: 'celeste.padilla@tabang.app',
+        phone: '+63 927 771 3320',
+        barangay: 'San Jose',
+        role: UserRole.recipient,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(2001, 9, 3),
+        registeredOn: daysAgo(52),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-027',
+        fullName: 'Nathaniel Lim',
+        alias: 'Nate',
+        email: 'nathaniel.lim@tabang.app',
+        phone: '+63 906 331 8845',
+        barangay: 'Zone 1',
+        role: UserRole.recipient,
+        bloodType: BloodType.abPos,
+        birthDate: DateTime(1990, 4, 19),
+        registeredOn: daysAgo(48),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-028',
+        fullName: 'Rowena Tiu',
+        alias: 'Wena',
+        email: 'rowena.tiu@tabang.app',
+        phone: '+63 915 664 2201',
+        barangay: 'Aplaya',
+        role: UserRole.recipient,
+        bloodType: BloodType.aNeg,
+        birthDate: DateTime(1988, 12, 8),
+        registeredOn: daysAgo(41),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-029',
+        fullName: 'Benjie Alcantara',
+        alias: 'Benjie',
+        email: 'benjie.alcantara@tabang.app',
+        phone: '+63 920 887 4452',
+        barangay: 'Kapatagan',
+        role: UserRole.recipient,
+        bloodType: BloodType.oNeg,
+        birthDate: DateTime(1974, 7, 22),
+        registeredOn: daysAgo(37),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-030',
+        fullName: 'Marilou Espino',
+        alias: 'Lulu',
+        email: 'marilou.espino@tabang.app',
+        phone: '+63 939 112 7790',
+        barangay: 'Cogon',
+        role: UserRole.recipient,
+        bloodType: BloodType.bNeg,
+        birthDate: DateTime(1969, 2, 14),
+        registeredOn: daysAgo(31),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-031',
+        fullName: 'Cyrus Villareal',
+        alias: 'Cyrus',
+        email: 'cyrus.villareal@tabang.app',
+        phone: '+63 917 559 6603',
+        barangay: 'Dawis',
+        role: UserRole.recipient,
+        bloodType: BloodType.abNeg,
+        birthDate: DateTime(1993, 8, 26),
+        registeredOn: daysAgo(29),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-032',
+        fullName: 'Edna Mae Rosales',
+        alias: 'Edna',
+        email: 'edna.rosales@tabang.app',
+        phone: '+63 908 772 1188',
+        barangay: 'Igpit',
+        role: UserRole.recipient,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(1965, 10, 5),
+        registeredOn: daysAgo(24),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-033',
+        fullName: 'Francis Solano',
+        alias: 'Francis',
+        email: 'francis.solano@tabang.app',
+        phone: '+63 927 330 5528',
+        barangay: 'Kiagot',
+        role: UserRole.recipient,
+        bloodType: BloodType.aPos,
+        birthDate: DateTime(1986, 5, 30),
+        registeredOn: daysAgo(19),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-034',
+        fullName: 'Honey Grace Bacalso',
+        alias: 'Honey',
+        email: 'honey.bacalso@tabang.app',
+        phone: '+63 918 441 9902',
+        barangay: 'Balabag',
+        role: UserRole.recipient,
+        bloodType: BloodType.bPos,
+        birthDate: DateTime(1998, 3, 17),
+        registeredOn: daysAgo(15),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-035',
+        fullName: 'Isko Salvador',
+        alias: 'Isko',
+        email: 'isko.salvador@tabang.app',
+        phone: '+63 906 990 3317',
+        barangay: 'Sinawilan',
+        role: UserRole.recipient,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(1971, 11, 9),
+        registeredOn: daysAgo(11),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-036',
+        fullName: 'Jasmine Kwan',
+        alias: 'Jas',
+        email: 'jasmine.kwan@tabang.app',
+        phone: '+63 915 220 7734',
+        barangay: 'Soong',
+        role: UserRole.recipient,
+        bloodType: BloodType.abPos,
+        birthDate: DateTime(2003, 1, 31),
+        registeredOn: daysAgo(7),
+        status: AccountStatus.verified,
+      ),
+      AppUser(
+        id: 'USR-037',
+        fullName: 'Lorenzo Basco',
+        alias: 'Enzo',
+        email: 'lorenzo.basco@tabang.app',
+        phone: '+63 920 664 1109',
+        barangay: 'San Miguel',
+        role: UserRole.recipient,
+        bloodType: BloodType.aNeg,
+        birthDate: DateTime(1983, 6, 6),
+        registeredOn: daysAgo(3),
         status: AccountStatus.verified,
       ),
       AppUser(
@@ -1187,13 +1948,36 @@ class TabangRepository {
         registeredOn: daysAgo(600),
         status: AccountStatus.verified,
       ),
+
+      // Default community account: can request blood, browse the directory and
+      // later choose "Register as a donor" without switching accounts.
+      AppUser(
+        id: 'USR-038',
+        fullName: 'Kairos Villanueva',
+        alias: 'Kai',
+        email: 'community@tabang.app',
+        phone: '+63 917 555 0101',
+        barangay: 'Zone 2',
+        role: UserRole.user,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(2000, 5, 21),
+        registeredOn: daysAgo(9),
+        status: AccountStatus.verified,
+      ),
     ]);
 
-    // Seeded demo accounts have already seen the welcome guide. Only users
-    // created through registration or the staff console get the first-run
-    // walkthrough.
+    // Every seeded profile gets its own bundled illustration. The generator in
+    // tools/make_avatars.py produces one distinct portrait per account, so no
+    // image is reused across donors, recipients, staff or the demo community
+    // user.
+    const avatarCount = 48;
     for (var i = 0; i < _users.length; i++) {
-      _users[i] = _users[i].copyWith(onboardingCompleted: true);
+      final asset =
+          'assets/images/avatars/avatar_${(i % avatarCount + 1).toString().padLeft(3, '0')}.png';
+      _users[i] = _users[i].copyWith(
+        onboardingCompleted: true,
+        photoAsset: asset,
+      );
     }
 
     // ---- inventory -----------------------------------------------------
@@ -1288,6 +2072,93 @@ class TabangRepository {
         barangay: 'Zone 1',
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(days: 3)),
+      ),
+      BloodRequest(
+        id: 'REQ-004',
+        requesterId: 'USR-024',
+        patientAlias: 'Patient 312',
+        bloodType: BloodType.aPos,
+        component: BloodComponent.plasma,
+        unitsNeeded: 2,
+        hospital: 'Digos Doctors Hospital',
+        barangay: 'Zone 3',
+        urgency: RequestUrgency.routine,
+        createdAt: now.subtract(const Duration(days: 2)),
+      ),
+      BloodRequest(
+        id: 'REQ-005',
+        requesterId: 'USR-025',
+        patientAlias: 'Patient 041',
+        bloodType: BloodType.bPos,
+        component: BloodComponent.wholeBlood,
+        unitsNeeded: 2,
+        hospital: 'Digos Provincial Hospital',
+        barangay: 'Matti',
+        urgency: RequestUrgency.urgent,
+        createdAt: now.subtract(const Duration(days: 1, hours: 8)),
+        note: 'Dialysis patient, two units requested by the attending physician.',
+      ),
+      BloodRequest(
+        id: 'REQ-006',
+        requesterId: 'USR-026',
+        patientAlias: 'Patient 177',
+        bloodType: BloodType.oPos,
+        component: BloodComponent.platelets,
+        unitsNeeded: 1,
+        hospital: 'Cor Jesu College Infirmary',
+        barangay: 'San Jose',
+        urgency: RequestUrgency.routine,
+        createdAt: now.subtract(const Duration(hours: 20)),
+        source: RequestSource.bloodBank,
+      ),
+      BloodRequest(
+        id: 'REQ-007',
+        requesterId: 'USR-029',
+        patientAlias: 'Patient 205',
+        bloodType: BloodType.oNeg,
+        component: BloodComponent.packedRbc,
+        unitsNeeded: 4,
+        hospital: 'Digos Provincial Hospital',
+        barangay: 'Kapatagan',
+        urgency: RequestUrgency.critical,
+        createdAt: now.subtract(const Duration(hours: 16)),
+        note: 'Trauma case in the emergency room; universal donor needed.',
+      ),
+      BloodRequest(
+        id: 'REQ-008',
+        requesterId: 'USR-033',
+        patientAlias: 'Patient 390',
+        bloodType: BloodType.aPos,
+        component: BloodComponent.packedRbc,
+        unitsNeeded: 1,
+        hospital: 'Digos Doctors Hospital',
+        barangay: 'Kiagot',
+        urgency: RequestUrgency.urgent,
+        createdAt: now.subtract(const Duration(hours: 11)),
+      ),
+      BloodRequest(
+        id: 'REQ-009',
+        requesterId: 'USR-037',
+        patientAlias: 'Patient 088',
+        bloodType: BloodType.aNeg,
+        component: BloodComponent.wholeBlood,
+        unitsNeeded: 2,
+        hospital: 'Digos Provincial Hospital',
+        barangay: 'San Miguel',
+        urgency: RequestUrgency.urgent,
+        createdAt: now.subtract(const Duration(hours: 7)),
+      ),
+      BloodRequest(
+        id: 'REQ-010',
+        requesterId: 'USR-031',
+        patientAlias: 'Patient 143',
+        bloodType: BloodType.abNeg,
+        component: BloodComponent.plasma,
+        unitsNeeded: 1,
+        hospital: 'Cor Jesu College Infirmary',
+        barangay: 'Dawis',
+        urgency: RequestUrgency.routine,
+        createdAt: now.subtract(const Duration(days: 4)),
       ),
     ]);
 
@@ -1409,6 +2280,54 @@ class TabangRepository {
           ),
         ],
       ),
+      // Seeded reciprocal conversations let the demo select pre-existing
+      // responses immediately; newly posted responses still require chat first.
+      ChatThread(
+        id: 'ROOM-104',
+        participantAId: 'USR-009',
+        participantAAlias: 'Recipient 209',
+        participantBId: 'USR-012',
+        participantBAlias: 'Liza',
+        messages: [
+          ChatMessage(
+            id: 'MSG-301',
+            senderId: 'USR-009',
+            senderAlias: 'Recipient 209',
+            text: 'Thank you for responding. Are you free tomorrow morning?',
+            sentAt: now.subtract(const Duration(hours: 2, minutes: 40)),
+          ),
+          ChatMessage(
+            id: 'MSG-302',
+            senderId: 'USR-012',
+            senderAlias: 'Liza',
+            text: 'Yes, I can be at the hospital by 8 AM.',
+            sentAt: now.subtract(const Duration(hours: 2, minutes: 25)),
+          ),
+        ],
+      ),
+      ChatThread(
+        id: 'ROOM-105',
+        participantAId: 'USR-009',
+        participantAAlias: 'Recipient 209',
+        participantBId: 'USR-007',
+        participantBAlias: 'Bea',
+        messages: [
+          ChatMessage(
+            id: 'MSG-401',
+            senderId: 'USR-009',
+            senderAlias: 'Recipient 209',
+            text: 'Hello Bea, can you confirm your availability for Patient 118?',
+            sentAt: now.subtract(const Duration(days: 2, hours: 22)),
+          ),
+          ChatMessage(
+            id: 'MSG-402',
+            senderId: 'USR-007',
+            senderAlias: 'Bea',
+            text: 'Confirmed. I can donate at the infirmary this week.',
+            sentAt: now.subtract(const Duration(days: 2, hours: 21)),
+          ),
+        ],
+      ),
     ]);
 
     // ---- drives --------------------------------------------------------
@@ -1440,20 +2359,67 @@ class TabangRepository {
         endsAt: _atHour(now, 14, 16),
         expectedDonors: 150,
       ),
+      BloodDrive(
+        id: 'DRV-004',
+        title: 'Aplaya Coastal Community Drive',
+        venue: 'Aplaya Barangay Hall',
+        barangay: 'Aplaya',
+        startsAt: _atHour(now, 5, 8),
+        endsAt: _atHour(now, 5, 13),
+        expectedDonors: 60,
+      ),
+      BloodDrive(
+        id: 'DRV-005',
+        title: 'San Jose Mall Bloodletting',
+        venue: 'San Jose Town Plaza',
+        barangay: 'San Jose',
+        startsAt: _atHour(now, 11, 9),
+        endsAt: _atHour(now, 11, 17),
+        expectedDonors: 95,
+      ),
+    ]);
+
+    // ---- blood-bank appointments ---------------------------------------
+    _appointments.addAll([
+      DonationAppointment(
+        id: 'APT-001',
+        requesterId: 'USR-009',
+        patientName: 'Mercy Santos',
+        bloodType: BloodType.oNeg,
+        component: BloodComponent.packedRbc,
+        hospital: 'Digos Provincial Hospital',
+        ward: 'Obstetrics Ward 2',
+        units: 2,
+        scheduledAt: _atHour(now, 1, 9),
+        status: 'Confirmed',
+        note: 'Scheduled caesarean section.',
+      ),
+      DonationAppointment(
+        id: 'APT-002',
+        requesterId: 'USR-025',
+        patientName: 'Elias Cabrera',
+        bloodType: BloodType.bPos,
+        component: BloodComponent.wholeBlood,
+        hospital: 'Digos Doctors Hospital',
+        ward: 'Dialysis Unit',
+        units: 2,
+        scheduledAt: _atHour(now, 2, 10),
+      ),
     ]);
 
     // ---- educational content -------------------------------------------
     _content.addAll(const [
       ContentItem(
         id: 'CNT-001',
-        title: 'National Blood Shortage: How One Donation Saves Up to 3 Lives',
+        title: 'One Donation, Three Lives',
         subtitle:
-            'Hospitals face critical shortages. Find a drive near you today.',
+            'A single bag can become red cells, platelets and plasma for three patients.',
         body:
             'A single whole-blood donation can be separated into red cells, platelets and plasma, '
-            'which may support up to three different patients. During shortage periods, voluntary '
-            'non-remunerated donors are the only sustainable source of supply under RA 7719.',
-        tag: 'URGENT NEED',
+            'which may support up to three different patients. Voluntary, non-remunerated donors '
+            'are the only sustainable source of supply under RA 7719, and every donation is '
+            'screened, typed and tracked before it reaches a patient.',
+        tag: 'WHY DONATE',
         category: ContentCategory.explore,
         imageAsset: 'assets/images/hero_donation.jpg',
       ),
@@ -1519,7 +2485,7 @@ class TabangRepository {
             'The screening nurse makes the final call.',
         tag: 'FAQ',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/content_screening.jpg',
+        imageAsset: 'assets/images/educational/edu_eligibility.png',
       ),
       ContentItem(
         id: 'CNT-007',
@@ -1573,6 +2539,48 @@ class TabangRepository {
         tag: 'DONOR SPOTLIGHT',
         category: ContentCategory.stories,
         imageAsset: 'assets/images/drive_community.jpg',
+      ),
+      ContentItem(
+        id: 'CNT-011',
+        title: 'What to Bring on Donation Day',
+        subtitle:
+            'A valid ID, your donor card, and a light meal before you arrive.',
+        body:
+            'Bring a government-issued ID and your blood donor card. Eat a '
+            'normal meal within four hours of donating and avoid fatty food, '
+            'which can affect screening. The chapter team will confirm your '
+            'identity and walk you through the questionnaire.',
+        tag: 'CHECKLIST',
+        category: ContentCategory.tips,
+        imageAsset: 'assets/images/educational/edu_prepare.png',
+      ),
+      ContentItem(
+        id: 'CNT-012',
+        title: 'How Donation Helps the Whole Community',
+        subtitle:
+            'One bag can become red cells, platelets and plasma for three patients.',
+        body:
+            'Voluntary, unpaid donation keeps the supply safe and sustainable. '
+            'Red cells support surgery and trauma, platelets support cancer '
+            'treatment, and plasma supports burns and clotting disorders. '
+            'Regular donors make planned care possible.',
+        tag: 'WHY DONATE',
+        category: ContentCategory.explore,
+        imageAsset: 'assets/images/educational/edu_benefits.png',
+      ),
+      ContentItem(
+        id: 'CNT-013',
+        title: 'Plan Your Recovery After Donating',
+        subtitle:
+            'Rest, hydrate and avoid heavy lifting for the rest of the day.',
+        body:
+            'Sit for at least ten minutes after donation and have a snack. '
+            'Drink extra fluids, keep the bandage on for four hours, and avoid '
+            'strenuous work, saunas and smoking for 24 hours. Contact the '
+            'chapter if you feel faint or the site starts bleeding.',
+        tag: 'AFTERCARE',
+        category: ContentCategory.tips,
+        imageAsset: 'assets/images/educational/edu_aftercare.png',
       ),
     ]);
   }

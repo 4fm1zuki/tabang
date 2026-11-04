@@ -11,6 +11,22 @@ import '../theme.dart';
 /// lets the recipient either submit to the blood bank for processing or post to
 /// the donor network. Keeping the dialog in one place means the Blood Bank and
 /// Requests surfaces cannot drift apart.
+/// Plain-language meaning of each urgency level, shown under the selector.
+String _urgencyBlurb(RequestUrgency urgency) {
+  switch (urgency) {
+    case RequestUrgency.critical:
+      return 'Critical — the patient needs units now. The chapter releases '
+          'stock or confirms a donor as soon as possible, usually within '
+          'minutes to a few hours.';
+    case RequestUrgency.urgent:
+      return 'Urgent — needed within 24–48 hours. The chapter schedules the '
+          'next available slot or drive for this patient.';
+    case RequestUrgency.routine:
+      return 'Routine — planned use, usually three or more days away, such as '
+          'a scheduled surgery.';
+  }
+}
+
 Future<void> showBloodRequestDialog(
   BuildContext context,
   AppUser user,
@@ -193,6 +209,15 @@ Future<void> showBloodRequestDialog(
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _urgencyBlurb(urgency),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.45,
+                        color: dialogContext.textMuted,
+                      ),
                     ),
                     const SizedBox(height: TabangSpace.md),
                     DropdownButtonFormField<String>(

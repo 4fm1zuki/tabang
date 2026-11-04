@@ -118,13 +118,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       Text(
                         'Alias "${user.alias}" · ${user.role.label}',
                         style: TextStyle(
-                            fontSize: 11.5, color: context.textMuted),
+                            fontSize: 12.5, color: context.textMuted),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         user.email,
                         style: TextStyle(
-                            fontSize: 11.5, color: context.textMuted),
+                            fontSize: 12.5, color: context.textMuted),
                       ),
                     ],
                   ),
@@ -194,14 +194,14 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Text(
                 'Donation type',
-                style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                style: TextStyle(fontSize: 12.5, color: context.textMuted),
               ),
               const SizedBox(width: TabangSpace.md),
               DropdownButton<BloodComponent>(
                 value: _eligibilityComponent,
                 isDense: true,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12.5,
                   color: context.textColor,
                 ),
                 items: BloodComponent.values
@@ -222,14 +222,14 @@ class _ProfilePageState extends State<ProfilePage> {
               'Last donation: ${formatDate(user.lastDonationDate!)}'
               '${user.lastDonationComponent == null ? '' : ' · '
                   '${user.lastDonationComponent!.label}'}',
-              style: TextStyle(fontSize: 11.5, color: context.textMuted),
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
             ),
             const SizedBox(height: 4),
           ],
           if (eligibility.eligibleFrom != null) ...[
             Text(
               'Eligible again from ${formatDate(eligibility.eligibleFrom!)}',
-              style: TextStyle(fontSize: 11.5, color: context.textMuted),
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
             ),
             const SizedBox(height: TabangSpace.sm),
             ProportionBar(
@@ -247,14 +247,14 @@ class _ProfilePageState extends State<ProfilePage> {
               '${EligibilityEngine.cooldownFor(_eligibilityComponent)} '
               'cooldown days remaining for '
               '${_eligibilityComponent.label.toLowerCase()}',
-              style: TextStyle(fontSize: 10.5, color: context.textMuted),
+              style: TextStyle(fontSize: 11.5, color: context.textMuted),
             ),
           ] else
             Text(
               'You meet every eligibility rule: age, availability, account '
               'standing and donation interval.',
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12.5,
                 height: 1.5,
                 color: context.textMuted,
               ),
@@ -375,7 +375,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   user.isAvailable
                       ? 'You appear in the donor directory when eligible'
                       : 'You are hidden from the donor directory',
-                  style: TextStyle(fontSize: 10.5, color: context.textMuted),
+                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
                 ),
               ],
             ),
@@ -399,14 +399,14 @@ class _ProfilePageState extends State<ProfilePage> {
             width: 140,
             child: Text(
               label,
-              style: TextStyle(fontSize: 11.5, color: context.textMuted),
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
             ),
           ),
           Expanded(
             child: Text(
               value,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: context.textColor,
               ),
