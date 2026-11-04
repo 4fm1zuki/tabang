@@ -218,7 +218,7 @@ class _AdminShellState extends State<AdminShell> {
           onThemeModeChanged: widget.onThemeModeChanged,
         );
       case 6:
-        return const AboutHelpPage();
+        return AboutHelpPage(onOpenMessages: () => _select(3));
       default:
         return const AdminOverviewPage();
     }

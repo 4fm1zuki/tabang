@@ -9,7 +9,6 @@ import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
-import '../../widgets/onboarding.dart';
 import '../../widgets/photo.dart';
 
 /// Discover / home feed.
@@ -43,6 +42,9 @@ class DiscoverPage extends StatefulWidget {
 class _DiscoverPageState extends State<DiscoverPage> {
   final TabangRepository _repo = TabangRepository.instance;
   final TextEditingController _searchController = TextEditingController();
+
+  /// Anchor for the "Find a drive" quick action.
+  final GlobalKey _drivesSectionKey = GlobalKey();
 
   ContentCategory _category = ContentCategory.explore;
   String _query = '';
@@ -189,15 +191,18 @@ class _DiscoverPageState extends State<DiscoverPage> {
             else
               _buildGrid(items),
           ] else if (_category == ContentCategory.explore) ...[
-            _buildSectionHeader(
-              context,
-              'Upcoming blood drives',
-              subtitle:
-                  'Walk in or book an appointment at a participating site.',
-              action: _sectionAction(
+            KeyedSubtree(
+              key: _drivesSectionKey,
+              child: _buildSectionHeader(
                 context,
-                'Blood Bank',
-                () => widget.onNavigate?.call(1),
+                'Upcoming blood drives',
+                subtitle:
+                    'Walk in or book an appointment at a participating site.',
+                action: _sectionAction(
+                  context,
+                  'Blood Bank',
+                  () => widget.onNavigate?.call(1),
+                ),
               ),
             ),
             if (_upcomingDrives.isEmpty)
@@ -254,15 +259,18 @@ class _DiscoverPageState extends State<DiscoverPage> {
             const SizedBox(height: TabangSpace.xxl),
             _buildVisitPlanner(context),
           ] else if (_category == ContentCategory.drives) ...[
-            _buildSectionHeader(
-              context,
-              'Upcoming blood drives',
-              subtitle:
-                  'Walk in or book an appointment at a participating site.',
-              action: _sectionAction(
+            KeyedSubtree(
+              key: _drivesSectionKey,
+              child: _buildSectionHeader(
                 context,
-                'Blood Bank',
-                () => widget.onNavigate?.call(1),
+                'Upcoming blood drives',
+                subtitle:
+                    'Walk in or book an appointment at a participating site.',
+                action: _sectionAction(
+                  context,
+                  'Blood Bank',
+                  () => widget.onNavigate?.call(1),
+                ),
               ),
             ),
             if (_upcomingDrives.isEmpty)
@@ -332,12 +340,26 @@ class _DiscoverPageState extends State<DiscoverPage> {
           icon: const Icon(Icons.map_outlined, size: 18),
           label: const Text('Find donors near you'),
         ),
-        TextButton.icon(
-          onPressed: () => showWelcomeGuide(context, user, markSeen: false),
-          icon: const Icon(Icons.menu_book_outlined, size: 18),
-          label: const Text('Donor guide'),
+        // Sits beside "Find donors near you" as requested; jumps to the drives
+        // rail instead of leaving the page.
+        OutlinedButton.icon(
+          onPressed: _jumpToDrives,
+          icon: const Icon(Icons.event_outlined, size: 18),
+          label: const Text('Find a drive'),
         ),
       ],
+    );
+  }
+
+  /// Scrolls the feed to the blood-drive rail.
+  void _jumpToDrives() {
+    final target = _drivesSectionKey.currentContext;
+    if (target == null) return;
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+      alignment: 0.05,
     );
   }
 
@@ -439,18 +461,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
                           foregroundColor: TabangColors.crimsonDark,
                         ),
                       ),
-                      TextButton.icon(
-                        onPressed: () => widget.onNavigate?.call(2),
-                        icon: const Icon(Icons.place_outlined, size: 17),
-                        label: const Text('Find a drive'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: TabangSpace.sm),
-                  PhotoCredit(item.imageAsset, onImage: true),
                 ],
               ),
             ),
@@ -683,7 +695,6 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     ),
                   ],
                 ),
-                PhotoCredit(photo),
               ],
             ),
           ),
@@ -822,8 +833,6 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     color: context.textMuted,
                   ),
                 ),
-                const SizedBox(height: TabangSpace.sm),
-                PhotoCredit(item.imageAsset),
               ],
             ),
           ),
@@ -1296,13 +1305,32 @@ class _ContentRailState extends State<_ContentRail> {
     );
   }
 
-  /// Mouse-wheel over the rail scrolls the rail horizontally.
-  ///
-  /// Flutter maps a vertical wheel delta to the nearest vertical scrollable,
-  /// so hovering an event-card rail and spinning the wheel used to scroll the
-  /// whole page instead of the row under the cursor.
+  /// The rail that currently owns the mouse wheel. Clicking a rail focuses it;
+  /// clicking anywhere else returns the wheel to normal page scrolling.
+  static _ContentRailState? _focusedRail;
+
+  bool _focused = false;
+
+  void _unfocus() {
+    if (!mounted) return;
+    if (_focused) setState(() => _focused = false);
+  }
+
+  void _focus() {
+    if (_focusedRail != this) _focusedRail?._unfocus();
+    _focusedRail = this;
+    if (!_focused) setState(() => _focused = true);
+  }
+
+  /// Mouse-wheel scrolls the rail only after it has been clicked ("focused").
+  /// Flutter otherwise maps a vertical wheel delta to the nearest vertical
+  /// scrollable, so plain hovering used to swallow the page scroll.
   void _handlePointerSignal(PointerSignalEvent event) {
-    if (event is! PointerScrollEvent || !_controller.hasClients) return;
+    if (!_focused || event is! PointerScrollEvent) return;
+    // The focused rail owns the wheel: consume the event even when the row is
+    // already at its end, so the page does not suddenly scroll vertically.
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {});
+    if (!_controller.hasClients) return;
     final delta = event.scrollDelta.dy != 0
         ? event.scrollDelta.dy
         : event.scrollDelta.dx;
@@ -1311,7 +1339,6 @@ class _ContentRailState extends State<_ContentRail> {
     final target = (_controller.offset + delta)
         .clamp(position.minScrollExtent, position.maxScrollExtent);
     if (target == _controller.offset) return;
-    GestureBinding.instance.pointerSignalResolver.register(event, (_) {});
     _controller.jumpTo(target);
   }
 
@@ -1322,7 +1349,13 @@ class _ContentRailState extends State<_ContentRail> {
     // swipe the rail instead, and mouse users can still drag it.
     final showArrows =
         !context.isPhone && widget.children.length > 1 && _hovered;
-    return MouseRegion(
+    return TapRegion(
+      onTapInside: (_) => _focus(),
+      onTapOutside: (_) {
+        if (_focusedRail == this) _focusedRail = null;
+        _unfocus();
+      },
+      child: MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: Listener(
@@ -1384,6 +1417,7 @@ class _ContentRailState extends State<_ContentRail> {
             ),
           ),
       ],
+      ),
       ),
       ),
     );

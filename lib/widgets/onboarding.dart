@@ -202,22 +202,15 @@ Future<void> showWelcomeGuide(
                 if (i != steps.length - 1) const SizedBox(height: TabangSpace.md),
               ],
               const SizedBox(height: TabangSpace.xl),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Skip'),
-                    ),
-                  ),
-                  const SizedBox(width: TabangSpace.sm),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Got it'),
-                    ),
-                  ),
-                ],
+              // One action only: "Skip" and "Got it" both just closed the
+              // dialog, so the pair was redundant. The guide stays available
+              // from Guides & help at any time.
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Got it'),
+                ),
               ),
             ],
           ),

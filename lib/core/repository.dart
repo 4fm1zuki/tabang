@@ -1048,6 +1048,35 @@ class TabangRepository {
     return thread;
   }
 
+  /// Chapter staff account that receives support messages.
+  static const String staffAccountId = 'USR-010';
+
+  /// Send a system question, data correction or feedback to chapter staff.
+  ///
+  /// Opens (or reuses) the thread with the staff account, posts the message
+  /// with its category, and adds an acknowledgement from staff so the report
+  /// visibly lands in a real conversation.
+  ChatThread? sendStaffFeedback({
+    required String userId,
+    required String category,
+    required String message,
+  }) {
+    final thread = startConversation(
+      initiatorId: userId,
+      otherId: staffAccountId,
+      firstMessage: '[$category] ${message.trim()}',
+    );
+    if (thread == null) return null;
+    sendMessage(
+      thread.id,
+      staffAccountId,
+      'Thanks — your ${category.toLowerCase()} was received. Chapter staff '
+      'review messages during office hours (Mon–Sat, 8:00 AM – 5:00 PM) and '
+      'will reply in this thread.',
+    );
+    return threadBetween(userId, staffAccountId);
+  }
+
   /// True when both participants have sent at least one human message. System
   /// notices do not count, so simply opening a thread is not enough.
   bool hasReciprocalChat(String a, String b) {

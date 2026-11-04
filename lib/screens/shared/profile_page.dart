@@ -264,47 +264,54 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  /// Donation summary tiles.
+  ///
+  /// Four tiles used to be forced into a single Row, which crushed each one to
+  /// ~85 px on a phone and clipped the values. They now wrap two-up on
+  /// narrow screens and four-up once there is room.
   Widget _buildStatsRow(BuildContext context, AppUser user) {
-    return Row(
-      children: [
-        Expanded(
-          child: MetricTile(
-            label: 'Total donations',
-            value: '${user.totalDonations}',
-            icon: Icons.favorite_outline,
-            tone: Tone.brand,
-          ),
-        ),
-        const SizedBox(width: TabangSpace.md),
-        Expanded(
-          child: MetricTile(
-            label: 'Last donated',
-            value: user.lastDonationDate == null
-                ? '—'
-                : formatDate(user.lastDonationDate!),
-            icon: Icons.event_outlined,
-            tone: Tone.info,
-          ),
-        ),
-        const SizedBox(width: TabangSpace.md),
-        Expanded(
-          child: MetricTile(
-            label: 'Warnings',
-            value: '${user.warningCount}',
-            icon: Icons.flag_outlined,
-            tone: user.warningCount == 0 ? Tone.success : Tone.warning,
-          ),
-        ),
-        const SizedBox(width: TabangSpace.md),
-        Expanded(
-          child: MetricTile(
-            label: 'Blood card',
-            value: user.bloodCardVerified ? 'Verified' : 'Pending',
-            icon: Icons.badge_outlined,
-            tone: user.bloodCardVerified ? Tone.success : Tone.info,
-          ),
-        ),
-      ],
+    final tiles = <Widget>[
+      MetricTile(
+        label: 'Total donations',
+        value: '${user.totalDonations}',
+        icon: Icons.favorite_outline,
+        tone: Tone.brand,
+      ),
+      MetricTile(
+        label: 'Last donated',
+        value: user.lastDonationDate == null
+            ? '—'
+            : formatDate(user.lastDonationDate!),
+        icon: Icons.event_outlined,
+        tone: Tone.info,
+      ),
+      MetricTile(
+        label: 'Warnings',
+        value: '${user.warningCount}',
+        icon: Icons.flag_outlined,
+        tone: user.warningCount == 0 ? Tone.success : Tone.warning,
+      ),
+      MetricTile(
+        label: 'Blood card',
+        value: user.bloodCardVerified ? 'Verified' : 'Pending',
+        icon: Icons.badge_outlined,
+        tone: user.bloodCardVerified ? Tone.success : Tone.info,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = TabangSpace.md;
+        final columns = constraints.maxWidth >= 720 ? 4 : 2;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final tile in tiles) SizedBox(width: width, child: tile),
+          ],
+        );
+      },
     );
   }
 
@@ -342,6 +349,16 @@ class _ProfilePageState extends State<ProfilePage> {
           _detailRow(context, 'Registered', formatDate(user.registeredOn)),
           if (user.suspensionReason != null)
             _detailRow(context, 'Suspension reason', user.suspensionReason!),
+          const SizedBox(height: TabangSpace.xs),
+          Text(
+            'Your real name and contact number are shared with another user '
+            'only after both of you accept an identity reveal in Messages.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: context.textMuted,
+            ),
+          ),
         ],
       ),
     );
@@ -445,8 +462,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     TextFormField(
                       controller: nameController,
-                      decoration:
-                          const InputDecoration(labelText: 'Full name'),
+                      decoration: const InputDecoration(
+                        labelText: 'Full name',
+                        helperText:
+                            'Shared only after a mutual identity reveal',
+                      ),
                       validator: (v) => (v == null || v.trim().length < 3)
                           ? 'Enter your full name'
                           : null,
@@ -466,8 +486,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     TextFormField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration:
-                          const InputDecoration(labelText: 'Contact number'),
+                      decoration: const InputDecoration(
+                        labelText: 'Contact number',
+                        helperText:
+                            'Shared only after a mutual identity reveal',
+                      ),
                       validator: (v) => (v == null || v.trim().length < 7)
                           ? 'Enter a contact number'
                           : null,

@@ -169,7 +169,7 @@ class _DonorShellState extends State<DonorShell> {
           onThemeModeChanged: widget.onThemeModeChanged,
         );
       case 8:
-        return const AboutHelpPage();
+        return AboutHelpPage(onOpenMessages: () => _select(4));
       default:
         return DiscoverPage(user: widget.user, onNavigate: _select);
     }

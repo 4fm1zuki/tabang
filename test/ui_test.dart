@@ -35,7 +35,7 @@ void main() {
     // organised feed. The old four-button + summary stack is gone.
     expect(find.text('View blood requests'), findsOneWidget);
     expect(find.text('Find donors near you'), findsOneWidget);
-    expect(find.text('Donor guide'), findsOneWidget);
+    expect(find.text('Find a drive'), findsOneWidget);
     expect(find.text('Upcoming blood drives'), findsOneWidget);
     expect(find.text('Announcements & stories'), findsOneWidget);
   });
@@ -239,22 +239,20 @@ void main() {
 
     // Hero, content cards and the two drive cards all use TabangPhoto.
     expect(find.byType(TabangPhoto), findsWidgets);
-    // Attribution is visible under the image, not hidden in a settings pane.
-    expect(find.byType(PhotoCredit), findsWidgets);
+    // The feed itself carries no credit text any more — attribution lives in
+    // the details dialog that opens when a card is tapped.
+    expect(find.byType(PhotoCredit), findsNothing);
 
     await tester.ensureVisible(find.text('Read the story'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Read the story'));
     await tester.pumpAndSettle();
     expect(find.byType(TabangPhoto), findsWidgets);
-    await tester.tap(find.text('Close'));
-    await tester.pumpAndSettle();
+    expect(find.byType(PhotoCredit), findsOneWidget);
 
-    // Photograph attribution is a chip; tapping it opens the licence and the
-    // source link. Asset paths are deliberately not shown to users.
-    await tester.ensureVisible(find.byType(PhotoCredit).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(PhotoCredit).first);
+    // Tapping the chip opens the licence and the source link. Asset paths are
+    // deliberately not shown to users.
+    await tester.tap(find.byType(PhotoCredit));
     await tester.pumpAndSettle();
     expect(find.text('Photo credit'), findsOneWidget);
     expect(find.text('Source'), findsOneWidget);

@@ -72,11 +72,13 @@ were bypassed.
 
 - **Discover** — one compact toolbar, then horizontal rails for upcoming blood
   drives, announcements and stories, and short learning cards, ending with a
-  visit planner. The urgent shortage callout lives on Blood Bank and the map,
-  not here. Blood-drive cards open venue, schedule and expected-donor details,
-  and every photograph carries a visible author/licence chip: tap or long-press
-  the chip for the exact file and source link. Original TABANG artwork shows no
-  external source because it has none.
+  visit planner. Quick actions are *Request blood*, *Find donors near you* and
+  *Find a drive* (which scrolls the feed to the drives rail). The urgent
+  shortage callout lives on Blood Bank and the map, not here. Credit text is
+  no longer printed under feed cards — attribution appears in the article and
+  drive details after a card is tapped, and original TABANG artwork is not
+  credited at all. A mouse wheel scrolls a rail only after that rail is
+  clicked; clicking elsewhere returns the wheel to normal page scrolling.
 - **Blood Bank** — the chapter banner, a one-line stock note, a public stock
   grid by component and blood type, then a *card list* of units (product,
   storage, expiry, status) that reflows one to three columns and highlights on
@@ -98,14 +100,17 @@ were bypassed.
   blood-drive pins with counts, dedicated **hospital and PRC chapter pins**,
   and haloed barangay labels that are collision-checked (biggest barangays
   win a slot, small ones appear as you zoom in) rather than stacked. The base
-  layer uses the map project's warm street template so roads, water and
-  buildings stay visible, and a **metric scale bar** shows the distance. A
-  single compass control re-frames the full north-up city, `+`/`−` step the
-  zoom, the light/dark map style is independent of the app theme, and
-  OpenStreetMap attribution is shown on the canvas. Blood-type chips keep clear
-  of the control stack, and mouse-wheel over a Discover rail scrolls that rail.
-  Tapping a barangay filters the donor list; the donor pane expands/collapses
-  explicitly, and each card offers Message and Requests actions.
+  layer uses the map project's exact warm street template (its
+  `ColorFilter.matrix` and `com.digos.barangay_map` tile layer) so roads,
+  water and buildings stay visible, and a **metric scale bar** shows the
+  distance. A single compass control re-frames the full north-up city, `+`/`−`
+  step the zoom, and the light/dark map style is independent of the app theme.
+  Map panels fade while the map is being touched and a **layers button** hides
+  them entirely for an unobstructed view; the OpenStreetMap credit is a small
+  footnote. The side panel now has three tabs — **Donors**, **Facilities**
+  (hospitals and the PRC chapter, tap to jump to the pin) and **Drives** (show
+  on map, details, and for donors a jump to Requests). Blood-type chips keep
+  clear of the control stack. Tapping a barangay filters the donor list.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Registration is
   **face-to-face**, so the app only records intent: the applicant says whether

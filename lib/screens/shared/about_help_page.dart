@@ -20,7 +20,10 @@ import '../../widgets/photo.dart';
 ///  * **About** is the platform summary, with SDG alignment and per-image
 ///    credits as supporting content rather than the headline.
 class AboutHelpPage extends StatefulWidget {
-  const AboutHelpPage({super.key});
+  const AboutHelpPage({super.key, this.onOpenMessages});
+
+  /// Opens the Messages tab, where the chapter support thread lives.
+  final VoidCallback? onOpenMessages;
 
   @override
   State<AboutHelpPage> createState() => _AboutHelpPageState();
@@ -746,10 +749,204 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       );
     }
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Straight to a human: the chapter support thread accepts system
+        // questions, data corrections and feedback.
+        _buildFeedbackCard(context),
+        const SizedBox(height: TabangSpace.lg),
         for (final category in categories) _buildCategory(context, category),
       ],
     );
+  }
+
+  Widget _buildFeedbackCard(BuildContext context) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.support_agent_outlined,
+                size: 19,
+                color: TabangColors.crimson,
+              ),
+              const SizedBox(width: TabangSpace.sm),
+              Expanded(
+                child: Text(
+                  'Still stuck? Message chapter staff',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Send a question about the app, a data correction, or feedback — '
+            'it opens a private thread with the chapter, the same place donor '
+            'coordination happens. Staff replies during office hours.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.5,
+              color: context.textMuted,
+            ),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          Wrap(
+            spacing: TabangSpace.sm,
+            runSpacing: TabangSpace.sm,
+            children: [
+              FilledButton.icon(
+                onPressed: () => _showFeedbackDialog(context),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Send feedback'),
+              ),
+              if (widget.onOpenMessages != null)
+                OutlinedButton.icon(
+                  onPressed: widget.onOpenMessages,
+                  icon: const Icon(Icons.forum_outlined, size: 16),
+                  label: const Text('Open Messages'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showFeedbackDialog(BuildContext context) async {
+    final categories = <String>[
+      'System issue',
+      'Data correction',
+      'Feedback or suggestion',
+      'Report a problem',
+    ];
+    final controller = TextEditingController();
+    var category = categories.first;
+    String? error;
+
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Message chapter staff'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'What is this about?',
+                    isDense: true,
+                  ),
+                  items: categories
+                      .map(
+                        (c) => DropdownMenuItem(value: c, child: Text(c)),
+                      )
+                      .toList(),
+                  onChanged: (v) => setDialogState(() => category = v ?? category),
+                ),
+                const SizedBox(height: TabangSpace.md),
+                TextField(
+                  controller: controller,
+                  maxLines: 4,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Message',
+                    hintText: 'Describe it as plainly as you can',
+                    isDense: true,
+                  ),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: TabangSpace.sm),
+                  Text(
+                    error!,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: TabangColors.danger,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: TabangSpace.sm),
+                Text(
+                  'This is a simulated prototype: messages reach the chapter '
+                  'conversation inside TABANG only.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                if (controller.text.trim().length < 5) {
+                  setDialogState(
+                    () => error = 'Please write at least a short sentence.',
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              icon: const Icon(Icons.send_outlined, size: 16),
+              label: const Text('Send'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (sent != true) {
+      controller.dispose();
+      return;
+    }
+
+    final user = _repo.currentUser;
+    final thread = user == null
+        ? null
+        : _repo.sendStaffFeedback(
+            userId: user.id,
+            category: category,
+            message: controller.text.trim(),
+          );
+    controller.dispose();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            thread == null
+                ? 'The chapter thread is unavailable right now.'
+                : 'Sent to chapter staff. Their reply appears in Messages.',
+          ),
+          action: thread == null || widget.onOpenMessages == null
+              ? null
+              : SnackBarAction(
+                  label: 'Open',
+                  onPressed: widget.onOpenMessages!,
+                ),
+        ),
+      );
   }
 
   Widget _buildCategory(BuildContext context, _FaqCategory category) {
@@ -804,9 +1001,16 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                   TabangSpace.lg,
                 ),
                 child: Column(
-                  children: category.faqs
-                      .map((f) => _buildFaq(context, f))
-                      .toList(),
+                  children: [
+                    // Deterministic order: questions are sorted A→Z inside
+                    // each category so the list does not look shuffled.
+                    for (final faq in ([...category.faqs]..sort(
+                      (a, b) => a.question
+                          .toLowerCase()
+                          .compareTo(b.question.toLowerCase()),
+                    )))
+                      _buildFaq(context, faq),
+                  ],
                 ),
               ),
           ],
@@ -815,36 +1019,127 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     );
   }
 
+  /// One FAQ entry as a chat exchange: the question arrives on the left, the
+  /// TABANG answer replies on the right.
   Widget _buildFaq(BuildContext context, _Faq faq) {
-    return Container(
-      margin: const EdgeInsets.only(top: TabangSpace.sm),
-      padding: const EdgeInsets.all(TabangSpace.md),
-      decoration: BoxDecoration(
-        color: context.surfaceAlt,
-        borderRadius: BorderRadius.circular(TabangRadius.sm),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(top: TabangSpace.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            faq.question,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: context.textColor,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _faqAvatar(
+                context,
+                background: context.surfaceAlt,
+                border: context.border,
+                child: Icon(
+                  Icons.person_outline,
+                  size: 15,
+                  color: context.textMuted,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.surfaceAlt,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(3),
+                      topRight: Radius.circular(TabangRadius.md),
+                      bottomLeft: Radius.circular(TabangRadius.md),
+                      bottomRight: Radius.circular(TabangRadius.md),
+                    ),
+                    border: Border.all(color: context.border),
+                  ),
+                  child: Text(
+                    faq.question,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4,
+                      color: context.textColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 36),
+            ],
           ),
           const SizedBox(height: 6),
-          Text(
-            faq.answer,
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.65,
-              color: context.textMuted,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(width: 36),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.isDark
+                        ? TabangColors.crimson.withValues(alpha: 0.18)
+                        : TabangColors.crimsonSoft,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(TabangRadius.md),
+                      topRight: Radius.circular(3),
+                      bottomLeft: Radius.circular(TabangRadius.md),
+                      bottomRight: Radius.circular(TabangRadius.md),
+                    ),
+                    border: Border.all(
+                      color: TabangColors.crimson.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    faq.answer,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.55,
+                      color: context.textColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _faqAvatar(
+                context,
+                background: TabangColors.crimson,
+                border: TabangColors.crimson,
+                child: const Icon(
+                  Icons.volunteer_activism,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _faqAvatar(
+    BuildContext context, {
+    required Color background,
+    required Color border,
+    required Widget child,
+  }) {
+    return Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: background,
+        shape: BoxShape.circle,
+        border: Border.all(color: border),
+      ),
+      child: child,
     );
   }
 
