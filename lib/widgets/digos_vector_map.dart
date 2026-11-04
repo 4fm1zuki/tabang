@@ -410,10 +410,12 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                 MarkerLayer(markers: _labelMarkers(labelSize)),
               ],
             ),
-            // Distance scale (metric), bottom-right above the attribution.
+            // Distance scale (metric). On a short map pane the compact legend
+            // and the attribution stack along the bottom, so the bar sits
+            // above both instead of on top of them.
             Positioned(
               right: 10,
-              bottom: 34,
+              bottom: (_mapSize?.height ?? 500) < 430 ? 96 : 34,
               child: _ScaleBar(
                 zoom: _zoom,
                 latitude: _cameraOrNull()?.center.latitude ?? 6.84,
@@ -442,6 +444,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   Map<String, int>? _labelCacheDonors;
   Map<String, int>? _labelCacheDrives;
   Size? _labelCacheSize;
+  String? _labelCacheCenter;
 
   /// Barangay label markers with greedy collision rejection in screen space.
   ///
@@ -450,6 +453,14 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   /// city proper. Labels are sorted by area (biggest first), so the large
   /// barangays always win a slot.
   List<Marker> _labelMarkers(double labelSize) {
+    final camera = _cameraOrNull();
+    // Panning only invalidates the cache every ~1 km, so a drag does not
+    // re-measure 26 labels on every frame.
+    final centerKey = camera == null
+        ? ''
+        : '${camera.center.latitude.toStringAsFixed(2)},'
+            '${camera.center.longitude.toStringAsFixed(2)}';
+
     final cached = _labelCache;
     if (cached != null &&
         _labelCacheZoom == _zoom &&
@@ -457,7 +468,8 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
         _labelCacheDark == widget.mapDark &&
         identical(_labelCacheDonors, widget.donorCounts) &&
         identical(_labelCacheDrives, widget.driveCounts) &&
-        _labelCacheSize == _mapSize) {
+        _labelCacheSize == _mapSize &&
+        _labelCacheCenter == centerKey) {
       return cached;
     }
     _labelCacheZoom = _zoom;
@@ -466,8 +478,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     _labelCacheDonors = widget.donorCounts;
     _labelCacheDrives = widget.driveCounts;
     _labelCacheSize = _mapSize;
-
-    final camera = _cameraOrNull();
+    _labelCacheCenter = centerKey;
     final placed = <Rect>[];
     final markers = <Marker>[];
 

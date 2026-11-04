@@ -247,13 +247,18 @@ void main() {
     await tester.tap(find.text('Read the story'));
     await tester.pumpAndSettle();
     expect(find.byType(TabangPhoto), findsWidgets);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
 
-    // Attribution stays visible under the image as a chip; the raw source URL
-    // only appears after tapping it, instead of being printed in the dialog.
-    await tester.tap(find.byType(PhotoCredit).last);
+    // Photograph attribution is a chip; tapping it opens the licence and the
+    // source link. Asset paths are deliberately not shown to users.
+    await tester.ensureVisible(find.byType(PhotoCredit).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PhotoCredit).first);
     await tester.pumpAndSettle();
     expect(find.text('Photo credit'), findsOneWidget);
-    expect(find.textContaining('File: assets/images/'), findsOneWidget);
+    expect(find.text('Source'), findsOneWidget);
+    expect(find.textContaining('assets/images'), findsNothing);
   });
 
   testWidgets('a missing photo renders the themed fallback, not an error box',

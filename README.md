@@ -93,25 +93,30 @@ were bypassed.
   barangays stitched from 75 shared border arcs plus the outer city ring, so no
   mapping SDK or API key is involved). Every TABANG layer is drawn on top
   locally, so the map still reads when tiles cannot load: a warm-crimson donor
-  density ramp, tappable blood-drive pins with counts, haloed barangay labels
-  that thin out at city-wide zoom, and a gold selection. The palette was
-  re-coloured from the map project's green/teal scheme to the app's crimson,
-  maroon and gold set. A single compass control re-frames the full north-up
-  city, `+`/`−` step the zoom, the light/dark map style is independent of the
-  app theme, and OpenStreetMap attribution is shown on the canvas. Blood-type
-  chips keep clear of the control stack. Tapping a barangay filters the donor
-  list; the donor pane expands/collapses explicitly, and each card offers
-  Message and Requests actions.
+  density ramp seeded across several barangays so the shades actually vary, a
+  subtle teal selection wash instead of the old gold/brown block, tappable
+  blood-drive pins with counts, dedicated **hospital and PRC chapter pins**,
+  and haloed barangay labels that are collision-checked (biggest barangays
+  win a slot, small ones appear as you zoom in) rather than stacked. The base
+  layer uses the map project's warm street template so roads, water and
+  buildings stay visible, and a **metric scale bar** shows the distance. A
+  single compass control re-frames the full north-up city, `+`/`−` step the
+  zoom, the light/dark map style is independent of the app theme, and
+  OpenStreetMap attribution is shown on the canvas. Blood-type chips keep clear
+  of the control stack, and mouse-wheel over a Discover rail scrolls that rail.
+  Tapping a barangay filters the donor list; the donor pane expands/collapses
+  explicitly, and each card offers Message and Requests actions.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
-  date, donation history and availability controls. Community users fill up a
-  **donor registration form** here: personal data, the medical-history
-  checklist from the PRC Blood Donor Interview Sheet, and the donor
-  declaration. The account becomes a donor immediately but stays *unverified*
-  — the eligibility engine will not match an unverified donor — and staff
-  verifies the blood card after the in-person interview, examination, blood
-  typing and screening. Donors see a verification card with what chapter staff
-  has requested, and keep one-tap access to requests and messages because
-  donating and needing blood are not mutually exclusive.
+  date, donation history and availability controls. Registration is
+  **face-to-face**, so the app only records intent: the applicant says whether
+  they already hold a PRC donor card (with an optional card number), picks an
+  optional visit day, and gets the walk-in steps plus what to bring. The
+  medical interview, examination, blood typing and screening stay on the PRC
+  interview sheet at the chapter; the account becomes a donor immediately but
+  stays *unverified*, and the eligibility engine will not match an unverified
+  donor until staff verifies the card on site. Donors see a verification card
+  with what chapter staff asked for, and keep one-tap access to requests and
+  messages because donating and needing blood are not mutually exclusive.
 - **Requests** — a recipient posts a request; the dialog first checks
   participating-facility stock and explains what each urgency level means
   (critical = now, urgent = 24–48 h, routine = planned). If compatible stock
@@ -144,8 +149,10 @@ were bypassed.
   with a gauge and four labelled subscores, primary KPI cards with progress
   bars, supply/community detail, then supporting exceptions. Every figure is
   computed from the repository. **User management** opens with the donor
-  registrations awaiting staff, where each form can be read, verified,
-  returned for documents or not accepted.
+  registrations awaiting staff — card on file, planned visit, notes — where
+  each one can be verified, returned for documents or not accepted. On phones
+  and small tablets the staff console uses the same bottom-bar shell as the
+  community app; the icon rail is desktop-only.
 - **Inventory** — units are a tappable list; selecting one opens the full
   record including the barcode graphic and the name of the person holding it.
 - **Inventory** — change unit status, monitor effective expiry pressure, confirm
@@ -476,19 +483,20 @@ flutter test
   rejection, community-only self-registration, the donor upgrade path,
   staff/admin privilege rules for walk-in accounts, generated temporary
   passwords that authenticate, and the onboarding flag.
-- **Donor registration** — a submitted form becomes a *pending* donor
-  application, an unverified donor is never matched by the eligibility engine,
-  staff can request documents without closing the application, and verifying
-  flips the blood card, the account status and the open queue at once.
-- **Interface widgets** — Discover leads with its section rails, visible photo
-  credit chips resolve for every content image, tapping one opens the full
-  provenance dialog, empty states render the vector illustration, every content
-  item resolves to a bundled photo, the hero/feed/dialog mount those photos, a
-  missing asset falls back to the themed placeholder, a narrow PageHeader stays
-  a single compact line with its description in the tooltip, and the Digos
-  vector map mounts all 26 barangays with tiles disabled (so no HTTP runs in
-  tests), keeps its overlay controls in the wide desktop layout, and selects a
-  barangay on tap.
+- **Donor registration** — a submitted registration interest (with or without
+  an existing donor card) becomes a *pending* application, an unverified donor
+  is never matched by the eligibility engine, staff can request documents
+  without closing the application, and verifying flips the blood card, the
+  account status and the open queue at once.
+- **Interface widgets** — Discover leads with its section rails, photo credit
+  chips resolve for every bundled photograph and open the licence/source dialog
+  (original artwork is deliberately uncredited), empty states render the vector
+  illustration, every content item resolves to a bundled photo, the
+  hero/feed/dialog mount those photos, a missing asset falls back to the themed
+  placeholder, a narrow PageHeader stays a single compact line with its
+  description in the tooltip, and the Digos vector map mounts all 26 barangays
+  with tiles disabled (so no HTTP runs in tests), keeps its overlay controls in
+  the wide desktop layout, and selects a barangay on tap.
 - **Narrow-screen layout** — Discover, Blood Bank (including unit selection and
   the appointment dialog) and Statistics render at a 360 × 780 phone viewport
   without overflow; the unit list reflows to one column and the appointment
