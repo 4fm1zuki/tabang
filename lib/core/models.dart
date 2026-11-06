@@ -104,8 +104,9 @@ class BloodUnit {
       collectedOn: collectedOn,
       expiresOn: expiresOn,
       reservedBy: clearReservation ? null : (reservedBy ?? this.reservedBy),
-      reservationNote:
-          clearReservation ? null : (reservationNote ?? this.reservationNote),
+      reservationNote: clearReservation
+          ? null
+          : (reservationNote ?? this.reservationNote),
       reservedAt: clearReservation ? null : (reservedAt ?? this.reservedAt),
     );
   }
@@ -287,13 +288,26 @@ class AppUser {
     if (dob == null) return null;
     final now = DateTime.now();
     var years = now.year - dob.year;
-    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
       years--;
     }
     return years;
   }
 
   bool get isDonor => role == UserRole.donor;
+
+  /// Public handle used on the map and donor directory.
+  ///
+  /// Aliases are friendly names and, on a map that anyone can browse, they
+  /// still read as a person. The directory therefore shows a stable anonymous
+  /// token instead; real names and aliases only surface in a thread after the
+  /// mutual identity reveal.
+  String get mapHandle {
+    final digits = id.replaceAll(RegExp(r'[^0-9]'), '');
+    final number = digits.isEmpty ? id : digits;
+    return 'Donor #$number';
+  }
 
   AppUser copyWith({
     AccountStatus? status,
@@ -424,7 +438,8 @@ class BloodRequest {
   final RequestSource source;
   final String? note;
 
-  int get unitsOutstanding => (unitsNeeded - unitsFulfilled).clamp(0, unitsNeeded);
+  int get unitsOutstanding =>
+      (unitsNeeded - unitsFulfilled).clamp(0, unitsNeeded);
 
   /// Only open donor-network requests accept new donor responses. Blood-bank
   /// requests are processed by chapter staff, not broadcast to donors.
@@ -492,14 +507,14 @@ class RequestResponse {
   final ResponseStatus status;
 
   RequestResponse copyWith({ResponseStatus? status}) => RequestResponse(
-        id: id,
-        requestId: requestId,
-        donorId: donorId,
-        donorAlias: donorAlias,
-        createdAt: createdAt,
-        message: message,
-        status: status ?? this.status,
-      );
+    id: id,
+    requestId: requestId,
+    donorId: donorId,
+    donorAlias: donorAlias,
+    createdAt: createdAt,
+    message: message,
+    status: status ?? this.status,
+  );
 }
 
 /// A moderation report raised from a chat thread.
@@ -536,16 +551,16 @@ class UserReport {
   final ReportStatus status;
 
   UserReport copyWith({ReportStatus? status}) => UserReport(
-        id: id,
-        reporterId: reporterId,
-        reporterAlias: reporterAlias,
-        reportedUserId: reportedUserId,
-        reportedAlias: reportedAlias,
-        reason: reason,
-        createdAt: createdAt,
-        threadId: threadId,
-        status: status ?? this.status,
-      );
+    id: id,
+    reporterId: reporterId,
+    reporterAlias: reporterAlias,
+    reportedUserId: reportedUserId,
+    reportedAlias: reportedAlias,
+    reason: reason,
+    createdAt: createdAt,
+    threadId: threadId,
+    status: status ?? this.status,
+  );
 }
 
 /// Moderation state of a single chat message.
@@ -578,13 +593,13 @@ class ChatMessage {
   final ModerationFlag flag;
 
   ChatMessage copyWith({ModerationFlag? flag}) => ChatMessage(
-        id: id,
-        senderId: senderId,
-        senderAlias: senderAlias,
-        text: text,
-        sentAt: sentAt,
-        flag: flag ?? this.flag,
-      );
+    id: id,
+    senderId: senderId,
+    senderAlias: senderAlias,
+    text: text,
+    sentAt: sentAt,
+    flag: flag ?? this.flag,
+  );
 }
 
 /// A conversation between two parties.
@@ -762,6 +777,8 @@ class BloodDrive {
     required this.endsAt,
     required this.expectedDonors,
     this.isOpenForRegistration = true,
+    this.lat,
+    this.lng,
   });
 
   final String id;
@@ -772,6 +789,11 @@ class BloodDrive {
   final DateTime endsAt;
   final int expectedDonors;
   final bool isOpenForRegistration;
+
+  /// Venue coordinates, so the map pin sits on the actual site rather than the
+  /// barangay centroid. Null falls back to the barangay centre.
+  final double? lat;
+  final double? lng;
 
   String get status {
     final now = DateTime.now();

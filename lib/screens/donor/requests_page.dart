@@ -18,12 +18,12 @@ import '../../widgets/illustrations.dart';
 /// serve. A response is an offer, not a fulfilled unit: the requester selects a
 /// donor, a private coordination thread is created, and only staff can mark the
 /// request fulfilled after the donation is recorded.
+/// Donors need both sides of the board: requests they can serve, the requests
+/// they posted themselves, and the donation side.
+enum _DonorRequestsTab { serve, mine, donate }
+
 class RequestsPage extends StatefulWidget {
-  const RequestsPage({
-    super.key,
-    required this.user,
-    this.onOpenDonorHub,
-  });
+  const RequestsPage({super.key, required this.user, this.onOpenDonorHub});
 
   final AppUser user;
 
@@ -39,9 +39,9 @@ class _RequestsPageState extends State<RequestsPage> {
 
   RequestUrgency? _urgencyFilter;
 
-  /// Donors get a second tab: the requests they can serve, and the donation
-  /// side (drives, eligibility, what to bring).
-  bool _donateTab = false;
+  /// Donors get three tabs: requests they can serve, requests they posted
+  /// themselves, and the donation side (drives, eligibility, what to bring).
+  _DonorRequestsTab _donorTab = _DonorRequestsTab.serve;
 
   @override
   void initState() {
@@ -62,23 +62,25 @@ class _RequestsPageState extends State<RequestsPage> {
   AppUser get _user => _repo.userById(widget.user.id) ?? widget.user;
 
   bool get _isDonor => _user.role == UserRole.donor;
-  bool get _isRecipient => _user.role == UserRole.recipient;
 
   List<BloodRequest> get _visible {
     final donorType = _user.bloodType;
 
     var list = _isDonor
-        ? _repo.donorNetworkRequests.where((r) {
-            if (donorType == null) return false;
-            return Compatibility.canDonateComponentTo(
-              donorType,
-              r.bloodType,
-              r.component,
-            );
-          }).toList()
-        : _repo.requests
-            .where((r) => r.requesterId == _user.id)
-            .toList();
+        ? _donorTab == _DonorRequestsTab.mine
+              ? _repo.requests.where((r) => r.requesterId == _user.id).toList()
+              : _repo.donorNetworkRequests.where((r) {
+                  // A donor can request blood too; their own request belongs on
+                  // the "Mine" tab, not in the list they can respond to.
+                  if (r.requesterId == _user.id) return false;
+                  if (donorType == null) return false;
+                  return Compatibility.canDonateComponentTo(
+                    donorType,
+                    r.bloodType,
+                    r.component,
+                  );
+                }).toList()
+        : _repo.requests.where((r) => r.requesterId == _user.id).toList();
 
     if (_urgencyFilter != null) {
       list = list.where((r) => r.urgency == _urgencyFilter).toList();
@@ -91,13 +93,13 @@ class _RequestsPageState extends State<RequestsPage> {
     };
 
     return [...list]..sort((a, b) {
-        final aOpen = a.status == RequestStatus.open ? 0 : 1;
-        final bOpen = b.status == RequestStatus.open ? 0 : 1;
-        if (aOpen != bOpen) return aOpen.compareTo(bOpen);
-        final ur = urgencyRank[a.urgency]!.compareTo(urgencyRank[b.urgency]!);
-        if (ur != 0) return ur;
-        return b.createdAt.compareTo(a.createdAt);
-      });
+      final aOpen = a.status == RequestStatus.open ? 0 : 1;
+      final bOpen = b.status == RequestStatus.open ? 0 : 1;
+      if (aOpen != bOpen) return aOpen.compareTo(bOpen);
+      final ur = urgencyRank[a.urgency]!.compareTo(urgencyRank[b.urgency]!);
+      if (ur != 0) return ur;
+      return b.createdAt.compareTo(a.createdAt);
+    });
   }
 
   @override
@@ -123,43 +125,55 @@ class _RequestsPageState extends State<RequestsPage> {
                 PageHeader(
                   title: 'Blood requests',
                   subtitle: _isDonor
-                      ? 'Open donor-network requests your blood type and '
-                          'component can serve.'
+                      ? _donorTab == _DonorRequestsTab.donate
+                            ? 'Attend a drive, check your eligibility and see '
+                                  'what staff asks for before a donation.'
+                            : _donorTab == _DonorRequestsTab.mine
+                            ? 'Requests you posted, with donor responses and '
+                                  'fulfilment progress.'
+                            : 'Open donor-network requests your blood type '
+                                  'and component can serve.'
                       : 'Your requests, donor responses and fulfilment '
-                          'progress.',
+                            'progress.',
                   actions: [
-                    if (_isRecipient)
-                      OutlinedButton.icon(
-                        onPressed: () => _showNewRequestDialog(context),
-                        icon: const Icon(Icons.add, size: 15),
-                        label: const Text('New request'),
-                      ),
+                    // Donors can need blood too: the same request form is
+                    // available to every signed-in role.
+                    OutlinedButton.icon(
+                      onPressed: () => _showNewRequestDialog(context),
+                      icon: const Icon(Icons.add, size: 15),
+                      label: const Text('New request'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: TabangSpace.lg),
 
                 if (_isDonor)
-                  SegmentedButton<bool>(
+                  SegmentedButton<_DonorRequestsTab>(
                     segments: const [
                       ButtonSegment(
-                        value: false,
+                        value: _DonorRequestsTab.serve,
                         icon: Icon(Icons.campaign_outlined, size: 16),
                         label: Text('Requests'),
                       ),
                       ButtonSegment(
-                        value: true,
+                        value: _DonorRequestsTab.mine,
+                        icon: Icon(Icons.assignment_ind_outlined, size: 16),
+                        label: Text('Mine'),
+                      ),
+                      ButtonSegment(
+                        value: _DonorRequestsTab.donate,
                         icon: Icon(Icons.volunteer_activism_outlined, size: 16),
                         label: Text('Donate'),
                       ),
                     ],
-                    selected: {_donateTab},
+                    selected: {_donorTab},
                     showSelectedIcon: false,
                     onSelectionChanged: (selection) =>
-                        setState(() => _donateTab = selection.first),
+                        setState(() => _donorTab = selection.first),
                   ),
                 const SizedBox(height: TabangSpace.lg),
 
-                if (_isDonor && !_donateTab)
+                if (_isDonor && _donorTab != _DonorRequestsTab.donate)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -190,13 +204,13 @@ class _RequestsPageState extends State<RequestsPage> {
                       ),
                     ],
                   ),
-                if (_isDonor && !_donateTab)
+                if (_isDonor && _donorTab != _DonorRequestsTab.donate)
                   const SizedBox(height: TabangSpace.lg),
               ],
             ),
           ),
         ),
-        if (_isDonor && _donateTab)
+        if (_isDonor && _donorTab == _DonorRequestsTab.donate)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               TabangSpace.xl,
@@ -212,12 +226,19 @@ class _RequestsPageState extends State<RequestsPage> {
             sliver: SliverToBoxAdapter(
               child: EmptyState(
                 art: TabangArt.requests,
-                title: _isDonor ? 'No matching requests' : 'No requests yet',
+                title: _isDonor
+                    ? _donorTab == _DonorRequestsTab.mine
+                          ? 'No requests yet'
+                          : 'No matching requests'
+                    : 'No requests yet',
                 message: _isDonor
-                    ? 'Nothing compatible is open right now. Check back '
-                        'later.'
+                    ? _donorTab == _DonorRequestsTab.mine
+                          ? 'Create a request to check blood-bank stock and, '
+                                'if needed, post to the donor network.'
+                          : 'Nothing compatible is open right now. Check back '
+                                'later.'
                     : 'Create a request to check blood-bank stock and, if '
-                        'needed, post to the donor network.',
+                          'needed, post to the donor network.',
               ),
             ),
           )
@@ -338,13 +359,13 @@ class _RequestsPageState extends State<RequestsPage> {
                       Text(
                         eligibility.isEligible
                             ? 'Whole blood, platelets and plasma can all be '
-                                'accepted at the chapter today.'
+                                  'accepted at the chapter today.'
                             : eligibility.daysRemaining > 0
-                                ? 'Next window opens in '
-                                    '${eligibility.daysRemaining} day'
-                                    '${eligibility.daysRemaining == 1 ? '' : 's'}.'
-                                : 'Chapter staff will confirm your next '
-                                    'donation window.',
+                            ? 'Next window opens in '
+                                  '${eligibility.daysRemaining} day'
+                                  '${eligibility.daysRemaining == 1 ? '' : 's'}.'
+                            : 'Chapter staff will confirm your next '
+                                  'donation window.',
                         style: TextStyle(
                           fontSize: 12.5,
                           height: 1.45,
@@ -418,11 +439,7 @@ class _RequestsPageState extends State<RequestsPage> {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.place,
-                size: 18,
-                color: TabangColors.crimson,
-              ),
+              const Icon(Icons.place, size: 18, color: TabangColors.crimson),
               const SizedBox(width: TabangSpace.sm),
               Expanded(
                 child: Text(
@@ -459,15 +476,20 @@ class _RequestsPageState extends State<RequestsPage> {
             width: double.infinity,
             child: interested
                 ? OutlinedButton.icon(
-                    onPressed: () =>
-                        setState(() => _repo.toggleDriveInterest(drive.id, _user.id)),
+                    onPressed: () => setState(
+                      () => _repo.toggleDriveInterest(drive.id, _user.id),
+                    ),
                     icon: const Icon(Icons.check, size: 16),
                     label: const Text('On the list — tap to leave'),
                   )
                 : FilledButton.tonalIcon(
-                    onPressed: () =>
-                        setState(() => _repo.toggleDriveInterest(drive.id, _user.id)),
-                    icon: const Icon(Icons.volunteer_activism_outlined, size: 16),
+                    onPressed: () => setState(
+                      () => _repo.toggleDriveInterest(drive.id, _user.id),
+                    ),
+                    icon: const Icon(
+                      Icons.volunteer_activism_outlined,
+                      size: 16,
+                    ),
                     label: const Text('Join this drive'),
                   ),
           ),
@@ -505,8 +527,7 @@ class _RequestsPageState extends State<RequestsPage> {
     final myResponse = _isDonor
         ? _repo.responseForDonor(request.id, _user.id)
         : null;
-    final compatibleDonors =
-        _repo.compatibleDonorsForRequest(request).length;
+    final compatibleDonors = _repo.compatibleDonorsForRequest(request).length;
     final compatibleUnits = _repo
         .compatibleUnitsFor(
           recipientType: request.bloodType,
@@ -587,11 +608,7 @@ class _RequestsPageState extends State<RequestsPage> {
               // cancel action are repeated.
               PopupMenuButton<String>(
                 tooltip: 'Request options',
-                icon: Icon(
-                  Icons.more_vert,
-                  size: 19,
-                  color: context.textMuted,
-                ),
+                icon: Icon(Icons.more_vert, size: 19, color: context.textMuted),
                 onSelected: (value) {
                   if (value == 'details') {
                     _showRequestDetails(context, request, isOwn: isOwn);
@@ -748,6 +765,7 @@ class _RequestsPageState extends State<RequestsPage> {
                   dense: true,
                 )
               else if (_isDonor &&
+                  !isOwn &&
                   request.status == RequestStatus.open &&
                   request.source == RequestSource.donorNetwork)
                 ElevatedButton.icon(
@@ -811,9 +829,12 @@ class _RequestsPageState extends State<RequestsPage> {
           component: request.component,
         )
         .length;
-    final myResponse =
-        _isDonor ? _repo.responseForDonor(request.id, _user.id) : null;
-    final canRespond = _isDonor &&
+    final myResponse = _isDonor
+        ? _repo.responseForDonor(request.id, _user.id)
+        : null;
+    final canRespond =
+        _isDonor &&
+        !isOwn &&
         request.status == RequestStatus.open &&
         request.source == RequestSource.donorNetwork &&
         _canRespond(request);
@@ -857,17 +878,20 @@ class _RequestsPageState extends State<RequestsPage> {
                 _detail(dialogContext, 'Barangay', request.barangay),
                 _detail(dialogContext, 'Urgency', request.urgency.label),
                 _detail(dialogContext, 'Status', request.status.label),
-                _detail(dialogContext, 'Posted',
-                    formatRelative(request.createdAt)),
+                _detail(
+                  dialogContext,
+                  'Posted',
+                  formatRelative(request.createdAt),
+                ),
                 _detail(
                   dialogContext,
                   'Channel',
                   request.source == RequestSource.bloodBank
                       ? 'Blood bank · $compatibleUnits compatible unit'
-                          '${compatibleUnits == 1 ? '' : 's'} in stock'
+                            '${compatibleUnits == 1 ? '' : 's'} in stock'
                       : 'Donor network · $compatibleDonors compatible '
-                          'eligible donor'
-                          '${compatibleDonors == 1 ? '' : 's'}',
+                            'eligible donor'
+                            '${compatibleDonors == 1 ? '' : 's'}',
                 ),
                 if (request.note != null && request.note!.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -912,7 +936,8 @@ class _RequestsPageState extends State<RequestsPage> {
                     (response) => Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
-                        '• ${response.donorAlias} · ${response.status.label} · '
+                        '• ${_repo.userById(response.donorId)?.mapHandle ?? 'Donor'}'
+                        ' · ${response.status.label} · '
                         '${formatRelative(response.createdAt)}',
                         style: TextStyle(
                           fontSize: 12.5,
@@ -995,10 +1020,7 @@ class _RequestsPageState extends State<RequestsPage> {
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12.5,
-              color: context.textMuted,
-            ),
+            style: TextStyle(fontSize: 12.5, color: context.textMuted),
           ),
         ),
       ],
@@ -1011,17 +1033,20 @@ class _RequestsPageState extends State<RequestsPage> {
     RequestResponse response,
   ) {
     final donor = _repo.userById(response.donorId);
+    final donorLabel = donor?.mapHandle ?? 'Donor';
     final eligibility = donor == null
         ? null
         : EligibilityEngine.evaluate(donor, component: request.component);
     final donorType = donor?.bloodType;
-    final stillCompatible = donorType != null &&
+    final stillCompatible =
+        donorType != null &&
         Compatibility.canDonateComponentTo(
           donorType,
           request.bloodType,
           request.component,
         );
-    final canSelect = response.status == ResponseStatus.pending &&
+    final canSelect =
+        response.status == ResponseStatus.pending &&
         request.status == RequestStatus.open &&
         stillCompatible &&
         (eligibility?.isEligible ?? false);
@@ -1039,11 +1064,9 @@ class _RequestsPageState extends State<RequestsPage> {
           CircleAvatar(
             radius: 13,
             backgroundColor: TabangColors.crimson.withValues(alpha: 0.12),
-            child: Text(
-              response.donorAlias.isEmpty
-                  ? '?'
-                  : response.donorAlias.substring(0, 1).toUpperCase(),
-              style: const TextStyle(
+            child: const Text(
+              '#',
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: TabangColors.crimson,
@@ -1058,7 +1081,7 @@ class _RequestsPageState extends State<RequestsPage> {
                 Row(
                   children: [
                     Text(
-                      response.donorAlias,
+                      donorLabel,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -1102,13 +1125,14 @@ class _RequestsPageState extends State<RequestsPage> {
                   eligibility == null
                       ? 'Donor record unavailable'
                       : eligibility.isEligible
-                          ? 'Eligible now · responded '
-                              '${formatRelative(response.createdAt)}'
-                          : '${eligibility.summary} · responded '
-                              '${formatRelative(response.createdAt)}',
+                      ? 'Eligible now · responded '
+                            '${formatRelative(response.createdAt)}'
+                      : '${eligibility.summary} · responded '
+                            '${formatRelative(response.createdAt)}',
                   style: TextStyle(
                     fontSize: 10.5,
-                    color: eligibility != null &&
+                    color:
+                        eligibility != null &&
                             !eligibility.isEligible &&
                             eligibility.blocker == EligibilityBlocker.cooldown
                         ? TabangColors.warning
@@ -1185,8 +1209,8 @@ class _RequestsPageState extends State<RequestsPage> {
           content: Text(
             '${eligibility.summary}.\n\n'
             '${eligibility.eligibleFrom != null ? 'You can donate '
-                '${request.component.label.toLowerCase()} again from '
-                '${formatDate(eligibility.eligibleFrom!)}. ' : ''}'
+                      '${request.component.label.toLowerCase()} again from '
+                      '${formatDate(eligibility.eligibleFrom!)}. ' : ''}'
             'TABANG enforces component-specific donation intervals to protect '
             'donor health.',
             style: const TextStyle(fontSize: 13, height: 1.6),
@@ -1214,10 +1238,10 @@ class _RequestsPageState extends State<RequestsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Your alias "${_user.alias}" is shared first. The '
-                'requester may select you; a private coordination thread is '
-                'created only after selection. Real names stay hidden until '
-                'both sides agree to reveal them.',
+                'Your anonymous handle "${_user.mapHandle}" is shared first. '
+                'The requester may select you; a private coordination thread '
+                'is created only after selection. Real names stay hidden '
+                'until both sides agree to reveal them.',
                 style: const TextStyle(fontSize: 13, height: 1.6),
               ),
               const SizedBox(height: TabangSpace.md),
@@ -1250,9 +1274,9 @@ class _RequestsPageState extends State<RequestsPage> {
                   content: Text(
                     response == null
                         ? 'Could not send response. The request may have '
-                            'closed or your eligibility changed.'
+                              'closed or your eligibility changed.'
                         : 'Response sent. The requester will be notified and '
-                            'may select you.',
+                              'may select you.',
                   ),
                 ),
               );
@@ -1274,9 +1298,9 @@ class _RequestsPageState extends State<RequestsPage> {
         content: Text(
           thread == null
               ? 'Could not select this donor. They may no longer be eligible, '
-                  'or the request may have closed.'
+                    'or the request may have closed.'
               : 'Donor selected. A private coordination thread is ready in '
-                  'Messages.',
+                    'Messages.',
         ),
       ),
     );

@@ -100,7 +100,6 @@ class DigosFacilities {
     'Philippine Red Cross — Davao del Sur Chapter',
     'Digos Provincial Hospital',
     'Digos Doctors Hospital',
-    'Cor Jesu College Infirmary',
   ];
 }
 
@@ -191,8 +190,9 @@ class TabangRepository {
   /// Pass [component] when the question is component-specific (for example,
   /// whether a platelet donor is still inside the platelet cooldown).
   List<AppUser> eligibleDonorsFor({BloodComponent? component}) => donors
-      .where((u) =>
-          EligibilityEngine.evaluate(u, component: component).isEligible)
+      .where(
+        (u) => EligibilityEngine.evaluate(u, component: component).isEligible,
+      )
       .toList(growable: false);
 
   List<AppUser> get eligibleDonors => eligibleDonorsFor();
@@ -208,26 +208,28 @@ class TabangRepository {
     BloodComponent? component,
     BloodType? compatibleWith,
   }) {
-    return donors.where((u) {
-      if (onlyEligible &&
-          !EligibilityEngine.evaluate(u, component: component).isEligible) {
-        return false;
-      }
-      if (bloodType != null && u.bloodType != bloodType) return false;
-      if (barangay != null && u.barangay != barangay) return false;
-      if (compatibleWith != null) {
-        final donorType = u.bloodType;
-        if (donorType == null ||
-            !Compatibility.canDonateComponentTo(
-              donorType,
-              compatibleWith,
-              component ?? BloodComponent.wholeBlood,
-            )) {
-          return false;
-        }
-      }
-      return true;
-    }).toList(growable: false);
+    return donors
+        .where((u) {
+          if (onlyEligible &&
+              !EligibilityEngine.evaluate(u, component: component).isEligible) {
+            return false;
+          }
+          if (bloodType != null && u.bloodType != bloodType) return false;
+          if (barangay != null && u.barangay != barangay) return false;
+          if (compatibleWith != null) {
+            final donorType = u.bloodType;
+            if (donorType == null ||
+                !Compatibility.canDonateComponentTo(
+                  donorType,
+                  compatibleWith,
+                  component ?? BloodComponent.wholeBlood,
+                )) {
+              return false;
+            }
+          }
+          return true;
+        })
+        .toList(growable: false);
   }
 
   /// Available donor count per barangay, optionally filtered by blood type.
@@ -257,14 +259,16 @@ class TabangRepository {
   }) {
     final today = now ?? DateTime.now();
     return _units
-        .where((u) =>
-            u.component == component &&
-            u.isUsableAt(today) &&
-            Compatibility.canDonateComponentTo(
-              u.bloodType,
-              recipientType,
-              component,
-            ))
+        .where(
+          (u) =>
+              u.component == component &&
+              u.isUsableAt(today) &&
+              Compatibility.canDonateComponentTo(
+                u.bloodType,
+                recipientType,
+                component,
+              ),
+        )
         .toList(growable: false);
   }
 
@@ -274,34 +278,36 @@ class TabangRepository {
         .where((r) => r.requestId == request.id)
         .map((r) => r.donorId)
         .toSet();
-    return donors.where((u) {
-      if (responded.contains(u.id)) return false;
-      final donorType = u.bloodType;
-      if (donorType == null) return false;
-      if (!EligibilityEngine.evaluate(u, component: request.component)
-          .isEligible) {
-        return false;
-      }
-      return Compatibility.canDonateComponentTo(
-        donorType,
-        request.bloodType,
-        request.component,
-      );
-    }).toList(growable: false);
+    return donors
+        .where((u) {
+          if (responded.contains(u.id)) return false;
+          final donorType = u.bloodType;
+          if (donorType == null) return false;
+          if (!EligibilityEngine.evaluate(
+            u,
+            component: request.component,
+          ).isEligible) {
+            return false;
+          }
+          return Compatibility.canDonateComponentTo(
+            donorType,
+            request.bloodType,
+            request.component,
+          );
+        })
+        .toList(growable: false);
   }
 
   List<BloodRequest> get openRequests => _requests
       .where((r) => r.status == RequestStatus.open)
       .toList(growable: false);
 
-  List<BloodRequest> get donorNetworkRequests => _requests
-      .where((r) => r.acceptsDonorResponses)
-      .toList(growable: false);
+  List<BloodRequest> get donorNetworkRequests =>
+      _requests.where((r) => r.acceptsDonorResponses).toList(growable: false);
 
-  List<RequestResponse> responsesFor(String requestId) => _responses
-      .where((r) => r.requestId == requestId)
-      .toList(growable: false)
-    ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  List<RequestResponse> responsesFor(String requestId) =>
+      _responses.where((r) => r.requestId == requestId).toList(growable: false)
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
   RequestResponse? responseForDonor(String requestId, String donorId) {
     for (final r in _responses) {
@@ -316,25 +322,23 @@ class TabangRepository {
 
   ChatThread? threadBetween(String a, String b) {
     for (final t in _threads) {
-      final hasA =
-          t.participantAId == a || t.participantBId == a;
-      final hasB =
-          t.participantAId == b || t.participantBId == b;
+      final hasA = t.participantAId == a || t.participantBId == a;
+      final hasB = t.participantAId == b || t.participantBId == b;
       if (hasA && hasB) return t;
     }
     return null;
   }
 
   /// Appointments belonging to one requester, newest first.
-  List<DonationAppointment> appointmentsFor(String userId) => _appointments
-      .where((a) => a.requesterId == userId)
-      .toList(growable: false)
-    ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+  List<DonationAppointment> appointmentsFor(String userId) =>
+      _appointments
+          .where((a) => a.requesterId == userId)
+          .toList(growable: false)
+        ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
 
   /// Units currently on hold by [userId].
   List<BloodUnit> reservedUnitsFor(String userId) => _units
-      .where((u) =>
-          u.reservedBy == userId && !u.isExpiredAt(DateTime.now()))
+      .where((u) => u.reservedBy == userId && !u.isExpiredAt(DateTime.now()))
       .toList(growable: false);
 
   bool isBlocked(String blockerId, String blockedId) =>
@@ -404,8 +408,7 @@ class TabangRepository {
     final normalized = alias.trim().toLowerCase();
     if (normalized.isEmpty) return true;
     return _users.any(
-      (u) =>
-          u.id != exceptUserId && u.alias.trim().toLowerCase() == normalized,
+      (u) => u.id != exceptUserId && u.alias.trim().toLowerCase() == normalized,
     );
   }
 
@@ -447,15 +450,17 @@ class TabangRepository {
     if (weightKg < EligibilityEngine.minimumWeightKg || weightKg > 300) {
       return false;
     }
-    updateUser(user.copyWith(
-      role: UserRole.donor,
-      bloodType: bloodType,
-      birthDate: birthDate,
-      weightKg: weightKg,
-      status: AccountStatus.unverified,
-      bloodCardVerified: false,
-      isAvailable: true,
-    ));
+    updateUser(
+      user.copyWith(
+        role: UserRole.donor,
+        bloodType: bloodType,
+        birthDate: birthDate,
+        weightKg: weightKg,
+        status: AccountStatus.unverified,
+        bloodCardVerified: false,
+        isAvailable: true,
+      ),
+    );
     return true;
   }
 
@@ -472,34 +477,33 @@ class TabangRepository {
   }) {
     final user = userById(userId);
     if (user == null) return;
-    updateUser(user.copyWith(
-      lastDonationDate: at ?? DateTime.now(),
-      lastDonationComponent: component ?? user.lastDonationComponent,
-      totalDonations: user.totalDonations + 1,
-    ));
+    updateUser(
+      user.copyWith(
+        lastDonationDate: at ?? DateTime.now(),
+        lastDonationComponent: component ?? user.lastDonationComponent,
+        totalDonations: user.totalDonations + 1,
+      ),
+    );
   }
 
-  void setUserStatus(
-    String userId,
-    AccountStatus status, {
-    String? reason,
-  }) {
+  void setUserStatus(String userId, AccountStatus status, {String? reason}) {
     final user = userById(userId);
     if (user == null) return;
-    updateUser(user.copyWith(
-      status: status,
-      suspensionReason: reason,
-      clearSuspensionReason: reason == null,
-    ));
+    updateUser(
+      user.copyWith(
+        status: status,
+        suspensionReason: reason,
+        clearSuspensionReason: reason == null,
+      ),
+    );
   }
 
   void verifyUser(String userId) {
     final user = userById(userId);
     if (user == null) return;
-    updateUser(user.copyWith(
-      status: AccountStatus.verified,
-      bloodCardVerified: true,
-    ));
+    updateUser(
+      user.copyWith(status: AccountStatus.verified, bloodCardVerified: true),
+    );
   }
 
   // ------------------------------------------------- donor applications
@@ -516,12 +520,15 @@ class TabangRepository {
   }
 
   /// Registrations staff still has to act on.
-  List<DonorApplication> get openDonorApplications => _donorApplications
-      .where((a) =>
-          a.status == DonorApplicationStatus.pending ||
-          a.status == DonorApplicationStatus.documentsRequested)
-      .toList(growable: false)
-    ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+  List<DonorApplication> get openDonorApplications =>
+      _donorApplications
+          .where(
+            (a) =>
+                a.status == DonorApplicationStatus.pending ||
+                a.status == DonorApplicationStatus.documentsRequested,
+          )
+          .toList(growable: false)
+        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
 
   /// Register interest in becoming a volunteer donor.
   ///
@@ -545,24 +552,27 @@ class TabangRepository {
     // A community user converts here; an unverified donor may re-submit,
     // which is why this is not restricted to community accounts.
     final freshApplicant = user.role.canRegisterAsDonor;
-    final resubmitting =
-        user.role == UserRole.donor && !user.bloodCardVerified;
+    final resubmitting = user.role == UserRole.donor && !user.bloodCardVerified;
     if (!freshApplicant && !resubmitting) return null;
 
     if (freshApplicant) {
-      updateUser(user.copyWith(
-        role: UserRole.donor,
-        bloodType: bloodType,
-        status: AccountStatus.unverified,
-        bloodCardVerified: false,
-        isAvailable: true,
-      ));
+      updateUser(
+        user.copyWith(
+          role: UserRole.donor,
+          bloodType: bloodType,
+          status: AccountStatus.unverified,
+          bloodCardVerified: false,
+          isAvailable: true,
+        ),
+      );
     } else {
-      updateUser(user.copyWith(
-        bloodType: bloodType ?? user.bloodType,
-        status: AccountStatus.unverified,
-        bloodCardVerified: false,
-      ));
+      updateUser(
+        user.copyWith(
+          bloodType: bloodType ?? user.bloodType,
+          status: AccountStatus.unverified,
+          bloodCardVerified: false,
+        ),
+      );
     }
 
     _donorApplications.removeWhere((a) => a.userId == userId);
@@ -634,12 +644,15 @@ class TabangRepository {
     final user = userById(userId);
     if (user == null) return;
     final next = user.warningCount + 1;
-    updateUser(user.copyWith(
-      warningCount: next,
-      status: next >= 3 ? AccountStatus.suspended : AccountStatus.warned,
-      suspensionReason:
-          next >= 3 ? 'Three moderation warnings on record.' : null,
-    ));
+    updateUser(
+      user.copyWith(
+        warningCount: next,
+        status: next >= 3 ? AccountStatus.suspended : AccountStatus.warned,
+        suspensionReason: next >= 3
+            ? 'Three moderation warnings on record.'
+            : null,
+      ),
+    );
   }
 
   void addRequest({
@@ -690,8 +703,10 @@ class TabangRepository {
     if (request == null || donor == null) return null;
     if (!request.acceptsDonorResponses) return null;
     if (donor.role != UserRole.donor || donor.bloodType == null) return null;
-    if (!EligibilityEngine.evaluate(donor, component: request.component)
-        .isEligible) {
+    if (!EligibilityEngine.evaluate(
+      donor,
+      component: request.component,
+    ).isEligible) {
       return null;
     }
     if (!Compatibility.canDonateComponentTo(
@@ -708,7 +723,7 @@ class TabangRepository {
       id: 'RES-${(_responses.length + 1).toString().padLeft(3, '0')}',
       requestId: requestId,
       donorId: donorId,
-      donorAlias: donor.alias,
+      donorAlias: donor.mapHandle,
       createdAt: DateTime.now(),
       message: trimmedMessage == null || trimmedMessage.isEmpty
           ? null
@@ -729,13 +744,13 @@ class TabangRepository {
   }) {
     final response = _firstOrNull(_responses, (r) => r.id == responseId);
     if (response == null) return null;
-    final request =
-        _firstOrNull(_requests, (r) => r.id == response.requestId);
+    final request = _firstOrNull(_requests, (r) => r.id == response.requestId);
     if (request == null || request.status != RequestStatus.open) return null;
 
     final actor = userById(selectedById);
     if (actor == null) return null;
-    final canSelect = actor.id == request.requesterId ||
+    final canSelect =
+        actor.id == request.requesterId ||
         actor.role == UserRole.staff ||
         actor.role == UserRole.admin;
     if (!canSelect) return null;
@@ -753,8 +768,10 @@ class TabangRepository {
     // Re-check at selection time: a donor may have become unavailable,
     // suspended, or entered a cooldown after responding.
     if (donor.bloodType == null ||
-        !EligibilityEngine.evaluate(donor, component: request.component)
-            .isEligible ||
+        !EligibilityEngine.evaluate(
+          donor,
+          component: request.component,
+        ).isEligible ||
         !Compatibility.canDonateComponentTo(
           donor.bloodType!,
           request.bloodType,
@@ -791,8 +808,10 @@ class TabangRepository {
     }
 
     final selectedCount = _responses
-        .where((r) =>
-            r.requestId == request.id && r.status == ResponseStatus.selected)
+        .where(
+          (r) =>
+              r.requestId == request.id && r.status == ResponseStatus.selected,
+        )
         .length;
     if (selectedCount >= request.unitsNeeded) {
       final reqIndex = _requests.indexWhere((r) => r.id == request.id);
@@ -845,7 +864,8 @@ class TabangRepository {
     final request = _firstOrNull(_requests, (r) => r.id == requestId);
     final actor = userById(actorId);
     if (request == null || actor == null) return false;
-    final canCancel = actor.id == request.requesterId ||
+    final canCancel =
+        actor.id == request.requesterId ||
         actor.role == UserRole.staff ||
         actor.role == UserRole.admin;
     if (!canCancel ||
@@ -900,18 +920,14 @@ class TabangRepository {
     _units[index] = unit.copyWith(
       status: UnitStatus.reserved,
       reservedBy: userId,
-      reservationNote:
-          note == null || note.trim().isEmpty ? null : note.trim(),
+      reservationNote: note == null || note.trim().isEmpty ? null : note.trim(),
       reservedAt: DateTime.now(),
     );
     _notify();
     return true;
   }
 
-  bool cancelReservation({
-    required String barcode,
-    required String userId,
-  }) {
+  bool cancelReservation({required String barcode, required String userId}) {
     final index = _units.indexWhere((u) => u.barcode == barcode);
     if (index == -1) return false;
     final unit = _units[index];
@@ -1082,10 +1098,12 @@ class TabangRepository {
   bool hasReciprocalChat(String a, String b) {
     final thread = threadBetween(a, b);
     if (thread == null) return false;
-    final fromA =
-        thread.messages.any((m) => m.senderId == a && m.senderId != 'system');
-    final fromB =
-        thread.messages.any((m) => m.senderId == b && m.senderId != 'system');
+    final fromA = thread.messages.any(
+      (m) => m.senderId == a && m.senderId != 'system',
+    );
+    final fromB = thread.messages.any(
+      (m) => m.senderId == b && m.senderId != 'system',
+    );
     return fromA && fromB;
   }
 
@@ -1097,8 +1115,8 @@ class TabangRepository {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
 
-    final isParticipant = thread.participantAId == senderId ||
-        thread.participantBId == senderId;
+    final isParticipant =
+        thread.participantAId == senderId || thread.participantBId == senderId;
     if (!isParticipant) return;
 
     final otherId = thread.participantAId == senderId
@@ -1116,9 +1134,7 @@ class TabangRepository {
       flag: _classify(trimmed),
     );
 
-    _threads[index] = thread.copyWith(
-      messages: [...thread.messages, message],
-    );
+    _threads[index] = thread.copyWith(messages: [...thread.messages, message]);
     _notify();
   }
 
@@ -1148,12 +1164,12 @@ class TabangRepository {
     if (index == -1) return false;
     final thread = _threads[index];
     if (thread.identityRevealed) return false;
-    final isParticipant = thread.participantAId == requesterId ||
+    final isParticipant =
+        thread.participantAId == requesterId ||
         thread.participantBId == requesterId;
     if (!isParticipant) return false;
     if (thread.identityRevealRequestedBy != null) return false;
-    _threads[index] =
-        thread.copyWith(identityRevealRequestedBy: requesterId);
+    _threads[index] = thread.copyWith(identityRevealRequestedBy: requesterId);
     _notify();
     return true;
   }
@@ -1165,7 +1181,8 @@ class TabangRepository {
     if (index == -1) return false;
     final thread = _threads[index];
     if (thread.identityRevealed) return false;
-    final isParticipant = thread.participantAId == accepterId ||
+    final isParticipant =
+        thread.participantAId == accepterId ||
         thread.participantBId == accepterId;
     if (!isParticipant) return false;
     final requestedBy = thread.identityRevealRequestedBy;
@@ -1184,7 +1201,8 @@ class TabangRepository {
     final thread = _threads[index];
     final requestedBy = thread.identityRevealRequestedBy;
     if (requestedBy == null || requestedBy == declinerId) return false;
-    final isParticipant = thread.participantAId == declinerId ||
+    final isParticipant =
+        thread.participantAId == declinerId ||
         thread.participantBId == declinerId;
     if (!isParticipant) return false;
     _threads[index] = thread.copyWith(clearIdentityRevealRequest: true);
@@ -1250,23 +1268,27 @@ class TabangRepository {
     final monthStart = DateTime(today.year, today.month, 1);
 
     final donationsToday = _users
-        .where((u) =>
-            u.lastDonationDate != null &&
-            _sameDay(u.lastDonationDate!, today))
+        .where(
+          (u) =>
+              u.lastDonationDate != null &&
+              _sameDay(u.lastDonationDate!, today),
+        )
         .length;
 
     final donationsThisMonth = _users
-        .where((u) =>
-            u.lastDonationDate != null &&
-            u.lastDonationDate!.isAfter(monthStart))
+        .where(
+          (u) =>
+              u.lastDonationDate != null &&
+              u.lastDonationDate!.isAfter(monthStart),
+        )
         .length;
 
     final barangayCounts = donorCountsByBarangay();
     final topBarangay = barangayCounts.isEmpty
         ? '—'
         : barangayCounts.entries
-            .reduce((a, b) => a.value >= b.value ? a : b)
-            .key;
+              .reduce((a, b) => a.value >= b.value ? a : b)
+              .key;
 
     return AnalyticsSummary(
       donationsToday: donationsToday,
@@ -1281,20 +1303,24 @@ class TabangRepository {
   }
 
   List<BloodTypeStat> bloodTypeStats() {
-    return BloodType.values.map((type) {
-      final donated = _users
-          .where((u) => u.bloodType == type)
-          .fold<int>(0, (sum, u) => sum + u.totalDonations);
-      final requested = _requests
-          .where((r) =>
-              r.bloodType == type && r.status != RequestStatus.cancelled)
-          .fold<int>(0, (sum, r) => sum + r.unitsNeeded);
-      return BloodTypeStat(
-        bloodType: type,
-        donated: donated,
-        requested: requested,
-      );
-    }).toList(growable: false);
+    return BloodType.values
+        .map((type) {
+          final donated = _users
+              .where((u) => u.bloodType == type)
+              .fold<int>(0, (sum, u) => sum + u.totalDonations);
+          final requested = _requests
+              .where(
+                (r) =>
+                    r.bloodType == type && r.status != RequestStatus.cancelled,
+              )
+              .fold<int>(0, (sum, r) => sum + r.unitsNeeded);
+          return BloodTypeStat(
+            bloodType: type,
+            donated: donated,
+            requested: requested,
+          );
+        })
+        .toList(growable: false);
   }
 
   List<BarangayStat> barangayStats() {
@@ -1302,11 +1328,16 @@ class TabangRepository {
     for (final barangay in DigosBarangays.all) {
       final donorsHere = donors.where((u) => u.barangay == barangay).toList();
       if (donorsHere.isEmpty) continue;
-      stats.add(BarangayStat(
-        barangay: barangay,
-        donationCount: donorsHere.fold<int>(0, (s, u) => s + u.totalDonations),
-        donorCount: donorsHere.length,
-      ));
+      stats.add(
+        BarangayStat(
+          barangay: barangay,
+          donationCount: donorsHere.fold<int>(
+            0,
+            (s, u) => s + u.totalDonations,
+          ),
+          donorCount: donorsHere.length,
+        ),
+      );
     }
     stats.sort((a, b) => b.donationCount.compareTo(a.donationCount));
     return stats;
@@ -1316,13 +1347,16 @@ class TabangRepository {
   /// excluded: they belong in the expired filter, not the expiry-pressure list.
   List<BloodUnit> expiringSoon({int days = 7, DateTime? now}) {
     final today = now ?? DateTime.now();
-    final list = _units
-        .where((u) =>
-            u.isUsableAt(today) &&
-            u.daysUntilExpiry(today) >= 0 &&
-            u.daysUntilExpiry(today) <= days)
-        .toList()
-      ..sort((a, b) => a.expiresOn.compareTo(b.expiresOn));
+    final list =
+        _units
+            .where(
+              (u) =>
+                  u.isUsableAt(today) &&
+                  u.daysUntilExpiry(today) >= 0 &&
+                  u.daysUntilExpiry(today) <= days,
+            )
+            .toList()
+          ..sort((a, b) => a.expiresOn.compareTo(b.expiresOn));
     return list;
   }
 
@@ -2013,45 +2047,127 @@ class TabangRepository {
       UnitStatus status = UnitStatus.available,
     }) {
       final collected = daysAgo(collectedDaysAgo);
-      _units.add(BloodUnit(
-        barcode: barcode,
-        bloodType: type,
-        component: component,
-        storageBay: bay,
-        status: status,
-        collectedOn: collected,
-        expiresOn: collected.add(Duration(days: shelfLifeDays)),
-      ));
+      _units.add(
+        BloodUnit(
+          barcode: barcode,
+          bloodType: type,
+          component: component,
+          storageBay: bay,
+          status: status,
+          collectedOn: collected,
+          expiresOn: collected.add(Duration(days: shelfLifeDays)),
+        ),
+      );
     }
 
-    addUnit('RBC-8849-O-', BloodType.oNeg, BloodComponent.packedRbc,
-        'Cold room R-02 (4 °C)', 40, 42);
-    addUnit('RBC-8850-O-', BloodType.oNeg, BloodComponent.packedRbc,
-        'Cold room R-02 (4 °C)', 39, 42);
-    addUnit('RBC-6612-O+', BloodType.oPos, BloodComponent.packedRbc,
-        'Cold room R-01 (4 °C)', 20, 42);
-    addUnit('RBC-3391-B-', BloodType.bNeg, BloodComponent.packedRbc,
-        'Cold room R-02 (4 °C)', 14, 42);
-    addUnit('RBC-9014-AB-', BloodType.abNeg, BloodComponent.packedRbc,
-        'Bay 03 (4 °C)', 28, 42, status: UnitStatus.reserved);
-    addUnit('PLT-4019-A+', BloodType.aPos, BloodComponent.platelets,
-        'Agitator A-01 (22 °C)', 3, 5);
-    addUnit('PLT-4020-O+', BloodType.oPos, BloodComponent.platelets,
-        'Agitator A-01 (22 °C)', 2, 5);
-    addUnit('FFP-7712-B+', BloodType.bPos, BloodComponent.plasma,
-        'Freezer F-03 (-30 °C)', 185, 365);
-    addUnit('FFP-9912-AB+', BloodType.abPos, BloodComponent.plasma,
-        'Freezer F-01 (-30 °C)', 205, 365);
-    addUnit('WB-1092-A-', BloodType.aNeg, BloodComponent.wholeBlood,
-        'Cold room R-03 (4 °C)', 38, 42, status: UnitStatus.quarantined);
-    addUnit('WB-1093-A+', BloodType.aPos, BloodComponent.wholeBlood,
-        'Cold room R-03 (4 °C)', 12, 42);
-    addUnit('RBC-7723-B+', BloodType.bPos, BloodComponent.packedRbc,
-        'Cold room R-01 (4 °C)', 8, 42);
+    addUnit(
+      'RBC-8849-O-',
+      BloodType.oNeg,
+      BloodComponent.packedRbc,
+      'Cold room R-02 (4 °C)',
+      40,
+      42,
+    );
+    addUnit(
+      'RBC-8850-O-',
+      BloodType.oNeg,
+      BloodComponent.packedRbc,
+      'Cold room R-02 (4 °C)',
+      39,
+      42,
+    );
+    addUnit(
+      'RBC-6612-O+',
+      BloodType.oPos,
+      BloodComponent.packedRbc,
+      'Cold room R-01 (4 °C)',
+      20,
+      42,
+    );
+    addUnit(
+      'RBC-3391-B-',
+      BloodType.bNeg,
+      BloodComponent.packedRbc,
+      'Cold room R-02 (4 °C)',
+      14,
+      42,
+    );
+    addUnit(
+      'RBC-9014-AB-',
+      BloodType.abNeg,
+      BloodComponent.packedRbc,
+      'Bay 03 (4 °C)',
+      28,
+      42,
+      status: UnitStatus.reserved,
+    );
+    addUnit(
+      'PLT-4019-A+',
+      BloodType.aPos,
+      BloodComponent.platelets,
+      'Agitator A-01 (22 °C)',
+      3,
+      5,
+    );
+    addUnit(
+      'PLT-4020-O+',
+      BloodType.oPos,
+      BloodComponent.platelets,
+      'Agitator A-01 (22 °C)',
+      2,
+      5,
+    );
+    addUnit(
+      'FFP-7712-B+',
+      BloodType.bPos,
+      BloodComponent.plasma,
+      'Freezer F-03 (-30 °C)',
+      185,
+      365,
+    );
+    addUnit(
+      'FFP-9912-AB+',
+      BloodType.abPos,
+      BloodComponent.plasma,
+      'Freezer F-01 (-30 °C)',
+      205,
+      365,
+    );
+    addUnit(
+      'WB-1092-A-',
+      BloodType.aNeg,
+      BloodComponent.wholeBlood,
+      'Cold room R-03 (4 °C)',
+      38,
+      42,
+      status: UnitStatus.quarantined,
+    );
+    addUnit(
+      'WB-1093-A+',
+      BloodType.aPos,
+      BloodComponent.wholeBlood,
+      'Cold room R-03 (4 °C)',
+      12,
+      42,
+    );
+    addUnit(
+      'RBC-7723-B+',
+      BloodType.bPos,
+      BloodComponent.packedRbc,
+      'Cold room R-01 (4 °C)',
+      8,
+      42,
+    );
     // Kept in the record with its stored status still `available` to exercise
     // effective-status expiry handling; it is never counted as usable.
-    addUnit('RBC-7700-O+', BloodType.oPos, BloodComponent.packedRbc,
-        'Cold room R-01 (4 °C)', 45, 42);
+    addUnit(
+      'RBC-7700-O+',
+      BloodType.oPos,
+      BloodComponent.packedRbc,
+      'Cold room R-01 (4 °C)',
+      45,
+      42,
+    );
 
     // ---- requests ------------------------------------------------------
     _requests.addAll([
@@ -2088,7 +2204,7 @@ class TabangRepository {
         bloodType: BloodType.bPos,
         component: BloodComponent.wholeBlood,
         unitsNeeded: 1,
-        hospital: 'Cor Jesu College Infirmary',
+        hospital: 'Digos Doctors Hospital',
         barangay: 'Zone 1',
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(days: 3)),
@@ -2116,7 +2232,8 @@ class TabangRepository {
         barangay: 'Matti',
         urgency: RequestUrgency.urgent,
         createdAt: now.subtract(const Duration(days: 1, hours: 8)),
-        note: 'Dialysis patient, two units requested by the attending physician.',
+        note:
+            'Dialysis patient, two units requested by the attending physician.',
       ),
       BloodRequest(
         id: 'REQ-006',
@@ -2125,7 +2242,7 @@ class TabangRepository {
         bloodType: BloodType.oPos,
         component: BloodComponent.platelets,
         unitsNeeded: 1,
-        hospital: 'Cor Jesu College Infirmary',
+        hospital: 'Digos Doctors Hospital',
         barangay: 'San Jose',
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(hours: 20)),
@@ -2175,7 +2292,7 @@ class TabangRepository {
         bloodType: BloodType.abNeg,
         component: BloodComponent.plasma,
         unitsNeeded: 1,
-        hospital: 'Cor Jesu College Infirmary',
+        hospital: 'Digos Doctors Hospital',
         barangay: 'Dawis',
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(days: 4)),
@@ -2191,7 +2308,8 @@ class TabangRepository {
         donorId: 'USR-012',
         donorAlias: 'Liza',
         createdAt: now.subtract(const Duration(hours: 2)),
-        message: 'O- donor available tomorrow morning at Digos Provincial '
+        message:
+            'O- donor available tomorrow morning at Digos Provincial '
             'Hospital.',
       ),
       RequestResponse(
@@ -2229,8 +2347,7 @@ class TabangRepository {
             id: 'MSG-001',
             senderId: 'USR-009',
             senderAlias: 'Recipient 209',
-            text:
-                'Hello, are you available to donate at Digos Provincial Hospital tomorrow morning?',
+            text: 'Hello, are you available to donate at Digos Provincial Hospital tomorrow morning?',
             sentAt: now.subtract(const Duration(hours: 3)),
           ),
           ChatMessage(
@@ -2293,8 +2410,7 @@ class TabangRepository {
             id: 'MSG-201',
             senderId: 'USR-002',
             senderAlias: 'Tere',
-            text:
-                'Click this link to buy supplements before donating: http://spam-link.test',
+            text: 'Click this link to buy supplements before donating: http://spam-link.test',
             sentAt: now.subtract(const Duration(hours: 12)),
             flag: ModerationFlag.spam,
           ),
@@ -2336,7 +2452,8 @@ class TabangRepository {
             id: 'MSG-401',
             senderId: 'USR-009',
             senderAlias: 'Recipient 209',
-            text: 'Hello Bea, can you confirm your availability for Patient 118?',
+            text:
+                'Hello Bea, can you confirm your availability for Patient 118?',
             sentAt: now.subtract(const Duration(days: 2, hours: 22)),
           ),
           ChatMessage(
@@ -2351,12 +2468,17 @@ class TabangRepository {
     ]);
 
     // ---- drives --------------------------------------------------------
+    // Pin coordinates are representative points inside each drive's own
+    // barangay on the bundled Digos map, so a marker never drifts outside the
+    // city outline or into a neighbouring barangay.
     _drives.addAll([
       BloodDrive(
         id: 'DRV-001',
         title: 'Digos City Gym Blood Drive',
-        venue: 'Digos City Gymnasium, Zone 1',
-        barangay: 'Zone 1',
+        venue: 'Digos City Gymnasium, Zone 3',
+        barangay: 'Zone 3',
+        lat: 6.74378,
+        lng: 125.35629,
         startsAt: _atHour(now, 4, 8),
         endsAt: _atHour(now, 4, 15),
         expectedDonors: 120,
@@ -2366,6 +2488,8 @@ class TabangRepository {
         title: 'Barangay Matti Health Drive',
         venue: 'Matti Covered Court',
         barangay: 'Matti',
+        lat: 6.78678,
+        lng: 125.32991,
         startsAt: _atHour(now, 8, 9),
         endsAt: _atHour(now, 8, 14),
         expectedDonors: 75,
@@ -2373,8 +2497,10 @@ class TabangRepository {
       BloodDrive(
         id: 'DRV-003',
         title: 'Cor Jesu College Campus Mobile Drive',
-        venue: 'Student Activity Center',
-        barangay: 'Zone 1',
+        venue: 'Cor Jesu College, Student Activity Center',
+        barangay: 'Zone 2',
+        lat: 6.75210,
+        lng: 125.35365,
         startsAt: _atHour(now, 14, 10),
         endsAt: _atHour(now, 14, 16),
         expectedDonors: 150,
@@ -2384,15 +2510,19 @@ class TabangRepository {
         title: 'Aplaya Coastal Community Drive',
         venue: 'Aplaya Barangay Hall',
         barangay: 'Aplaya',
+        lat: 6.72470,
+        lng: 125.36879,
         startsAt: _atHour(now, 5, 8),
         endsAt: _atHour(now, 5, 13),
         expectedDonors: 60,
       ),
       BloodDrive(
         id: 'DRV-005',
-        title: 'San Jose Mall Bloodletting',
-        venue: 'San Jose Town Plaza',
+        title: 'San Jose Community Bloodletting',
+        venue: 'San Jose Barangay Hall',
         barangay: 'San Jose',
+        lat: 6.73230,
+        lng: 125.34217,
         startsAt: _atHour(now, 11, 9),
         endsAt: _atHour(now, 11, 17),
         expectedDonors: 95,
@@ -2432,8 +2562,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-001',
         title: 'One Donation, Three Lives',
-        subtitle:
-            'A single bag can become red cells, platelets and plasma for three patients.',
+        subtitle: 'A single bag can become red cells, platelets and plasma for three patients.',
         body:
             'A single whole-blood donation can be separated into red cells, platelets and plasma, '
             'which may support up to three different patients. Voluntary, non-remunerated donors '
@@ -2446,8 +2575,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-002',
         title: 'Hydration First Before Donating',
-        subtitle:
-            'Drink at least 16 oz of water before your appointment for a smoother donation.',
+        subtitle: 'Drink at least 16 oz of water before your appointment for a smoother donation.',
         body:
             'Plasma is roughly 90 percent water. Being well hydrated before donation keeps your '
             'blood pressure stable and reduces the chance of light-headedness afterwards. Avoid '
@@ -2472,8 +2600,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-004',
         title: 'Post-Donation Rest & Recovery',
-        subtitle:
-            'Avoid heavy lifting and rest for 24 hours to let your body rebuild.',
+        subtitle: 'Avoid heavy lifting and rest for 24 hours to let your body rebuild.',
         body:
             'Keep the bandage on for at least four hours. Drink extra fluids for the rest of the '
             'day, avoid strenuous activity and smoking for 24 hours, and sit or lie down if you '
@@ -2485,8 +2612,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-005',
         title: 'Basic Requirements: Age, Weight & Health',
-        subtitle:
-            'Must be at least 18 years old, weigh 50 kg or more, and be in general good health.',
+        subtitle: 'Must be at least 18 years old, weigh 50 kg or more, and be in general good health.',
         body:
             'Donors must be 18 to 65 years old, weigh at least 50 kg, and pass the pre-donation '
             'screening. Bring a valid ID and your blood donor card if you have one.',
@@ -2497,8 +2623,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-006',
         title: 'Can I Donate If I Got a Tattoo?',
-        subtitle:
-            'You can donate if the tattoo was applied by a regulated shop with sterile needles.',
+        subtitle: 'You can donate if the tattoo was applied by a regulated shop with sterile needles.',
         body:
             'Tattoos and piercings from regulated establishments using sterile single-use '
             'equipment do not disqualify you. Unregulated settings carry a deferral period. '
@@ -2510,8 +2635,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-007',
         title: 'How Often Can You Donate?',
-        subtitle:
-            'Whole blood every 12 weeks. Platelets every 2 weeks. Plasma every 4 weeks.',
+        subtitle: 'Whole blood every 12 weeks. Platelets every 2 weeks. Plasma every 4 weeks.',
         body:
             'Whole blood and packed red cells require a 12-week interval so red cell volume and '
             'iron stores recover. Platelets can be given more frequently because they are '
@@ -2524,8 +2648,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-008',
         title: 'Why TABANG Never Shows Real Names',
-        subtitle:
-            'Donor and patient identities stay tokenized until both sides agree.',
+        subtitle: 'Donor and patient identities stay tokenized until both sides agree.',
         body:
             'Under RA 10173, health information is sensitive personal data. TABANG shows aliases '
             'in the directory and in chat. Real names and exact addresses are only exchanged '
@@ -2537,8 +2660,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-009',
         title: '"A stranger\'s donation saved my daughter\'s life."',
-        subtitle:
-            'How an emergency transfusion changed one family\'s story in Digos City.',
+        subtitle: 'How an emergency transfusion changed one family\'s story in Digos City.',
         body:
             'When local stock ran low, the family spent hours calling around. A matched donor '
             'found through a community drive arrived within the window. This is the gap TABANG '
@@ -2550,8 +2672,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-010',
         title: 'Meet Mark: 50th Blood Donation Milestone',
-        subtitle:
-            'Why one donor has given every 12 weeks for over a decade.',
+        subtitle: 'Why one donor has given every 12 weeks for over a decade.',
         body:
             'Fifty donations is roughly 150 units of separated components. Regular donors like '
             'Mark are the backbone of a stable supply, because predictable donation beats '
@@ -2577,8 +2698,7 @@ class TabangRepository {
       ContentItem(
         id: 'CNT-012',
         title: 'How Donation Helps the Whole Community',
-        subtitle:
-            'One bag can become red cells, platelets and plasma for three patients.',
+        subtitle: 'One bag can become red cells, platelets and plasma for three patients.',
         body:
             'Voluntary, unpaid donation keeps the supply safe and sustainable. '
             'Red cells support surgery and trauma, platelets support cancer '

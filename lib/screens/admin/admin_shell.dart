@@ -140,8 +140,7 @@ class _AdminShellState extends State<AdminShell> {
                 selectedIndex: _phoneIndices.contains(_index)
                     ? _phoneIndices.indexOf(_index)
                     : 0,
-                onDestinationSelected: (slot) =>
-                    _select(_phoneIndices[slot]),
+                onDestinationSelected: (slot) => _select(_phoneIndices[slot]),
                 destinations: [
                   for (final index in _phoneIndices)
                     NavigationDestination(
@@ -165,9 +164,9 @@ class _AdminShellState extends State<AdminShell> {
             onEnter: wide ? (_) => setState(() => _hovering = true) : null,
             onExit: wide
                 ? (_) => setState(() {
-                      _hovering = false;
-                      if (!_pinned) _railSettled = false;
-                    })
+                    _hovering = false;
+                    if (!_pinned) _railSettled = false;
+                  })
                 : null,
             child: _AdminSidebar(
               user: widget.user,
@@ -394,8 +393,11 @@ class _AdminSidebar extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(TabangRadius.xs),
                   ),
-                  child: const Icon(Icons.health_and_safety,
-                      color: Colors.white, size: 18),
+                  child: const Icon(
+                    Icons.health_and_safety,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 if (expanded) ...[
                   const SizedBox(width: TabangSpace.md),
@@ -420,10 +422,7 @@ class _AdminSidebar extends StatelessWidget {
                           maxLines: 1,
                           softWrap: false,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
-                          ),
+                          style: TextStyle(fontSize: 12, color: Colors.white70),
                         ),
                       ],
                     ),
@@ -441,6 +440,20 @@ class _AdminSidebar extends StatelessWidget {
               ],
             ),
           ),
+          // Keep the pin reachable after the rail collapses. Previously the
+          // control only existed in the expanded brand row, so an unpinned
+          // rail could not be pinned open again without hovering.
+          if (!expanded)
+            IconButton(
+              tooltip: pinned ? 'Unpin sidebar' : 'Pin sidebar',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                size: 16,
+                color: Colors.white70,
+              ),
+              onPressed: onTogglePin,
+            ),
           const SizedBox(height: TabangSpace.sm),
           Expanded(
             child: ListView.builder(
@@ -578,8 +591,9 @@ class _AdminSidebar extends StatelessWidget {
       context: context,
       backgroundColor: context.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(TabangRadius.lg)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(TabangRadius.lg),
+        ),
       ),
       builder: (context) => Padding(
         padding: context.pagePadding,

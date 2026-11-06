@@ -19,22 +19,15 @@ dependencies:
   crypto: ^3.0.3
 
   # --- Maps ---
-  # Find Donor uses the standalone digos_barangay_map implementation: a
-  # FlutterMap vector map whose barangay topology ships in
-  # lib/core/digos_geodata.dart. Tiles are fetched from OpenStreetMap for the
-  # base layer only (attribution shown on the map); every TABANG layer —
-  # barangays, donor density, drive pins — is drawn locally and still renders
-  # when the device is offline.
+  # Find Donor uses a FlutterMap vector map whose barangay topology ships in
+  # lib/core/digos_geodata.dart. OpenStreetMap raster tiles supply the base
+  # layer only (attribution shown on the map); every TABANG layer — barangays,
+  # donor density, drive pins — is drawn locally and still renders offline.
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
 
   firebase_core: ^5.1.0
   firebase_auth: ^7.0.1
-
-  # Supabase is intentionally not a dependency in this simulated build. The
-  # backend migration is documented as a known gap instead of shipping an
-  # unused client that implies a live connection.
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -44,7 +37,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/maps/
     - assets/images/
     - assets/images/avatars/
     - assets/images/educational/

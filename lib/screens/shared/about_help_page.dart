@@ -61,8 +61,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     _Guide(
       title: 'Requesting blood',
       icon: Icons.add_circle_outline,
-      summary:
-          'Check the bank first, then coordinate with compatible donors.',
+      summary: 'Check the bank first, then coordinate with compatible donors.',
       steps: [
         'Open Requests and tap New request. Start with a patient alias — never the real patient name.',
         'Choose the blood type, component, units, hospital, barangay and urgency. TABANG checks participating inventory as you type.',
@@ -79,8 +78,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     _Guide(
       title: 'Messaging safely',
       icon: Icons.forum_outlined,
-      summary:
-          'Alias-only chat, bilateral reveal, reporting and blocking.',
+      summary: 'Alias-only chat, bilateral reveal, reporting and blocking.',
       steps: [
         'Open Messages and choose a conversation. Other users only see your nickname, never your full name or address.',
         'Ask about availability, hospital logistics and timing. Keep clinical details minimal until both sides agree to reveal identities.',
@@ -112,8 +110,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     _Guide(
       title: 'Profile & donor registration',
       icon: Icons.badge_outlined,
-      summary:
-          'Your alias identity, donor upgrade and availability controls.',
+      summary: 'Your alias identity, donor upgrade and availability controls.',
       steps: [
         'Open Profile to review your alias, barangay, blood type and account status. Your full name is never public.',
         'New accounts start as community users. You can request blood and browse donors immediately.',
@@ -129,8 +126,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     _Guide(
       title: 'Settings & accessibility',
       icon: Icons.settings_outlined,
-      summary:
-          'Theme, notification summaries, privacy and safe-area layout.',
+      summary: 'Theme, notification summaries, privacy and safe-area layout.',
       steps: [
         'Open Settings from the account menu or the desktop rail. Appearance follows System, Light or Dark mode immediately.',
         'Dark mode uses raised secondary-text contrast and Material 3 surfaced components, not a simple colour inversion.',
@@ -208,7 +204,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       faqs: [
         _Faq(
           'How does TABANG decide between the blood bank and the donor '
-          'network?',
+              'network?',
           'When a recipient creates a request, the dialog checks the public '
               'inventory for compatible units of the selected component. If '
               'stock exists, the recipient can submit the request to the blood '
@@ -339,16 +335,20 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     final result = <_FaqCategory>[];
     for (final category in _categories) {
       final matches = category.faqs
-          .where((f) =>
-              f.question.toLowerCase().contains(q) ||
-              f.answer.toLowerCase().contains(q))
+          .where(
+            (f) =>
+                f.question.toLowerCase().contains(q) ||
+                f.answer.toLowerCase().contains(q),
+          )
           .toList();
       if (matches.isNotEmpty) {
-        result.add(_FaqCategory(
-          title: category.title,
-          icon: category.icon,
-          faqs: matches,
-        ));
+        result.add(
+          _FaqCategory(
+            title: category.title,
+            icon: category.icon,
+            faqs: matches,
+          ),
+        );
       }
     }
     return result;
@@ -358,10 +358,12 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     if (_query.trim().isEmpty) return _guides;
     final q = _query.toLowerCase();
     return _guides
-        .where((g) =>
-            g.title.toLowerCase().contains(q) ||
-            g.summary.toLowerCase().contains(q) ||
-            g.steps.any((s) => s.toLowerCase().contains(q)))
+        .where(
+          (g) =>
+              g.title.toLowerCase().contains(q) ||
+              g.summary.toLowerCase().contains(q) ||
+              g.steps.any((s) => s.toLowerCase().contains(q)),
+        )
         .toList();
   }
 
@@ -523,8 +525,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                 final action = FilledButton.tonalIcon(
                   onPressed: user == null
                       ? null
-                      : () =>
-                          showWelcomeGuide(context, user, markSeen: false),
+                      : () => showWelcomeGuide(context, user, markSeen: false),
                   icon: const Icon(Icons.play_circle_outline, size: 16),
                   label: const Text('Open welcome guide'),
                 );
@@ -572,9 +573,8 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           children: [
             InkWell(
               borderRadius: BorderRadius.circular(TabangRadius.md),
-              onTap: () => setState(
-                () => _openGuide = open ? null : guide.title,
-              ),
+              onTap: () =>
+                  setState(() => _openGuide = open ? null : guide.title),
               child: Padding(
                 padding: const EdgeInsets.all(TabangSpace.lg),
                 child: Row(
@@ -621,11 +621,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                       ),
                     ),
                     const SizedBox(width: TabangSpace.sm),
-                    HelpTip(
-                      title: guide.title,
-                      message: guide.tip,
-                      size: 18,
-                    ),
+                    HelpTip(title: guide.title, message: guide.tip, size: 18),
                     Icon(
                       open ? Icons.expand_less : Icons.expand_more,
                       size: 20,
@@ -661,8 +657,9 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                               color: context.isDark
                                   ? TabangColors.gold.withValues(alpha: 0.13)
                                   : TabangColors.goldSoft,
-                              borderRadius:
-                                  BorderRadius.circular(TabangRadius.sm),
+                              borderRadius: BorderRadius.circular(
+                                TabangRadius.sm,
+                              ),
                             ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -850,11 +847,10 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                     isDense: true,
                   ),
                   items: categories
-                      .map(
-                        (c) => DropdownMenuItem(value: c, child: Text(c)),
-                      )
+                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
-                  onChanged: (v) => setDialogState(() => category = v ?? category),
+                  onChanged: (v) =>
+                      setDialogState(() => category = v ?? category),
                 ),
                 const SizedBox(height: TabangSpace.md),
                 TextField(
@@ -878,16 +874,6 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                     ),
                   ),
                 ],
-                const SizedBox(height: TabangSpace.sm),
-                Text(
-                  'This is a simulated prototype: messages reach the chapter '
-                  'conversation inside TABANG only.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.4,
-                    color: dialogContext.textMuted,
-                  ),
-                ),
               ],
             ),
           ),
@@ -928,7 +914,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
             message: controller.text.trim(),
           );
     controller.dispose();
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -967,8 +953,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                 padding: const EdgeInsets.all(TabangSpace.lg),
                 child: Row(
                   children: [
-                    Icon(category.icon,
-                        size: 17, color: TabangColors.crimson),
+                    Icon(category.icon, size: 17, color: TabangColors.crimson),
                     const SizedBox(width: TabangSpace.md),
                     Expanded(
                       child: Text(
@@ -980,8 +965,11 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                         ),
                       ),
                     ),
-                    StatusPill('${category.faqs.length}',
-                        tone: Tone.neutral, dense: true),
+                    StatusPill(
+                      '${category.faqs.length}',
+                      tone: Tone.neutral,
+                      dense: true,
+                    ),
                     const SizedBox(width: TabangSpace.sm),
                     Icon(
                       open ? Icons.expand_less : Icons.expand_more,
@@ -1004,11 +992,12 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                   children: [
                     // Deterministic order: questions are sorted A→Z inside
                     // each category so the list does not look shuffled.
-                    for (final faq in ([...category.faqs]..sort(
-                      (a, b) => a.question
-                          .toLowerCase()
-                          .compareTo(b.question.toLowerCase()),
-                    )))
+                    for (final faq
+                        in ([...category.faqs]..sort(
+                          (a, b) => a.question.toLowerCase().compareTo(
+                            b.question.toLowerCase(),
+                          ),
+                        )))
                       _buildFaq(context, faq),
                   ],
                 ),
@@ -1098,6 +1087,9 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                   ),
                   child: Text(
                     faq.answer,
+                    // Answers sit on the right of the exchange, so their
+                    // copy is right-aligned to the bubble edge.
+                    textAlign: TextAlign.right,
                     style: TextStyle(
                       fontSize: 12.5,
                       height: 1.55,
@@ -1152,10 +1144,15 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
         Container(
           width: double.infinity,
           clipBehavior: Clip.antiAlias,
-          padding: EdgeInsets.all(context.isPhone ? TabangSpace.lg : TabangSpace.xl),
+          padding: EdgeInsets.all(
+            context.isPhone ? TabangSpace.lg : TabangSpace.xl,
+          ),
           decoration: BoxDecoration(
             gradient: TabangGradients.brand,
             borderRadius: BorderRadius.circular(TabangRadius.lg),
+            // A bright rim keeps the card from reading as a bare gradient
+            // wash against the page background.
+            border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             boxShadow: [
               BoxShadow(
                 color: TabangColors.crimsonDark.withValues(alpha: 0.24),
@@ -1347,37 +1344,32 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
         _buildCredits(context),
 
         const SizedBox(height: TabangSpace.xl),
-        _aboutSection(
-          context,
-          'Known gaps',
-          'Documented rather than hidden.',
-          [
-            const _Pillar(
-              Icons.key_outlined,
-              'Production authentication',
-              'Google OAuth 2.0 and production password KDF/release signing '
-                  'are not wired in this build.',
-            ),
-            const _Pillar(
-              Icons.cloud_outlined,
-              'Backend services',
-              'Supabase/PostgreSQL, push notifications and multi-facility '
-                  'inventory require a deployed service.',
-            ),
-            const _Pillar(
-              Icons.mic_none_outlined,
-              'Voice calls',
-              'Chat is text-only. Voice calling is out of scope for the '
-                  'prototype.',
-            ),
-            const _Pillar(
-              Icons.photo_camera_outlined,
-              'Profile uploads',
-              'Profile pictures are original bundled illustrations; user upload '
-                  'and moderation are not implemented.',
-            ),
-          ],
-        ),
+        _aboutSection(context, 'Known gaps', 'Documented rather than hidden.', [
+          const _Pillar(
+            Icons.key_outlined,
+            'Production authentication',
+            'Google OAuth 2.0 and production password KDF/release signing '
+                'are not wired in this build.',
+          ),
+          const _Pillar(
+            Icons.cloud_outlined,
+            'Backend services',
+            'Supabase/PostgreSQL, push notifications and multi-facility '
+                'inventory require a deployed service.',
+          ),
+          const _Pillar(
+            Icons.mic_none_outlined,
+            'Voice calls',
+            'Chat is text-only. Voice calling is out of scope for the '
+                'prototype.',
+          ),
+          const _Pillar(
+            Icons.photo_camera_outlined,
+            'Profile uploads',
+            'Profile pictures are original bundled illustrations; user upload '
+                'and moderation are not implemented.',
+          ),
+        ]),
         const SizedBox(height: TabangSpace.xl),
 
         Center(
@@ -1477,10 +1469,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
               runSpacing: gap,
               children: [
                 for (final credit in photos)
-                  SizedBox(
-                    width: width,
-                    child: _creditCard(context, credit),
-                  ),
+                  SizedBox(width: width, child: _creditCard(context, credit)),
               ],
             );
           },
@@ -1563,11 +1552,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           ),
           Padding(
             padding: const EdgeInsets.all(6),
-            child: Icon(
-              Icons.open_in_new,
-              size: 13,
-              color: context.textMuted,
-            ),
+            child: Icon(Icons.open_in_new, size: 13, color: context.textMuted),
           ),
         ],
       ),

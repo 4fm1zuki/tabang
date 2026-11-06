@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/core/repository.dart';
 import 'package:tabang/screens/admin/admin_overview.dart';
+import 'package:tabang/screens/admin/admin_shell.dart';
 import 'package:tabang/screens/donor/blood_bank_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_shell.dart';
@@ -42,8 +43,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('blood bank table, selection bar and dialog fit a phone',
-      (tester) async {
+  testWidgets('blood bank table, selection bar and dialog fit a phone', (
+    tester,
+  ) async {
     await usePhone(tester);
     final user = repo.userById('USR-038')!;
 
@@ -90,8 +92,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('collapsed sidebar keeps its icons centred in the rail',
-      (tester) async {
+  testWidgets('collapsed sidebar keeps its icons centred in the rail', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -122,6 +125,50 @@ void main() {
     expect((iconRect.center.dx - itemRect.center.dx).abs(), lessThan(1.5));
     expect((iconRect.center.dy - itemRect.center.dy).abs(), lessThan(1.5));
     expect(itemRect.width, lessThan(80));
+    expect(tester.takeException(), isNull);
+
+    // Collapsing the rail used to remove the only pin control with it, so an
+    // unpinned rail could never be pinned open again. The compact pin stays
+    // reachable under the logo.
+    expect(find.byTooltip('Pin sidebar'), findsOneWidget);
+    await tester.tap(find.byTooltip('Pin sidebar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.byTooltip('Unpin sidebar'), findsOneWidget);
+    // The branded header only renders once the rail has slid back open.
+    expect(find.text('Digos City'), findsOneWidget);
+    expect(find.byTooltip('Pin sidebar'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('admin rail can be pinned open again from the collapsed state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: AdminShell(
+          user: repo.userById('USR-011')!,
+          themeMode: ThemeMode.light,
+          onThemeModeChanged: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Unpin sidebar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    expect(find.byTooltip('Pin sidebar'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Pin sidebar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+    expect(find.byTooltip('Unpin sidebar'), findsOneWidget);
+    expect(find.text('Chapter console'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

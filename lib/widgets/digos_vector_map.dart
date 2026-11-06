@@ -31,6 +31,7 @@ class DigosMapColors {
   static const Color labelDark = Color(0xFFFBF5F2);
   static const Color halo = Color(0xFFFBF7F4);
   static const Color haloDark = Color(0xFF171312);
+
   /// Selected barangay: a subtle teal wash with a brand-teal outline, so it
   /// no longer competes with the warm donor ramp. (Polygon fills cannot take a
   /// gradient in flutter_map, so this is the flat two-tone treatment.)
@@ -48,22 +49,53 @@ class DigosMapColors {
   static const Color attribution = Color(0xFF5A4F4B);
 
   /// Base-map tint from the standalone map project: a warm, low-contrast
-  /// street template so roads, water and buildings stay visible under the
-  /// barangay fills. (The previous matrix brightened the tiles into near-white,
-  /// which is why the base looked like a plain outline.)
+  /// street template so roads, water, buildings and land use stay visible
+  /// under the barangay fills.
   static const List<double> lightTileFilter = <double>[
-    0.575, 0.422, 0.043, 0, -6,
-    0.125, 0.872, 0.043, 0, -4,
-    0.125, 0.422, 0.493, 0, -8,
-    0.000, 0.000, 0.000, 1, 0,
+    0.575,
+    0.422,
+    0.043,
+    0,
+    -6,
+    0.125,
+    0.872,
+    0.043,
+    0,
+    -4,
+    0.125,
+    0.422,
+    0.493,
+    0,
+    -8,
+    0.000,
+    0.000,
+    0.000,
+    1,
+    0,
   ];
 
   /// Inverted, dimmed tiles for the dark map style.
   static const List<double> darkTileFilter = <double>[
-    -0.300, -0.300, -0.300, 0, 96,
-    -0.300, -0.300, -0.300, 0, 90,
-    -0.300, -0.300, -0.300, 0, 82,
-    0.000, 0.000, 0.000, 1, 0,
+    -0.300,
+    -0.300,
+    -0.300,
+    0,
+    96,
+    -0.300,
+    -0.300,
+    -0.300,
+    0,
+    90,
+    -0.300,
+    -0.300,
+    -0.300,
+    0,
+    82,
+    0.000,
+    0.000,
+    0.000,
+    1,
+    0,
   ];
 }
 
@@ -87,45 +119,59 @@ class DigosFacilityPin {
 
 /// Coordinates are approximate in this prototype — they place each facility
 /// inside the correct barangay for wayfinding, not for navigation.
+/// One active blood drive, pinned at its venue rather than the barangay
+/// centroid.
+class DigosDriveMarker {
+  const DigosDriveMarker({
+    required this.title,
+    required this.barangay,
+    required this.point,
+  });
+
+  final String title;
+  final String barangay;
+  final LatLng point;
+}
+
+///
+/// Coordinates come from the OpenStreetMap features for each facility, not
+/// barangay centroids: the PRC chapter sits on Quezon Avenue, Digos Doctors on
+/// MacArthur Highway and the provincial hospital on Malvar Street. A pin that
+/// is half a kilometre off is worse than no pin on a blood-donation map.
 const List<DigosFacilityPin> digosFacilityPins = [
   DigosFacilityPin(
     name: 'Philippine Red Cross — Davao del Sur Chapter',
     kind: 'chapter',
-    point: LatLng(6.7508, 125.3527),
-    note: 'Blood bank and donation site · walk-ins welcome',
+    point: LatLng(6.757051, 125.352800),
+    note: 'Blood bank and donation site · Quezon Avenue · walk-ins welcome',
   ),
   DigosFacilityPin(
     name: 'Digos Provincial Hospital',
     kind: 'hospital',
-    point: LatLng(6.7552, 125.3492),
-    note: 'Participating hospital · accepts blood-bank releases',
+    point: LatLng(6.743810, 125.361265),
+    note:
+        'Participating hospital · Malvar Street · accepts blood-bank releases',
   ),
   DigosFacilityPin(
     name: 'Digos Doctors Hospital',
     kind: 'hospital',
-    point: LatLng(6.7459, 125.3568),
-    note: 'Participating hospital · accepts blood-bank releases',
-  ),
-  DigosFacilityPin(
-    name: 'Cor Jesu College Infirmary',
-    kind: 'hospital',
-    point: LatLng(6.7446, 125.3602),
-    note: 'Participating infirmary · student and community referrals',
+    point: LatLng(6.764423, 125.355069),
+    note: 'Participating hospital · MacArthur Highway · accepts blood-bank releases',
   ),
 ];
 
 /// How much of the base map each density band lets through.
 ///
-/// The fills used to be fully opaque, which hid the OpenStreetMap layer
-/// completely: the base map was there but no street ever showed. Empty
-/// barangays are almost transparent (like the standalone map project's 5.5%
-/// fill) and the fills build up as donor density rises.
+/// The fills used to be fully opaque, which hid the street layer completely:
+/// the base map was there but no road ever showed. Empty barangays are almost
+/// transparent and every band stays below 0.8 so the streets remain readable
+/// even in the densest part of the city proper.
 double digosHeatOpacity(int count) {
-  if (count == 0) return 0.10;
-  if (count <= 2) return 0.45;
-  if (count <= 5) return 0.62;
-  if (count <= 9) return 0.78;
-  return 0.88;
+  if (count == 0) return 0.04;
+  if (count <= 2) return 0.30;
+  if (count <= 5) return 0.48;
+  if (count <= 9) return 0.64;
+  return 0.78;
 }
 
 /// Sequential donor-density ramp, re-tuned to sit on the warm paper base.
@@ -156,7 +202,7 @@ class DigosVectorMap extends StatefulWidget {
     super.key,
     required this.controller,
     required this.donorCounts,
-    required this.driveCounts,
+    required this.drives,
     required this.selectedBarangay,
     required this.mapDark,
     required this.onSelectBarangay,
@@ -172,8 +218,8 @@ class DigosVectorMap extends StatefulWidget {
   /// Canonical barangay name → eligible donors.
   final Map<String, int> donorCounts;
 
-  /// Canonical barangay name → active drives.
-  final Map<String, int> driveCounts;
+  /// Active drives with their venue coordinates.
+  final List<DigosDriveMarker> drives;
 
   final String? selectedBarangay;
 
@@ -196,10 +242,11 @@ class DigosVectorMap extends StatefulWidget {
   /// Widget tests disable network tiles so no HTTP is attempted.
   static bool tilesEnabled = true;
 
-  /// The camera fit that frames the whole city.
+  /// The camera fit that frames the whole city, matching the dissolved
+  /// PSA/NAMRIA boundary in [DigosGeoData.cityRing].
   static final LatLngBounds cityBounds = LatLngBounds(
-    const LatLng(6.71695, 125.2524),
-    const LatLng(6.9874, 125.3930),
+    const LatLng(6.7235, 125.2547),
+    const LatLng(6.9852, 125.3912),
   );
 
   /// Centroid of a barangay by repository name ("Zone 1"), used by the donor
@@ -218,7 +265,10 @@ class DigosVectorMap extends StatefulWidget {
       CameraFit.bounds(
         bounds: cityBounds,
         padding: const EdgeInsets.all(40),
-        maxZoom: 13,
+        // The whole city fits around 11.4; capping the fit just above that
+        // stops a zero-sized first layout from falling back to a street-level
+        // zoom that hides half the barangays.
+        maxZoom: 11.5,
       ),
     );
   }
@@ -231,75 +281,9 @@ class DigosVectorMap extends StatefulWidget {
 /// cached once per process.
 List<BarangayFeature>? _barangayFeaturesCache;
 List<List<LatLng>>? _internalBordersCache;
-List<LatLng>? _cityRingCache;
 
 List<BarangayFeature> _barangayFeatures() =>
     _barangayFeaturesCache ??= DigosGeoData.buildBarangays();
-
-/// Douglas–Peucker simplification for the city outline.
-///
-/// The stitched ring carries ~1000 points, and the mask polygon (a huge
-/// rectangle with that ring as a hole) is re-tessellated whenever the camera
-/// moves. Simplifying to a sub-pixel tolerance at the city-wide zoom cuts the
-/// work dramatically while keeping the outline visually identical.
-List<LatLng> _simplifyRing(List<LatLng> points, double epsilon) {
-  if (points.length < 4) return points;
-
-  double perpendicularDistance(LatLng p, LatLng a, LatLng b) {
-    final dx = b.longitude - a.longitude;
-    final dy = b.latitude - a.latitude;
-    final norm = math.sqrt(dx * dx + dy * dy);
-    if (norm == 0) {
-      return math.sqrt(
-        math.pow(p.longitude - a.longitude, 2) +
-            math.pow(p.latitude - a.latitude, 2),
-      );
-    }
-    return ((p.longitude - a.longitude) * dy -
-                (p.latitude - a.latitude) * dx)
-            .abs() /
-        norm;
-  }
-
-  final keep = List<bool>.filled(points.length, false);
-  keep[0] = true;
-  keep[points.length - 1] = true;
-
-  final stack = <List<int>>[
-    [0, points.length - 1],
-  ];
-  while (stack.isNotEmpty) {
-    final range = stack.removeLast();
-    final first = range[0];
-    final last = range[1];
-    var maxDistance = 0.0;
-    var index = -1;
-    for (var i = first + 1; i < last; i++) {
-      final distance = perpendicularDistance(
-        points[i],
-        points[first],
-        points[last],
-      );
-      if (distance > maxDistance) {
-        maxDistance = distance;
-        index = i;
-      }
-    }
-    if (index != -1 && maxDistance > epsilon) {
-      keep[index] = true;
-      stack
-        ..add([first, index])
-        ..add([index, last]);
-    }
-  }
-
-  final simplified = <LatLng>[
-    for (var i = 0; i < points.length; i++)
-      if (keep[i]) points[i],
-  ];
-  if (simplified.length < 3) return points;
-  return simplified;
-}
 
 class _DigosVectorMapState extends State<DigosVectorMap> {
   late final List<BarangayFeature> _features;
@@ -320,6 +304,28 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   Size? _mapSize;
   bool _firstFrameDone = false;
 
+  /// `initialCameraFit` is computed before the map has a real size when the
+  /// page is restored straight into Find Donor, which used to leave the city
+  /// framed too small. Once a valid layout size exists, re-fit exactly once.
+  bool _didInitialFit = false;
+
+  void _fitOnceMeasured() {
+    if (_didInitialFit) return;
+    final size = _mapSize;
+    if (size == null || size.width < 50 || size.height < 50) return;
+    _didInitialFit = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        DigosVectorMap.fitCity(widget.controller);
+      } catch (_) {
+        // The camera may not exist on the very first frame; the next layout
+        // will schedule another attempt.
+        _didInitialFit = false;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -331,21 +337,21 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       setState(() {});
     });
     _internalBordersCache ??= DigosGeoData.buildInternalBorders();
-    _cityRingCache ??= _simplifyRing(
-      DigosGeoData.stitchRing(DigosGeoData.cityArcs),
-      0.00035,
-    );
     _features = _barangayFeatures();
     _internalBorders = _internalBordersCache!;
-    _cityRing = _cityRingCache!;
+    _cityRing = DigosGeoData.cityRing;
     _canonicalNames = {
       for (final feature in _features)
-        feature.name:
-            DigosBarangays.canonical(feature.name) ?? feature.name,
+        feature.name: DigosBarangays.canonical(feature.name) ?? feature.name,
     };
   }
 
-  double _lerp(double minZoom, double minValue, double maxZoom, double maxValue) {
+  double _lerp(
+    double minZoom,
+    double minValue,
+    double maxZoom,
+    double maxValue,
+  ) {
     final t = ((_zoom - minZoom) / (maxZoom - minZoom)).clamp(0.0, 1.0);
     return minValue + (maxValue - minValue) * t;
   }
@@ -362,206 +368,209 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   @override
   Widget build(BuildContext context) {
     final dark = widget.mapDark;
-    final internalWidth = _lerp(9, 1.2, 14, 2.2);
-    final outerWidth = _lerp(9, 2.2, 14, 3.4);
-    final labelSize = _lerp(10, 9.5, 13, 11.5);
+    final internalWidth = _lerp(9, 1.2, 18, 2.6);
+    final outerWidth = _lerp(9, 2.2, 18, 4.0);
+    final labelSize = _lerp(10.5, 9.5, 18, 15);
+    // Pins shrink with the map so a city-wide view does not drown in markers,
+    // and grow back to full size once the user is at street level.
+    final pinScale = _lerp(10.5, 0.62, 14, 1.0);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         _mapSize = constraints.biggest;
+        _fitOnceMeasured();
         return Stack(
           clipBehavior: Clip.hardEdge,
           children: [
             FlutterMap(
               mapController: widget.controller,
-      options: MapOptions(
-        initialCenter: const LatLng(6.84, 125.33),
-        initialZoom: 11,
-        // Proper zoom limit: stay within useful tile detail, and never lose
-        // the city in the masked paper around it.
-        minZoom: 10,
-        maxZoom: 16,
-        cameraConstraint: CameraConstraint.containCenter(
-          bounds: LatLngBounds(
-            const LatLng(6.68, 125.20),
-            const LatLng(7.03, 125.44),
-          ),
-        ),
-        backgroundColor: dark ? DigosMapColors.paperDark : DigosMapColors.paper,
-        initialCameraFit: CameraFit.bounds(
-          // Same framing as the standalone map project.
-          bounds: DigosVectorMap.cityBounds,
-          padding: const EdgeInsets.all(40),
-          maxZoom: 13,
-        ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-        ),
-        onPositionChanged: (camera, hasGesture) {
-          if ((camera.zoom - _zoom).abs() > 0.05) {
-            setState(() => _zoom = camera.zoom);
-          }
-        },
-        // Gesture-start / gesture-end drive the panel fade, so the panels come
-        // back as soon as the user stops moving the map instead of on a long
-        // timer.
-        onMapEvent: (event) {
-          switch (event) {
-            case MapEventMoveStart():
-            case MapEventFlingAnimationStart():
-              widget.onInteractionStart?.call();
-            case MapEventMoveEnd():
-            case MapEventFlingAnimationEnd():
-            case MapEventDoubleTapZoomEnd():
-              widget.onInteractionEnd?.call();
-            default:
-              break;
-          }
-        },
-        onTap: (tapPosition, point) {
-          widget.onInteractionStart?.call();
-          widget.onInteractionEnd?.call();
-          widget.onSelectBarangay(_canonicalAt(point));
-        },
-        onPointerHover: (event, point) {
-          if (event.kind != PointerDeviceKind.mouse) return;
-          final feature = _featureAt(point);
-          final id = feature?.id;
-          if (id != _hoveredId) setState(() => _hoveredId = id);
-        },
-      ),
-      children: [
-        if (DigosVectorMap.tilesEnabled)
-          // Base template exactly as the standalone map project renders it:
-          // the warm, low-contrast matrix keeps roads, water and buildings
-          // visible underneath the barangay fills.
-          ColorFiltered(
-            colorFilter: ColorFilter.matrix(
-              dark
-                  ? DigosMapColors.darkTileFilter
-                  : DigosMapColors.lightTileFilter,
-            ),
-            child: TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.digos.barangay_map',
-              maxNativeZoom: 19,
-              // No per-tile fade animation: with many tiles loading during a
-              // drag the animation pass was visible as stutter.
-              tileDisplay: const TileDisplay.instantaneous(),
-              // Offline or rate-limited tiles must never break the map: the
-              // local vector layers keep rendering over the paper background.
-              // A few failures in a row also raise a small "base map offline"
-              // note so a blank base is explained rather than mysterious.
-              errorTileCallback: (tile, error, stackTrace) {
-                _tileFailures++;
-                if (!_tileWarned && _tileFailures >= 4 && mounted) {
-                  setState(() => _tileWarned = true);
-                }
-              },
-            ),
-          ),
-
-        // Inverse mask: hide every tile outside Digos City. Alternative
-        // rendering is markedly faster for a polygon with a hole on web.
-        PolygonLayer(
-          useAltRendering: true,
-          polygons: [
-            Polygon(
-              points: const [
-                LatLng(5.0, 123.0),
-                LatLng(5.0, 127.0),
-                LatLng(9.0, 127.0),
-                LatLng(9.0, 123.0),
-              ],
-              holePointsList: [_cityRing],
-              color: dark ? DigosMapColors.paperDark : DigosMapColors.paper,
-              borderStrokeWidth: 0,
-            ),
-          ],
-        ),
-
-        // Barangay fills: donor density, with hover and selection states.
-        PolygonLayer(
-          polygons: [
-            for (final feature in _features)
-              _barangayPolygon(feature, dark),
-          ],
-        ),
-
-        // Internal boundaries, drawn once per shared edge.
-        PolylineLayer(
-          polylines: [
-            for (final arc in _internalBorders)
-              Polyline(
-                points: arc,
-                color: (dark
-                        ? DigosMapColors.internalBorderDark
-                        : DigosMapColors.internalBorder)
-                    .withValues(alpha: 0.85),
-                strokeWidth: internalWidth,
-                strokeCap: StrokeCap.round,
-                strokeJoin: StrokeJoin.round,
+              options: MapOptions(
+                initialCenter: const LatLng(6.80, 125.34),
+                initialZoom: 11,
+                // Below 10.5 the whole city is barely a hundred pixels wide;
+                // above 18 the raster base has no more detail to show. Both
+                // zoom buttons use the same clamp.
+                minZoom: 10.5,
+                maxZoom: 18,
+                cameraConstraint: CameraConstraint.containCenter(
+                  bounds: LatLngBounds(
+                    const LatLng(6.70, 125.23),
+                    const LatLng(7.01, 125.42),
+                  ),
+                ),
+                backgroundColor: dark
+                    ? DigosMapColors.paperDark
+                    : DigosMapColors.paper,
+                initialCameraFit: CameraFit.bounds(
+                  // Frame the dissolved city boundary, not the old schematic
+                  // template. The cap keeps the first layout from opening at
+                  // street level when the map has not been measured yet.
+                  bounds: DigosVectorMap.cityBounds,
+                  padding: const EdgeInsets.all(40),
+                  maxZoom: 11.5,
+                ),
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+                onPositionChanged: (camera, hasGesture) {
+                  if ((camera.zoom - _zoom).abs() > 0.05) {
+                    setState(() => _zoom = camera.zoom);
+                  }
+                },
+                // Gesture-start / gesture-end drive the panel fade, so the panels come
+                // back as soon as the user stops moving the map instead of on a long
+                // timer.
+                onMapEvent: (event) {
+                  switch (event) {
+                    case MapEventMoveStart():
+                    case MapEventFlingAnimationStart():
+                      widget.onInteractionStart?.call();
+                    case MapEventMoveEnd():
+                    case MapEventFlingAnimationEnd():
+                    case MapEventDoubleTapZoomEnd():
+                      widget.onInteractionEnd?.call();
+                    default:
+                      break;
+                  }
+                },
+                onTap: (tapPosition, point) {
+                  widget.onInteractionStart?.call();
+                  widget.onInteractionEnd?.call();
+                  widget.onSelectBarangay(_canonicalAt(point));
+                },
+                onPointerHover: (event, point) {
+                  if (event.kind != PointerDeviceKind.mouse) return;
+                  final feature = _featureAt(point);
+                  final id = feature?.id;
+                  if (id != _hoveredId) setState(() => _hoveredId = id);
+                },
               ),
-          ],
-        ),
-
-        // Heavy outer city border.
-        PolylineLayer(
-          polylines: [
-            Polyline(
-              points: _cityRing,
-              color: dark
-                  ? DigosMapColors.cityBorderDark
-                  : DigosMapColors.cityBorder,
-              strokeWidth: outerWidth,
-              strokeCap: StrokeCap.round,
-              strokeJoin: StrokeJoin.round,
-            ),
-          ],
-        ),
-
-        // Drive pins above the fills, below the labels.
-        if (widget.driveCounts.isNotEmpty)
-          MarkerLayer(
-            markers: [
-              for (final feature in _features)
-                if ((widget.driveCounts[_canonicalNames[feature.name]] ?? 0) > 0)
-                  Marker(
-                    point: feature.centroid,
-                    width: 34,
-                    height: 42,
-                    alignment: Alignment.topCenter,
-                    child: _DrivePin(
-                      count: widget.driveCounts[_canonicalNames[feature.name]]!,
-                      dark: dark,
-                      onTap: () =>
-                          widget.onDriveTap(_canonicalNames[feature.name]!),
+              children: [
+                if (DigosVectorMap.tilesEnabled)
+                  // Street base exactly as the standalone map project renders
+                  // it. The warm, low-contrast matrix keeps roads, water,
+                  // buildings and land use visible underneath the barangay
+                  // fills while muting the Carto style's farmland hatching and
+                  // baked-in place names, so TABANG's labels stay the names
+                  // that stand out.
+                  ColorFiltered(
+                    colorFilter: ColorFilter.matrix(
+                      dark
+                          ? DigosMapColors.darkTileFilter
+                          : DigosMapColors.lightTileFilter,
+                    ),
+                    child: TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.digos.barangay_map',
+                      maxNativeZoom: 19,
+                      // No per-tile fade animation: with many tiles loading during a
+                      // drag the animation pass was visible as stutter.
+                      tileDisplay: const TileDisplay.instantaneous(),
+                      // Offline or rate-limited tiles must never break the map: the
+                      // local vector layers keep rendering over the paper background.
+                      // A few failures in a row also raise a small "base map offline"
+                      // note so a blank base is explained rather than mysterious.
+                      errorTileCallback: (tile, error, stackTrace) {
+                        _tileFailures++;
+                        if (!_tileWarned && _tileFailures >= 4 && mounted) {
+                          setState(() => _tileWarned = true);
+                        }
+                      },
                     ),
                   ),
-            ],
-          ),
 
-        // Hospitals and the PRC chapter, above the fills.
-        MarkerLayer(
-          markers: [
-            for (final pin in digosFacilityPins)
-              Marker(
-                point: pin.point,
-                width: 30,
-                height: 30,
-                child: _FacilityPin(
-                  pin: pin,
-                  dark: dark,
-                  onTap: () => widget.onFacilityTap(pin),
+                // Inverse mask: hide every tile outside Digos City. (Alt rendering
+                // triangulates the polygon and showed visible seams across the city,
+                // so the simplified ring does the heavy lifting instead.)
+                PolygonLayer(
+                  polygons: [
+                    Polygon(
+                      points: const [
+                        LatLng(5.0, 123.0),
+                        LatLng(5.0, 127.0),
+                        LatLng(9.0, 127.0),
+                        LatLng(9.0, 123.0),
+                      ],
+                      holePointsList: [_cityRing],
+                      color: dark
+                          ? DigosMapColors.paperDark
+                          : DigosMapColors.paper,
+                      borderStrokeWidth: 0,
+                    ),
+                  ],
                 ),
-              ),
-          ],
-        ),
 
-        // Barangay labels, collision-checked: small barangays only appear as
-        // the user zooms in and a name is dropped rather than stacked on top
-        // of a neighbour.
-                MarkerLayer(markers: _labelMarkers(labelSize)),
+                // Barangay fills: donor density, with hover and selection states.
+                PolygonLayer(
+                  polygons: [
+                    for (final feature in _features)
+                      _barangayPolygon(feature, dark),
+                  ],
+                ),
+
+                // Internal boundaries. Each ring is drawn once, so a shared
+                // edge doubles up; the half-opacity stroke keeps the result a
+                // soft hairline instead of a heavy wall between barangays.
+                PolylineLayer(
+                  polylines: [
+                    for (final arc in _internalBorders)
+                      Polyline(
+                        points: arc,
+                        color:
+                            (dark
+                                    ? DigosMapColors.internalBorderDark
+                                    : DigosMapColors.internalBorder)
+                                .withValues(alpha: 0.55),
+                        strokeWidth: internalWidth,
+                        strokeCap: StrokeCap.round,
+                        strokeJoin: StrokeJoin.round,
+                      ),
+                  ],
+                ),
+
+                // Heavy outer city border.
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _cityRing,
+                      color: dark
+                          ? DigosMapColors.cityBorderDark
+                          : DigosMapColors.cityBorder,
+                      strokeWidth: outerWidth,
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
+                    ),
+                  ],
+                ),
+
+                // Drive pins at their venues, above the fills and below the labels.
+                // Two drives in the same barangay are nudged apart so both are
+                // reachable.
+                if (widget.drives.isNotEmpty)
+                  MarkerLayer(markers: _driveMarkers(dark, pinScale)),
+
+                // Hospitals and the PRC chapter, above the fills.
+                MarkerLayer(
+                  markers: [
+                    for (final pin in digosFacilityPins)
+                      Marker(
+                        point: pin.point,
+                        width: 30 * pinScale,
+                        height: 30 * pinScale,
+                        child: _FacilityPin(
+                          pin: pin,
+                          dark: dark,
+                          onTap: () => widget.onFacilityTap(pin),
+                          scale: pinScale,
+                        ),
+                      ),
+                  ],
+                ),
+
+                // Barangay labels at their representative points, largest
+                // first; all 26 stay on the map at every zoom.
+                MarkerLayer(markers: _labelMarkers(labelSize, pinScale)),
               ],
             ),
             // Distance scale (metric). On a short map pane the compact legend
@@ -581,8 +590,10 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                 right: 10,
                 bottom: (_mapSize?.height ?? 500) < 430 ? 128 : 66,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: dark
                         ? const Color(0xFF241C1A)
@@ -619,67 +630,32 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     return null;
   }
 
-  // Label placement is memoised: hovering a barangay must not re-measure all
-  // 26 labels, and panning must not rebuild them at all.
-  List<Marker>? _labelCache;
-  double _labelCacheZoom = -1;
-  String? _labelCacheSelected;
-  bool? _labelCacheDark;
-  Map<String, int>? _labelCacheDonors;
-  Map<String, int>? _labelCacheDrives;
-  Size? _labelCacheSize;
-  String? _labelCacheCenter;
-
-  /// Barangay label markers with greedy collision rejection in screen space.
+  /// Barangay labels with collision rejection in screen space.
   ///
-  /// The old layer drew every candidate at its centroid, which piled "Zone 1
-  /// (Pob.) / Zone 2 (Pob.) / Sinawilan / Aplaya" on top of each other in the
-  /// city proper. Labels are sorted by area (biggest first), so the large
-  /// barangays always win a slot.
-  List<Marker> _labelMarkers(double labelSize) {
+  /// Labels sit on their barangay's representative point and are placed
+  /// largest-area first, so the names that matter most win the available
+  /// space. The font shrinks at wide views before a name is allowed to touch a
+  /// neighbour, and a name that still cannot fit is drawn anyway: every one of
+  /// the 26 names stays on the map at every zoom instead of disappearing when
+  /// the user zooms out.
+  List<Marker> _labelMarkers(double labelSize, double pinScale) {
     final camera = _cameraOrNull();
-    // Panning only invalidates the cache every ~1 km, so a drag does not
-    // re-measure 26 labels on every frame.
-    final centerKey = camera == null
-        ? ''
-        : '${camera.center.latitude.toStringAsFixed(2)},'
-            '${camera.center.longitude.toStringAsFixed(2)}';
+    if (camera == null) return const [];
 
-    final cached = _labelCache;
-    if (cached != null &&
-        _labelCacheZoom == _zoom &&
-        _labelCacheSelected == widget.selectedBarangay &&
-        _labelCacheDark == widget.mapDark &&
-        identical(_labelCacheDonors, widget.donorCounts) &&
-        identical(_labelCacheDrives, widget.driveCounts) &&
-        _labelCacheSize == _mapSize &&
-        _labelCacheCenter == centerKey) {
-      return cached;
-    }
-    _labelCacheZoom = _zoom;
-    _labelCacheSelected = widget.selectedBarangay;
-    _labelCacheDark = widget.mapDark;
-    _labelCacheDonors = widget.donorCounts;
-    _labelCacheDrives = widget.driveCounts;
-    _labelCacheSize = _mapSize;
-    _labelCacheCenter = centerKey;
     final placed = <Rect>[];
     final markers = <Marker>[];
 
     // Reserve the pin footprints so a name never lands under a pin.
-    if (camera != null) {
-      for (final pin in digosFacilityPins) {
-        placed.add(_screenRect(camera, pin.point, 30, 30));
-      }
-      for (final feature in _features) {
-        if ((widget.driveCounts[_canonicalNames[feature.name]] ?? 0) > 0) {
-          placed.add(_screenRect(camera, feature.centroid, 34, 46));
-        }
-      }
+    for (final pin in digosFacilityPins) {
+      placed.add(_screenRect(camera, pin.point, 30 * pinScale, 30 * pinScale));
+    }
+    for (final drive in widget.drives) {
+      placed.add(
+        _screenRect(camera, drive.point, 30 * pinScale, 42 * pinScale),
+      );
     }
 
-    // Selected barangay first, then biggest area first, so the names that
-    // matter most always win a slot.
+    // Selected barangay first, then biggest area first.
     final selectedName = widget.selectedBarangay;
     final ordered = [..._features]
       ..sort((a, b) {
@@ -689,23 +665,26 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
         return _ringArea(b).compareTo(_ringArea(a));
       });
 
-    final bounds = _mapSize;
     for (final feature in ordered) {
       final text = _shortName(feature.name);
-      // Try the full size first, then a smaller one, so names in the crowded
-      // city proper still appear instead of being dropped outright.
-      for (final size in <double>[labelSize, labelSize * 0.8]) {
-        final width = text.length * size * 0.62 + 14;
-        final height = size * 1.9;
-
-        if (camera != null && bounds != null) {
-          final rect = _screenRect(camera, feature.centroid, width, height);
-          final canvasRect = Offset.zero & bounds;
-          if (!canvasRect.deflate(4).overlaps(rect)) break;
-          if (placed.any((other) => other.overlaps(rect))) continue;
-          placed.add(rect);
-        }
-
+      final base = _screenCenter(camera, feature.centroid);
+      final sizes = <double>[
+        labelSize,
+        labelSize * 0.82,
+        labelSize * 0.66,
+        labelSize * 0.54,
+      ];
+      var didPlace = false;
+      for (final size in sizes) {
+        final width = text.length * size * 0.6 + 10;
+        final height = size * 1.75;
+        final rect = Rect.fromCenter(
+          center: base,
+          width: width,
+          height: height,
+        );
+        if (placed.any((other) => other.overlaps(rect))) continue;
+        placed.add(rect);
         markers.add(
           Marker(
             point: feature.centroid,
@@ -720,18 +699,132 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
             ),
           ),
         );
+        didPlace = true;
         break;
       }
+      if (!didPlace) {
+        // All four sizes collided with a neighbour or a pin. Keep the name at
+        // the smallest size anyway — the user asked for a name that never
+        // vanishes, and zooming in separates it again.
+        final size = sizes.last;
+        final width = text.length * size * 0.6 + 10;
+        final height = size * 1.75;
+        placed.add(Rect.fromCenter(center: base, width: width, height: height));
+        markers.add(
+          Marker(
+            point: feature.centroid,
+            width: width + 12,
+            height: height,
+            child: IgnorePointer(
+              child: _HaloLabel(
+                text: text,
+                fontSize: size,
+                dark: widget.mapDark,
+              ),
+            ),
+          ),
+        );
+      }
     }
-    _labelCache = markers;
     return markers;
   }
 
-  Rect _screenRect(MapCamera camera, LatLng point, double width, double height) {
+  /// Venue-accurate drive pins, separated when a barangay hosts several or
+  /// when a hospital/PRC pin already occupies the same spot. The glyph scales
+  /// with the zoom so wide views stay readable.
+  List<Marker> _driveMarkers(bool dark, double pinScale) {
+    final camera = _cameraOrNull();
+    final driveWidth = 30 * pinScale;
+    final driveHeight = 38 * pinScale;
+    final driveHitHeight = 42 * pinScale;
+    final facilityRects = camera == null
+        ? const <Rect>[]
+        : [
+            for (final pin in digosFacilityPins)
+              _screenRect(camera, pin.point, 30 * pinScale, 30 * pinScale),
+          ];
+    final seenPerBarangay = <String, int>{};
+    return [
+      for (final drive in widget.drives)
+        () {
+          final index = seenPerBarangay.update(
+            drive.barangay,
+            (value) => value + 1,
+            ifAbsent: () => 0,
+          );
+          var point = index == 0
+              ? drive.point
+              : LatLng(
+                  drive.point.latitude + 0.0018 * index,
+                  drive.point.longitude + 0.0018 * index,
+                );
+          if (camera != null && facilityRects.isNotEmpty) {
+            final base = _screenCenter(camera, point);
+            final rect = Rect.fromCenter(
+              center: base,
+              width: driveWidth,
+              height: driveHitHeight,
+            );
+            if (facilityRects.any((facility) => facility.overlaps(rect))) {
+              // Step off the facility pin in the first direction that clears
+              // it. The drive stays inside its barangay; only the pin glyph
+              // moves, so both venues remain tappable.
+              for (final nudge in const [
+                Offset(0, -40),
+                Offset(20, -30),
+                Offset(-20, -30),
+                Offset(0, 44),
+                Offset(24, 0),
+                Offset(-24, 0),
+              ]) {
+                final scaled = nudge * pinScale;
+                point = camera.pointToLatLng(
+                  math.Point(base.dx + scaled.dx, base.dy + scaled.dy),
+                );
+                final nudgedRect = Rect.fromCenter(
+                  center: base + scaled,
+                  width: driveWidth,
+                  height: driveHitHeight,
+                );
+                if (!facilityRects.any(
+                  (facility) => facility.overlaps(nudgedRect),
+                )) {
+                  break;
+                }
+              }
+            }
+          }
+          return Marker(
+            point: point,
+            width: driveWidth,
+            height: driveHeight,
+            alignment: Alignment.topCenter,
+            child: _DrivePin(
+              dark: dark,
+              tooltip: '${drive.title} · tap for details',
+              onTap: () => widget.onDriveTap(drive.barangay),
+              scale: pinScale,
+            ),
+          );
+        }(),
+    ];
+  }
+
+  /// Screen position of [point] in the map's local coordinate space.
+  Offset _screenCenter(MapCamera camera, LatLng point) {
     final projected = camera.project(point);
     final origin = camera.pixelOrigin;
+    return Offset(projected.x - origin.x, projected.y - origin.y);
+  }
+
+  Rect _screenRect(
+    MapCamera camera,
+    LatLng point,
+    double width,
+    double height,
+  ) {
     return Rect.fromCenter(
-      center: Offset(projected.x - origin.x, projected.y - origin.y),
+      center: _screenCenter(camera, point),
       width: width,
       height: height,
     );
@@ -772,10 +865,11 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       // ramp and from the old gold/brown treatment.
       return Polygon(
         points: feature.ring,
-        color: (dark
-                ? DigosMapColors.selectionFillDark
-                : DigosMapColors.selectionFill)
-            .withValues(alpha: 0.55),
+        color:
+            (dark
+                    ? DigosMapColors.selectionFillDark
+                    : DigosMapColors.selectionFill)
+                .withValues(alpha: 0.55),
         borderColor: dark
             ? DigosMapColors.selectionBorderDark
             : DigosMapColors.selectionBorder,
@@ -801,21 +895,22 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   }
 
   /// "Zone 2 (Pob.)" → "Zone 2", "Kapatagan (Rizal)" → "Kapatagan".
-  String _shortName(String name) =>
-      DigosBarangays.canonical(name) ?? name;
+  String _shortName(String name) => DigosBarangays.canonical(name) ?? name;
 }
 
-/// A map pin with the active-drive count, tappable to open the drives sheet.
+/// A drop-shaped drive pin sitting on the venue, tappable for details.
 class _DrivePin extends StatelessWidget {
   const _DrivePin({
-    required this.count,
     required this.dark,
+    required this.tooltip,
     required this.onTap,
+    this.scale = 1,
   });
 
-  final int count;
   final bool dark;
+  final String tooltip;
   final VoidCallback onTap;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
@@ -824,15 +919,12 @@ class _DrivePin extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Tooltip(
-        message: '$count active drive${count == 1 ? '' : 's'} · tap for '
-            'details',
+        message: tooltip,
         child: Center(
           child: SizedBox(
-            width: 30,
-            height: 36,
-            child: CustomPaint(
-              painter: _DrivePinPainter(color: color, count: count, dark: dark),
-            ),
+            width: 28 * scale,
+            height: 34 * scale,
+            child: CustomPaint(painter: _DrivePinPainter(color: color)),
           ),
         ),
       ),
@@ -840,21 +932,17 @@ class _DrivePin extends StatelessWidget {
   }
 }
 
+/// The pin silhouette with a blood drop under it.
 class _DrivePinPainter extends CustomPainter {
-  const _DrivePinPainter({
-    required this.color,
-    required this.count,
-    required this.dark,
-  });
+  const _DrivePinPainter({required this.color});
 
   final Color color;
-  final int count;
-  final bool dark;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height * 0.36);
     final radius = size.width * 0.42;
+
     canvas.drawCircle(
       center.translate(0, 1.2),
       radius,
@@ -869,35 +957,34 @@ class _DrivePinPainter extends CustomPainter {
       ..close();
     canvas.drawPath(tip, Paint()..color = color);
     canvas.drawCircle(center, radius, Paint()..color = color);
-    canvas.drawCircle(
-      center,
-      radius * 0.62,
-      Paint()
-        ..color = dark ? const Color(0xFF2A1512) : Colors.white,
-    );
 
-    final painter = TextPainter(
-      text: TextSpan(
-        text: '$count',
-        style: TextStyle(
-          fontSize: radius * 0.85,
-          fontWeight: FontWeight.w800,
-          color: dark ? const Color(0xFFFFDAD4) : DigosMapColors.drive,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(
-      canvas,
-      center.translate(-painter.width / 2, -painter.height / 2),
-    );
+    // Blood drop glyph, drawn rather than fonted so the pin stays crisp at
+    // any size.
+    final drop = ui.Path()
+      ..moveTo(center.dx, center.dy - radius * 0.62)
+      ..cubicTo(
+        center.dx + radius * 0.5,
+        center.dy - radius * 0.05,
+        center.dx + radius * 0.42,
+        center.dy + radius * 0.45,
+        center.dx,
+        center.dy + radius * 0.45,
+      )
+      ..cubicTo(
+        center.dx - radius * 0.42,
+        center.dy + radius * 0.45,
+        center.dx - radius * 0.5,
+        center.dy - radius * 0.05,
+        center.dx,
+        center.dy - radius * 0.62,
+      )
+      ..close();
+    canvas.drawPath(drop, Paint()..color = Colors.white);
   }
 
   @override
   bool shouldRepaint(_DrivePinPainter oldDelegate) =>
-      oldDelegate.color != color ||
-      oldDelegate.count != count ||
-      oldDelegate.dark != dark;
+      oldDelegate.color != color;
 }
 
 /// Haloed barangay label, mirroring the vector map's text-halo treatment.
@@ -955,11 +1042,13 @@ class _FacilityPin extends StatelessWidget {
     required this.pin,
     required this.dark,
     required this.onTap,
+    this.scale = 1,
   });
 
   final DigosFacilityPin pin;
   final bool dark;
   final VoidCallback onTap;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
@@ -974,12 +1063,15 @@ class _FacilityPin extends StatelessWidget {
         message: pin.name,
         child: Center(
           child: Container(
-            width: 25,
-            height: 25,
+            width: 25 * scale,
+            height: 25 * scale,
             decoration: BoxDecoration(
               color: dark ? const Color(0xFF241C1A) : Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: color, width: 2),
+              border: Border.all(
+                color: color,
+                width: (2 * scale).clamp(1.0, 2.6),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.18),
@@ -990,7 +1082,7 @@ class _FacilityPin extends StatelessWidget {
             ),
             child: Icon(
               isChapter ? Icons.bloodtype : Icons.local_hospital,
-              size: 13,
+              size: 13 * scale,
               color: color,
             ),
           ),
@@ -1015,12 +1107,19 @@ class _ScaleBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const candidates = <double>[
-      50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000,
+      50,
+      100,
+      200,
+      500,
+      1000,
+      2000,
+      5000,
+      10000,
+      20000,
     ];
     // Web-mercator metres per logical pixel at this latitude and zoom.
-    final metresPerPixel = 156543.03392 *
-        math.cos(latitude * math.pi / 180) /
-        math.pow(2, zoom);
+    final metresPerPixel =
+        156543.03392 * math.cos(latitude * math.pi / 180) / math.pow(2, zoom);
 
     var distance = candidates.first;
     for (final candidate in candidates) {
@@ -1035,15 +1134,11 @@ class _ScaleBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: (dark
-                ? const Color(0xFF241C1A)
-                : const Color(0xFFFFFFFF))
+        color: (dark ? const Color(0xFF241C1A) : const Color(0xFFFFFFFF))
             .withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: (dark
-                  ? const Color(0xFF4A3B36)
-                  : const Color(0xFFE0D5CE)),
+          color: (dark ? const Color(0xFF4A3B36) : const Color(0xFFE0D5CE)),
         ),
       ),
       child: Column(
@@ -1076,7 +1171,7 @@ class _ScaleBar extends StatelessWidget {
   }
 }
 
-/// Attribution required by the OpenStreetMap tile usage policy.
+/// Attribution required by the base-map and OpenStreetMap data licences.
 class DigosMapAttribution extends StatelessWidget {
   const DigosMapAttribution({super.key});
 
@@ -1091,11 +1186,7 @@ class DigosMapAttribution extends StatelessWidget {
       ),
       child: Text(
         '© OpenStreetMap contributors',
-        style: TextStyle(
-          fontSize: 8.5,
-          height: 1.1,
-          color: context.textMuted,
-        ),
+        style: TextStyle(fontSize: 8.5, height: 1.1, color: context.textMuted),
       ),
     );
   }

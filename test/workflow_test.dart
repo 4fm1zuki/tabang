@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/core/auth.dart';
 import 'package:tabang/core/eligibility.dart';
 import 'package:tabang/core/models.dart';
@@ -32,33 +32,38 @@ void main() {
   setUp(repo.resetForTesting);
 
   group('Seed data', () {
-    test('provides 15 available donors, 15 recipients and a community demo',
-        () {
-      final eligibleDonors = repo.users
-          .where((u) =>
-              u.role == UserRole.donor &&
-              EligibilityEngine.evaluate(u).isEligible)
-          .toList();
-      expect(eligibleDonors, hasLength(15));
+    test(
+      'provides 15 available donors, 15 recipients and a community demo',
+      () {
+        final eligibleDonors = repo.users
+            .where(
+              (u) =>
+                  u.role == UserRole.donor &&
+                  EligibilityEngine.evaluate(u).isEligible,
+            )
+            .toList();
+        expect(eligibleDonors, hasLength(15));
 
-      final recipients = repo.users
-          .where((u) => u.role == UserRole.recipient)
-          .toList();
-      expect(recipients, hasLength(15));
+        final recipients = repo.users
+            .where((u) => u.role == UserRole.recipient)
+            .toList();
+        expect(recipients, hasLength(15));
 
-      final community =
-          repo.users.where((u) => u.email == 'community@tabang.app').toList();
-      expect(community, hasLength(1));
-      expect(community.single.role, UserRole.user);
+        final community = repo.users
+            .where((u) => u.email == 'community@tabang.app')
+            .toList();
+        expect(community, hasLength(1));
+        expect(community.single.role, UserRole.user);
 
-      // Profiles must be individually illustrated rather than sharing a
-      // placeholder.
-      final avatars = repo.users
-          .map((u) => u.photoAsset)
-          .whereType<String>()
-          .toSet();
-      expect(avatars.length, repo.users.length);
-    });
+        // Profiles must be individually illustrated rather than sharing a
+        // placeholder.
+        final avatars = repo.users
+            .map((u) => u.photoAsset)
+            .whereType<String>()
+            .toSet();
+        expect(avatars.length, repo.users.length);
+      },
+    );
   });
 
   group('Component-aware compatibility', () {
@@ -112,8 +117,10 @@ void main() {
 
     test('plasma donorsForComponent(O-) includes every ABO type', () {
       expect(
-        Compatibility.donorsForComponent(BloodType.oNeg, BloodComponent.plasma)
-            .toSet(),
+        Compatibility.donorsForComponent(
+          BloodType.oNeg,
+          BloodComponent.plasma,
+        ).toSet(),
         BloodType.values.toSet(),
       );
     });
@@ -139,9 +146,7 @@ void main() {
     });
 
     test('seed expired unit is excluded from available stock', () {
-      final expired = repo.units.firstWhere(
-        (u) => u.barcode == 'RBC-7700-O+',
-      );
+      final expired = repo.units.firstWhere((u) => u.barcode == 'RBC-7700-O+');
       expect(expired.effectiveStatus(DateTime.now()), UnitStatus.expired);
       expect(
         repo.availableUnits.any((u) => u.barcode == expired.barcode),
@@ -176,11 +181,15 @@ void main() {
         now: now,
       );
       expect(units, isNotEmpty);
-      expect(units.every((u) => u.component == BloodComponent.packedRbc), isTrue);
+      expect(
+        units.every((u) => u.component == BloodComponent.packedRbc),
+        isTrue,
+      );
       expect(units.every((u) => u.isUsableAt(now)), isTrue);
       expect(
-        units.every((u) =>
-            Compatibility.canDonateTo(u.bloodType, BloodType.oNeg)),
+        units.every(
+          (u) => Compatibility.canDonateTo(u.bloodType, BloodType.oNeg),
+        ),
         isTrue,
       );
     });
@@ -198,51 +207,49 @@ void main() {
       expect(response, isNotNull);
       expect(response!.status, ResponseStatus.pending);
       expect(repo.responsesFor(request.id), hasLength(1));
-      expect(repo.requests.firstWhere((r) => r.id == request.id).status,
-          RequestStatus.open);
-    });
-
-    test('incompatible, ineligible, suspended and duplicate responses fail',
-        () {
-      final request = addRequest(repo, patientAlias: 'Lifecycle 2');
-
       expect(
-        repo.respondToRequest(
-          requestId: request.id,
-          donorId: 'USR-001', // O+ cannot give red cells to O-
-        ),
-        isNull,
-      );
-      expect(
-        repo.respondToRequest(
-          requestId: request.id,
-          donorId: 'USR-004', // O- but suspended
-        ),
-        isNull,
-      );
-      expect(
-        repo.respondToRequest(
-          requestId: request.id,
-          donorId: 'USR-008', // O+ and unverified
-        ),
-        isNull,
-      );
-
-      expect(
-        repo.respondToRequest(
-          requestId: request.id,
-          donorId: 'USR-012',
-        ),
-        isNotNull,
-      );
-      expect(
-        repo.respondToRequest(
-          requestId: request.id,
-          donorId: 'USR-012',
-        ),
-        isNull,
+        repo.requests.firstWhere((r) => r.id == request.id).status,
+        RequestStatus.open,
       );
     });
+
+    test(
+      'incompatible, ineligible, suspended and duplicate responses fail',
+      () {
+        final request = addRequest(repo, patientAlias: 'Lifecycle 2');
+
+        expect(
+          repo.respondToRequest(
+            requestId: request.id,
+            donorId: 'USR-001', // O+ cannot give red cells to O-
+          ),
+          isNull,
+        );
+        expect(
+          repo.respondToRequest(
+            requestId: request.id,
+            donorId: 'USR-004', // O- but suspended
+          ),
+          isNull,
+        );
+        expect(
+          repo.respondToRequest(
+            requestId: request.id,
+            donorId: 'USR-008', // O+ and unverified
+          ),
+          isNull,
+        );
+
+        expect(
+          repo.respondToRequest(requestId: request.id, donorId: 'USR-012'),
+          isNotNull,
+        );
+        expect(
+          repo.respondToRequest(requestId: request.id, donorId: 'USR-012'),
+          isNull,
+        );
+      },
+    );
 
     test('blood-bank requests do not accept donor responses', () {
       final request = addRequest(
@@ -264,10 +271,7 @@ void main() {
       )!;
 
       expect(
-        repo.selectResponse(
-          responseId: response.id,
-          selectedById: 'USR-001',
-        ),
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-001'),
         isNull,
       );
       expect(
@@ -303,10 +307,7 @@ void main() {
       // conversation first.
       expect(repo.hasReciprocalChat('USR-009', 'USR-017'), isFalse);
       expect(
-        repo.selectResponse(
-          responseId: response.id,
-          selectedById: 'USR-009',
-        ),
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-009'),
         isNull,
       );
       expect(
@@ -322,20 +323,14 @@ void main() {
       )!;
       expect(repo.hasReciprocalChat('USR-009', 'USR-017'), isFalse);
       expect(
-        repo.selectResponse(
-          responseId: response.id,
-          selectedById: 'USR-009',
-        ),
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-009'),
         isNull,
       );
 
       repo.sendMessage(thread.id, 'USR-017', 'Yes, I can donate on Friday.');
       expect(repo.hasReciprocalChat('USR-009', 'USR-017'), isTrue);
       expect(
-        repo.selectResponse(
-          responseId: response.id,
-          selectedById: 'USR-009',
-        ),
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-009'),
         isNotNull,
       );
     });
@@ -350,10 +345,7 @@ void main() {
 
       repo.updateUser(donor.copyWith(isAvailable: false));
       expect(
-        repo.selectResponse(
-          responseId: response.id,
-          selectedById: 'USR-009',
-        ),
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-009'),
         isNull,
       );
       expect(
@@ -367,43 +359,34 @@ void main() {
 
       repo.updateUser(donor.copyWith(isAvailable: true));
       expect(
-        repo.selectResponse(
-          responseId: response.id,
-          selectedById: 'USR-009',
-        ),
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-009'),
         isNotNull,
       );
     });
 
-    test('selection creates one coordination thread and does not double-count',
-        () {
-      final request = addRequest(repo, patientAlias: 'Lifecycle 5');
-      final response = repo.respondToRequest(
-        requestId: request.id,
-        donorId: 'USR-012',
-      )!;
+    test(
+      'selection creates one coordination thread and does not double-count',
+      () {
+        final request = addRequest(repo, patientAlias: 'Lifecycle 5');
+        final response = repo.respondToRequest(
+          requestId: request.id,
+          donorId: 'USR-012',
+        )!;
 
-      repo.selectResponse(
-        responseId: response.id,
-        selectedById: 'USR-009',
-      );
-      final threadCount = repo.threads.length;
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-009');
+        final threadCount = repo.threads.length;
 
-      expect(
-        repo.selectResponse(
-          responseId: response.id,
-          selectedById: 'USR-009',
-        ),
-        isNull,
-      );
-      expect(repo.threads.length, threadCount);
-      expect(
-        repo.requests
-            .firstWhere((r) => r.id == request.id)
-            .unitsFulfilled,
-        0,
-      );
-    });
+        expect(
+          repo.selectResponse(responseId: response.id, selectedById: 'USR-009'),
+          isNull,
+        );
+        expect(repo.threads.length, threadCount);
+        expect(
+          repo.requests.firstWhere((r) => r.id == request.id).unitsFulfilled,
+          0,
+        );
+      },
+    );
 
     test('only staff can mark a request fulfilled', () {
       final request = addRequest(repo, patientAlias: 'Lifecycle 6');
@@ -418,22 +401,15 @@ void main() {
         requestId: request.id,
         donorId: 'USR-012',
       )!;
-      repo.selectResponse(
-        responseId: response.id,
-        selectedById: 'USR-009',
-      );
+      repo.selectResponse(responseId: response.id, selectedById: 'USR-009');
 
       expect(
         repo.markRequestFulfilled(request.id, actorId: 'USR-009'),
         isFalse,
       );
-      expect(
-        repo.markRequestFulfilled(request.id, actorId: 'USR-010'),
-        isTrue,
-      );
+      expect(repo.markRequestFulfilled(request.id, actorId: 'USR-010'), isTrue);
 
-      final fulfilled =
-          repo.requests.firstWhere((r) => r.id == request.id);
+      final fulfilled = repo.requests.firstWhere((r) => r.id == request.id);
       expect(fulfilled.status, RequestStatus.fulfilled);
       expect(fulfilled.unitsFulfilled, fulfilled.unitsNeeded);
       expect(
@@ -489,10 +465,7 @@ void main() {
         patientAlias: 'Lifecycle 8',
         source: RequestSource.bloodBank,
       );
-      expect(
-        repo.markRequestFulfilled(request.id, actorId: 'USR-010'),
-        isTrue,
-      );
+      expect(repo.markRequestFulfilled(request.id, actorId: 'USR-010'), isTrue);
       expect(
         repo.requests.firstWhere((r) => r.id == request.id).status,
         RequestStatus.fulfilled,
@@ -502,18 +475,9 @@ void main() {
     test('requester can cancel an open request, but not twice', () {
       final request = addRequest(repo, patientAlias: 'Lifecycle 9');
 
-      expect(
-        repo.cancelRequest(request.id, actorId: 'USR-001'),
-        isFalse,
-      );
-      expect(
-        repo.cancelRequest(request.id, actorId: 'USR-009'),
-        isTrue,
-      );
-      expect(
-        repo.cancelRequest(request.id, actorId: 'USR-009'),
-        isFalse,
-      );
+      expect(repo.cancelRequest(request.id, actorId: 'USR-001'), isFalse);
+      expect(repo.cancelRequest(request.id, actorId: 'USR-009'), isTrue);
+      expect(repo.cancelRequest(request.id, actorId: 'USR-009'), isFalse);
       expect(
         repo.markRequestFulfilled(request.id, actorId: 'USR-010'),
         isFalse,
@@ -521,12 +485,45 @@ void main() {
     });
   });
 
+  group('Donor request authoring and anonymity', () {
+    test('a donor can post a request that other donors can serve', () {
+      repo.addRequest(
+        requesterId: 'USR-001', // a donor
+        patientAlias: 'Donor patient 01',
+        bloodType: BloodType.aPos,
+        component: BloodComponent.wholeBlood,
+        unitsNeeded: 1,
+        hospital: DigosFacilities.names.first,
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.urgent,
+      );
+      final request = repo.requests.firstWhere(
+        (r) => r.patientAlias == 'Donor patient 01',
+      );
+      expect(request.requesterId, 'USR-001');
+
+      final response = repo.respondToRequest(
+        requestId: request.id,
+        donorId: 'USR-012', // eligible O- donor
+        message: 'I can donate.',
+      );
+      expect(response, isNotNull);
+      final alias = response!.donorAlias;
+      expect(alias, 'Donor #012');
+      expect(alias, isNot(contains('Liza')));
+    });
+
+    test('donor map handles never expose the alias or real name', () {
+      final donor = repo.userById('USR-001')!;
+      expect(donor.mapHandle, 'Donor #001');
+      expect(donor.mapHandle, isNot(donor.alias));
+      expect(donor.mapHandle, isNot(contains(donor.fullName.split(' ').first)));
+    });
+  });
+
   group('Bilateral identity reveal', () {
     test('reveal requires the other participant to accept', () {
-      expect(
-        repo.requestIdentityReveal('ROOM-101', 'USR-009'),
-        isTrue,
-      );
+      expect(repo.requestIdentityReveal('ROOM-101', 'USR-009'), isTrue);
       expect(
         repo.acceptIdentityReveal('ROOM-101', 'USR-009'),
         isFalse,
@@ -537,31 +534,17 @@ void main() {
         isFalse,
       );
 
-      expect(
-        repo.acceptIdentityReveal('ROOM-101', 'USR-001'),
-        isTrue,
-      );
-      final thread =
-          repo.threads.firstWhere((t) => t.id == 'ROOM-101');
+      expect(repo.acceptIdentityReveal('ROOM-101', 'USR-001'), isTrue);
+      final thread = repo.threads.firstWhere((t) => t.id == 'ROOM-101');
       expect(thread.identityRevealed, isTrue);
       expect(thread.identityRevealRequestedBy, isNull);
-      expect(
-        repo.requestIdentityReveal('ROOM-101', 'USR-001'),
-        isFalse,
-      );
+      expect(repo.requestIdentityReveal('ROOM-101', 'USR-001'), isFalse);
     });
 
     test('the other participant can decline', () {
-      expect(
-        repo.requestIdentityReveal('ROOM-103', 'USR-005'),
-        isTrue,
-      );
-      expect(
-        repo.declineIdentityReveal('ROOM-103', 'USR-002'),
-        isTrue,
-      );
-      final thread =
-          repo.threads.firstWhere((t) => t.id == 'ROOM-103');
+      expect(repo.requestIdentityReveal('ROOM-103', 'USR-005'), isTrue);
+      expect(repo.declineIdentityReveal('ROOM-103', 'USR-002'), isTrue);
+      final thread = repo.threads.firstWhere((t) => t.id == 'ROOM-103');
       expect(thread.identityRevealed, isFalse);
       expect(thread.identityRevealRequestedBy, isNull);
     });
@@ -763,8 +746,7 @@ void main() {
       expect(result.error, contains('nickname'));
     });
 
-    test('staff can create a community account with a temporary password',
-        () {
+    test('staff can create a community account with a temporary password', () {
       final result = AuthService.instance.adminCreateUser(
         actorId: 'USR-010', // clinical personnel
         fullName: 'Walk In Donor',

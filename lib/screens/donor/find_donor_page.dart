@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/eligibility.dart';
 import '../../core/models.dart';
@@ -151,17 +152,20 @@ class _FindDonorPageState extends State<FindDonorPage> {
   }
 
   List<AppUser> get _visibleDonors {
-    return _repo.findDonors(
-      bloodType: _bloodType,
-      barangay: _selectedBarangay,
-    ).where((donor) {
-      if (_query.isEmpty) return true;
-      final q = _query.toLowerCase();
-      return donor.alias.toLowerCase().contains(q) ||
-          (donor.shareBarangay &&
-              donor.barangay.toLowerCase().contains(q)) ||
-          (donor.bloodType?.label.toLowerCase().contains(q) ?? false);
-    }).toList();
+    return _repo
+        .findDonors(bloodType: _bloodType, barangay: _selectedBarangay)
+        .where((donor) {
+          // A donor is not a match for themselves: their own card had a
+          // disabled Message button and inflated the available-donor count.
+          if (donor.id == widget.user.id) return false;
+          if (_query.isEmpty) return true;
+          final q = _query.toLowerCase();
+          return donor.mapHandle.toLowerCase().contains(q) ||
+              (donor.shareBarangay &&
+                  donor.barangay.toLowerCase().contains(q)) ||
+              (donor.bloodType?.label.toLowerCase().contains(q) ?? false);
+        })
+        .toList();
   }
 
   List<BloodDrive> _drivesIn(String barangay) => _repo.drives
@@ -175,8 +179,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
       context: context,
       backgroundColor: context.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(TabangRadius.lg)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(TabangRadius.lg),
+        ),
       ),
       builder: (sheetContext) => SafeArea(
         top: false,
@@ -191,9 +196,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   Icon(
                     isChapter ? Icons.bloodtype : Icons.local_hospital,
                     size: 22,
-                    color: isChapter
-                        ? TabangColors.crimson
-                        : TabangColors.info,
+                    color: isChapter ? TabangColors.crimson : TabangColors.info,
                   ),
                   const SizedBox(width: TabangSpace.sm),
                   Expanded(
@@ -217,11 +220,6 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   height: 1.45,
                   color: context.textMuted,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Pinned at an approximate location in this prototype.',
-                style: TextStyle(fontSize: 12, color: context.textMuted),
               ),
               const SizedBox(height: TabangSpace.md),
               Row(
@@ -261,8 +259,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
       context: context,
       backgroundColor: context.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(TabangRadius.lg)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(TabangRadius.lg),
+        ),
       ),
       builder: (sheetContext) => SafeArea(
         top: false,
@@ -387,11 +386,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                 'Starts',
                 formatDateTime(drive.startsAt),
               ),
-              _driveDetail(
-                dialogContext,
-                'Ends',
-                formatDateTime(drive.endsAt),
-              ),
+              _driveDetail(dialogContext, 'Ends', formatDateTime(drive.endsAt)),
               _driveDetail(
                 dialogContext,
                 'Expected donors',
@@ -462,12 +457,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
   /// Zoom by whole steps around the current camera centre.
   void _zoomBy(double delta) {
     final camera = _mapController.camera;
-    // Same limits as the map widget: 10–16 keeps the city readable and never
-    // strands the user on featureless paper.
-    _mapController.move(
-      camera.center,
-      (camera.zoom + delta).clamp(10.0, 16.0),
-    );
+    // Same limits as the map widget: 10.5 frames the whole city and 18 is as
+    // far as the OSM base has detail worth showing.
+    _mapController.move(camera.center, (camera.zoom + delta).clamp(10.5, 18));
   }
 
   /// The map is always north-up and cannot rotate, so the compass control
@@ -486,6 +478,25 @@ class _FindDonorPageState extends State<FindDonorPage> {
       counts.update(drive.barangay, (value) => value + 1, ifAbsent: () => 1);
     }
     return counts;
+  }
+
+  /// Active drives pinned at their venue coordinates. Seeds without
+  /// coordinates fall back to the barangay centre.
+  List<DigosDriveMarker> get _driveMarkers {
+    final markers = <DigosDriveMarker>[];
+    for (final drive in _repo.drives) {
+      if (drive.status == 'Completed') continue;
+      final barangay =
+          DigosBarangays.canonical(drive.barangay) ?? drive.barangay;
+      final point = (drive.lat != null && drive.lng != null)
+          ? LatLng(drive.lat!, drive.lng!)
+          : DigosVectorMap.centroidOf(barangay);
+      if (point == null) continue;
+      markers.add(
+        DigosDriveMarker(title: drive.title, barangay: barangay, point: point),
+      );
+    }
+    return markers;
   }
 
   @override
@@ -620,17 +631,17 @@ class _FindDonorPageState extends State<FindDonorPage> {
             Positioned.fill(
               child: RepaintBoundary(
                 child: DigosVectorMap(
-                controller: _mapController,
-                donorCounts: _donorCounts,
-                driveCounts: _driveCounts,
-                selectedBarangay: _selectedBarangay,
-                mapDark: _mapDark,
-                onSelectBarangay: (name) =>
-                    setState(() => _selectedBarangay = name),
-                onDriveTap: _showDriveSheet,
-                onFacilityTap: _showFacilitySheet,
-                onInteractionStart: _startMapInteraction,
-                onInteractionEnd: _endMapInteraction,
+                  controller: _mapController,
+                  donorCounts: _donorCounts,
+                  drives: _driveMarkers,
+                  selectedBarangay: _selectedBarangay,
+                  mapDark: _mapDark,
+                  onSelectBarangay: (name) =>
+                      setState(() => _selectedBarangay = name),
+                  onDriveTap: _showDriveSheet,
+                  onFacilityTap: _showFacilitySheet,
+                  onInteractionStart: _startMapInteraction,
+                  onInteractionEnd: _endMapInteraction,
                 ),
               ),
             ),
@@ -656,182 +667,133 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     child: child,
                   ),
                   child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header format mirrors the approved simplified vector map:
-                  // eyebrow, map title, one-line description and a format tag.
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 460),
-                      child: SurfaceCard(
-                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Flexible(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'DAVAO DEL SUR · PHILIPPINES',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1,
-                                      color: context.textMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Just the name of the map, and only when there is room for
+                      // it. The old card also carried an eyebrow, a one-line
+                      // explanation and a "2D VECTOR MAP" badge: three lines of
+                      // chrome over a map the user can already see. On a phone the
+                      // title is dropped so the filter chips get the top edge.
+                      if (!compact)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SurfaceCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.map_outlined,
+                                  size: 15,
+                                  color: TabangColors.crimson,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
                                     'Digos City Barangay Map',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 15,
+                                      fontSize: 13.5,
                                       fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.3,
+                                      letterSpacing: -0.2,
                                       color: context.textColor,
                                     ),
                                   ),
-                                  if (!compact) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'A simplified, interactive map of local '
-                                      'areas and infrastructure',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        color: context.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: TabangSpace.sm),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: context.isDark
-                                    ? const Color(0xFF3A1917)
-                                    : TabangColors.crimsonSoft,
-                                borderRadius:
-                                    BorderRadius.circular(TabangRadius.pill),
-                                border: Border.all(
-                                  color: TabangColors.crimson
-                                      .withValues(alpha: 0.35),
                                 ),
-                              ),
-                              child: const Text(
-                                '2D VECTOR MAP',
-                                style: TextStyle(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.7,
-                                  color: TabangColors.crimsonDark,
-                                ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_selectedBarangay != null) ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: SurfaceCard(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.place,
-                              size: 14,
-                              color: TabangColors.crimson,
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                _selectedBarangay!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: context.textColor,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${_donorCounts[_selectedBarangay] ?? 0} donor'
-                              '${(_donorCounts[_selectedBarangay] ?? 0) == 1 ? '' : 's'}'
-                              ' · ${_drivesIn(_selectedBarangay!).length} '
-                              'drive'
-                              '${_drivesIn(_selectedBarangay!).length == 1 ? '' : 's'}',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: context.textMuted,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () =>
-                                  setState(() => _selectedBarangay = null),
-                              child: Padding(
-                                padding: const EdgeInsets.all(2),
-                                child: Icon(
-                                  Icons.close,
-                                  size: 14,
-                                  color: context.textMuted,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  // Scrollable so every blood type is reachable on a phone,
-                  // now with a bounded width from the Positioned above.
-                  // The chip row stops short of the floating control stack.
-                  // Padding *inside* the ListView only extends the scrollable
-                  // content, so the last chips still painted underneath the
-                  // buttons; shrinking the viewport is what actually keeps
-                  // them clear.
-                  SizedBox(
-                    height: 30,
-                    width: double.infinity,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 46),
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _typeChip(context, null, 'ALL'),
-                          ...BloodType.values.map(
-                            (t) => _typeChip(context, t, t.label),
                           ),
-                        ],
+                        ),
+                      if (_selectedBarangay != null) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: SurfaceCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.place,
+                                  size: 14,
+                                  color: TabangColors.crimson,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _selectedBarangay!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: context.textColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${_donorCounts[_selectedBarangay] ?? 0} donor'
+                                  '${(_donorCounts[_selectedBarangay] ?? 0) == 1 ? '' : 's'}'
+                                  ' · ${_drivesIn(_selectedBarangay!).length} '
+                                  'drive'
+                                  '${_drivesIn(_selectedBarangay!).length == 1 ? '' : 's'}',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: context.textMuted,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () =>
+                                      setState(() => _selectedBarangay = null),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 14,
+                                      color: context.textMuted,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      // Scrollable so every blood type is reachable on a phone,
+                      // now with a bounded width from the Positioned above.
+                      // The chip row stops short of the floating control stack.
+                      // Padding *inside* the ListView only extends the scrollable
+                      // content, so the last chips still painted underneath the
+                      // buttons; shrinking the viewport is what actually keeps
+                      // them clear.
+                      SizedBox(
+                        height: 30,
+                        width: double.infinity,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 46),
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              _typeChip(context, null, 'ALL'),
+                              ...BloodType.values.map(
+                                (t) => _typeChip(context, t, t.label),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
                   ),
                 ),
               ),
@@ -850,77 +812,82 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   child: child,
                 ),
                 child: Column(
-                children: [
-                  SurfaceCard(
-                    padding: const EdgeInsets.all(3),
-                    child: Column(
-                      children: [
-                        _mapButton(
-                          context,
-                          Icons.add,
-                          () => _zoomBy(0.75),
-                          tooltip: 'Zoom in',
-                        ),
-                        const SizedBox(height: 6),
-                        _mapButton(
-                          context,
-                          Icons.remove,
-                          () => _zoomBy(-0.75),
-                          tooltip: 'Zoom out',
-                        ),
-                      ],
+                  children: [
+                    SurfaceCard(
+                      padding: const EdgeInsets.all(3),
+                      child: Column(
+                        children: [
+                          _mapButton(
+                            context,
+                            Icons.add,
+                            () => _zoomBy(0.75),
+                            tooltip: 'Zoom in',
+                            size: compact ? 30 : 36,
+                          ),
+                          SizedBox(height: compact ? 4 : 6),
+                          _mapButton(
+                            context,
+                            Icons.remove,
+                            () => _zoomBy(-0.75),
+                            tooltip: 'Zoom out',
+                            size: compact ? 30 : 36,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  // One reset control, not two. The map is always drawn
-                  // north-up, so a compass is the honest affordance for
-                  // "return to the full, north-up city".
-                  _mapButton(
-                    context,
-                    Icons.explore_outlined,
-                    _resetNorth,
-                    tooltip: 'Compass · north up, show all 26 barangays',
-                    accent: true,
-                  ),
-                  const SizedBox(height: 6),
-                  _mapButton(
-                    context,
-                    _mapDark
-                        ? Icons.light_mode_outlined
-                        : Icons.dark_mode_outlined,
-                    () => setState(() => _mapDark = !_mapDark),
-                    tooltip: _mapDark
-                        ? 'Use light map'
-                        : 'Use dark map',
-                  ),
-                  const SizedBox(height: 12),
-                  // Hides every map panel for an unobstructed view.
-                  _mapButton(
-                    context,
-                    _overlaysHidden
-                        ? Icons.layers
-                        : Icons.layers_outlined,
-                    () => setState(() => _overlaysHidden = !_overlaysHidden),
-                    tooltip: _overlaysHidden
-                        ? 'Show map panels'
-                        : 'Hide map panels',
-                  ),
-                  if (!compact) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: compact ? 4 : 8),
+                    // One reset control, not two. The map is always drawn
+                    // north-up, so a compass is the honest affordance for
+                    // "return to the full, north-up city".
                     _mapButton(
                       context,
-                      _donorsCollapsed
-                          ? Icons.chevron_left
-                          : Icons.chevron_right,
-                      () => setState(
-                        () => _donorsCollapsed = !_donorsCollapsed,
-                      ),
-                      tooltip: _donorsCollapsed
-                          ? 'Show donor list'
-                          : 'Hide donor list',
+                      Icons.explore_outlined,
+                      _resetNorth,
+                      tooltip: 'Compass · north up, show all 26 barangays',
+                      accent: true,
+                      size: compact ? 30 : 36,
                     ),
+                    // The light/dark switch is desktop-only: on a phone the
+                    // extra button pushed the stack into the legend.
+                    if (!compact) ...[
+                      const SizedBox(height: 6),
+                      _mapButton(
+                        context,
+                        _mapDark
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                        () => setState(() => _mapDark = !_mapDark),
+                        tooltip: _mapDark ? 'Use light map' : 'Use dark map',
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    SizedBox(height: compact ? 4 : 0),
+                    // Hides every map panel for an unobstructed view.
+                    _mapButton(
+                      context,
+                      _overlaysHidden ? Icons.layers : Icons.layers_outlined,
+                      () => setState(() => _overlaysHidden = !_overlaysHidden),
+                      tooltip: _overlaysHidden
+                          ? 'Show map panels'
+                          : 'Hide map panels',
+                      size: compact ? 30 : 36,
+                    ),
+                    if (!compact) ...[
+                      const SizedBox(height: 12),
+                      _mapButton(
+                        context,
+                        _donorsCollapsed
+                            ? Icons.chevron_left
+                            : Icons.chevron_right,
+                        () => setState(
+                          () => _donorsCollapsed = !_donorsCollapsed,
+                        ),
+                        tooltip: _donorsCollapsed
+                            ? 'Show donor list'
+                            : 'Hide donor list',
+                      ),
+                    ],
                   ],
-                ],
                 ),
               ),
             ),
@@ -1030,6 +997,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
     VoidCallback onTap, {
     String? tooltip,
     bool accent = false,
+    double size = 36,
   }) {
     final button = Material(
       color: accent
@@ -1040,9 +1008,10 @@ class _FindDonorPageState extends State<FindDonorPage> {
         borderRadius: BorderRadius.circular(TabangRadius.sm),
         onTap: onTap,
         child: Container(
-          // 36 px controls: the stack was covering too much of the map.
-          width: 36,
-          height: 36,
+          // 36 px controls (30 px on phones): the stack was covering too
+          // much of the map.
+          width: size,
+          height: size,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(TabangRadius.sm),
@@ -1052,7 +1021,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
           ),
           child: Icon(
             icon,
-            size: 17,
+            size: size < 36 ? 15 : 17,
             color: accent ? Colors.white : context.textColor,
           ),
         ),
@@ -1064,8 +1033,10 @@ class _FindDonorPageState extends State<FindDonorPage> {
 
   Widget _buildLegend(BuildContext context, {required bool compact}) {
     // Sum, not barangay count: three drives in Zone 1 is three active drives.
-    final driveCount =
-        _driveCounts.values.fold<int>(0, (total, count) => total + count);
+    final driveCount = _driveCounts.values.fold<int>(
+      0,
+      (total, count) => total + count,
+    );
     if (compact) {
       return SurfaceCard(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -1090,11 +1061,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.place,
-                  size: 14,
-                  color: TabangColors.crimson,
-                ),
+                const Icon(Icons.place, size: 14, color: TabangColors.crimson),
                 const SizedBox(width: 2),
                 Flexible(
                   child: Text(
@@ -1121,23 +1088,8 @@ class _FindDonorPageState extends State<FindDonorPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // No "MAP LAYERS" heading: the swatches explain themselves and the
-          // panel stays as small as possible over the map.
-          _layerRow(context, DigosMapColors.cityBorder, 'Digos City boundary',
-              lineWidth: 3),
-          _layerRow(context, DigosMapColors.internalBorder,
-              'Barangay boundaries',
-              lineWidth: 2),
-          _layerRow(
-            context,
-            DigosMapColors.selectionBorder,
-            'Selected barangay',
-            lineWidth: 3,
-          ),
-          _layerRow(context, DigosMapColors.hospital, 'Hospital / blood bank'),
-          const SizedBox(height: 4),
-          Divider(height: 1, color: context.border),
-          const SizedBox(height: 6),
+          // Density key only. The boundary and pin rows repeated what the map
+          // already shows and turned the legend into a layers panel.
           Text(
             'DONOR DENSITY',
             style: TextStyle(
@@ -1157,18 +1109,11 @@ class _FindDonorPageState extends State<FindDonorPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.place,
-                  size: 15,
-                  color: TabangColors.crimson,
-                ),
+                const Icon(Icons.place, size: 15, color: TabangColors.crimson),
                 const SizedBox(width: 4),
                 Text(
                   '$driveCount active drive${driveCount == 1 ? '' : 's'}',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: context.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
                 ),
               ],
             ),
@@ -1215,56 +1160,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
   Widget _legendRow(BuildContext context, int count, String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Stack(
-        children: [
-          _legendSwatch(context, count, label),
-        ],
-      ),
-    );
-  }
-
-  /// A legend row for the base map layers: a coloured line for the city and
-  /// barangay boundaries, or a filled box for anything added later.
-  Widget _layerRow(
-    BuildContext context,
-    Color color,
-    String label, {
-    bool bordered = false,
-    double? lineWidth,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (lineWidth != null)
-            Container(
-              width: 20,
-              height: lineWidth,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(lineWidth / 2),
-              ),
-            )
-          else
-            Container(
-              width: 20,
-              height: 10,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(3),
-                border: bordered
-                    ? Border.all(color: context.border)
-                    : Border.all(color: color.withValues(alpha: 0.6)),
-              ),
-            ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: context.textMuted),
-          ),
-        ],
-      ),
+      child: Stack(children: [_legendSwatch(context, count, label)]),
     );
   }
 
@@ -1381,7 +1277,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   onChanged: (v) => setState(() => _query = v),
                   style: const TextStyle(fontSize: 13),
                   decoration: const InputDecoration(
-                    hintText: 'Search alias or barangay',
+                    hintText: 'Search donor # or barangay',
                     isDense: true,
                     prefixIcon: Icon(Icons.search, size: 16),
                   ),
@@ -1393,22 +1289,23 @@ class _FindDonorPageState extends State<FindDonorPage> {
         Divider(height: 1, color: context.border),
         Expanded(
           child: switch (_paneTab) {
-            0 => donors.isEmpty
-                ? const EmptyState(
-                    art: TabangArt.donors,
-                    title: 'No eligible donors',
-                    message:
-                        'No donor matches this filter right now. Donors in '
-                        'cooldown are hidden automatically.',
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(TabangSpace.md),
-                    itemCount: donors.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: TabangSpace.sm),
-                    itemBuilder: (context, i) =>
-                        _buildDonorCard(context, donors[i]),
-                  ),
+            0 =>
+              donors.isEmpty
+                  ? const EmptyState(
+                      art: TabangArt.donors,
+                      title: 'No eligible donors',
+                      message:
+                          'No donor matches this filter right now. Donors in '
+                          'cooldown are hidden automatically.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(TabangSpace.md),
+                      itemCount: donors.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: TabangSpace.sm),
+                      itemBuilder: (context, i) =>
+                          _buildDonorCard(context, donors[i]),
+                    ),
             1 => _buildFacilitiesTab(context),
             _ => _buildDrivesTab(context),
           },
@@ -1559,8 +1456,10 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   if (isDonor && widget.onOpenRequests != null)
                     FilledButton.tonalIcon(
                       onPressed: widget.onOpenRequests,
-                      icon: const Icon(Icons.volunteer_activism_outlined,
-                          size: 15),
+                      icon: const Icon(
+                        Icons.volunteer_activism_outlined,
+                        size: 15,
+                      ),
                       label: const Text('Open Requests'),
                     )
                   else if (widget.onOpenBloodBank != null)
@@ -1598,8 +1497,8 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   height: 42,
                   child: TabangPhoto(
                     donor.photoAsset,
-                    semanticLabel: '${donor.alias} profile illustration',
-                    creditLabel: donor.alias,
+                    semanticLabel: '${donor.mapHandle} profile illustration',
+                    creditLabel: donor.mapHandle,
                     fallbackIcon: Icons.person_outline,
                     fallbackIconSize: 20,
                   ),
@@ -1613,7 +1512,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      donor.alias,
+                      donor.mapHandle,
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
@@ -1622,10 +1521,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     ),
                     Text(
                       donor.shareBarangay ? donor.barangay : 'Barangay hidden',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.textMuted,
-                      ),
+                      style: TextStyle(fontSize: 12, color: context.textMuted),
                     ),
                   ],
                 ),
@@ -1674,10 +1570,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   icon: const Icon(Icons.assignment_outlined, size: 16),
-                  label: const Text(
-                    'Requests',
-                    style: TextStyle(fontSize: 12),
-                  ),
+                  label: const Text('Requests', style: TextStyle(fontSize: 12)),
                 ),
               TextButton.icon(
                 onPressed: donor.id == widget.user.id
@@ -1689,10 +1582,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 icon: const Icon(Icons.forum_outlined, size: 16),
-                label: const Text(
-                  'Message',
-                  style: TextStyle(fontSize: 12),
-                ),
+                label: const Text('Message', style: TextStyle(fontSize: 12)),
               ),
             ],
           ),
@@ -1706,7 +1596,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
     final send = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Message ${donor.alias}'),
+        title: Text('Message ${donor.mapHandle}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1762,15 +1652,11 @@ class _FindDonorPageState extends State<FindDonorPage> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Conversation with ${donor.alias} is ready.'),
+        content: Text('Conversation with ${donor.mapHandle} is ready.'),
         action: widget.onOpenChat == null
             ? null
-            : SnackBarAction(
-                label: 'Open',
-                onPressed: widget.onOpenChat!,
-              ),
+            : SnackBarAction(label: 'Open', onPressed: widget.onOpenChat!),
       ),
     );
   }
 }
-

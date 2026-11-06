@@ -227,6 +227,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
         // added weight to an already dense dashboard.
         gradient: TabangGradients.donorHero,
         borderRadius: BorderRadius.circular(TabangRadius.lg),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),

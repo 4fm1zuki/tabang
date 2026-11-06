@@ -87,11 +87,25 @@ class _DonorHubPageState extends State<DonorHubPage> {
             width: double.infinity,
             padding: const EdgeInsets.all(TabangSpace.xl),
             decoration: BoxDecoration(
+              // A gradient on its own read as an unfinished block; the border
+              // and shadow give it the same card structure as every panel.
+              color: context.surface,
               gradient: TabangGradients.forContext(context),
               borderRadius: BorderRadius.circular(TabangRadius.lg),
               border: Border.all(
-                color: TabangColors.crimson.withValues(alpha: 0.2),
+                color: TabangColors.crimson.withValues(
+                  alpha: context.isDark ? 0.35 : 0.28,
+                ),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha: context.isDark ? 0.3 : 0.06,
+                  ),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,9 +467,12 @@ class _DonorHubPageState extends State<DonorHubPage> {
             decoration: BoxDecoration(
               gradient: TabangGradients.donorHero,
               borderRadius: BorderRadius.circular(TabangRadius.lg),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.10),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: TabangColors.crimsonDark.withValues(alpha: 0.24),
+                  color: Colors.black.withValues(alpha: 0.22),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),

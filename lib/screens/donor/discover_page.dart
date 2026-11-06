@@ -1357,7 +1357,13 @@ class _ContentRailState extends State<_ContentRail> {
       },
       child: MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onExit: (_) => setState(() {
+        _hovered = false;
+        // Hovering away releases the wheel focus, so the page scrolls
+        // vertically again without needing an extra click.
+        if (_focused) _focused = false;
+        if (_focusedRail == this) _focusedRail = null;
+      }),
       child: Listener(
       onPointerSignal: _handlePointerSignal,
       child: Stack(

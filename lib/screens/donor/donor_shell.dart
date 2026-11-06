@@ -213,8 +213,7 @@ class _DonorShellState extends State<DonorShell> {
                 selectedIndex: _phoneIndices.contains(_index)
                     ? _phoneIndices.indexOf(_index)
                     : 0,
-                onDestinationSelected: (slot) =>
-                    _select(_phoneIndices[slot]),
+                onDestinationSelected: (slot) => _select(_phoneIndices[slot]),
                 destinations: [
                   for (final index in _phoneIndices)
                     NavigationDestination(
@@ -236,15 +235,13 @@ class _DonorShellState extends State<DonorShell> {
         child: Row(
           children: [
             MouseRegion(
-              onEnter: wide
-                  ? (_) => setState(() => _hovering = true)
-                  : null,
+              onEnter: wide ? (_) => setState(() => _hovering = true) : null,
               onExit: wide
                   ? (_) => setState(() {
-                        _hovering = false;
-                        // Collapse: drop the labels first, then slide in.
-                        if (!_pinned) _railSettled = false;
-                      })
+                      _hovering = false;
+                      // Collapse: drop the labels first, then slide in.
+                      if (!_pinned) _railSettled = false;
+                    })
                   : null,
               child: _Sidebar(
                 user: widget.user,
@@ -350,10 +347,7 @@ class _PhoneHeader extends StatelessWidget {
               ),
               Text(
                 user.alias,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: context.textMuted,
-                ),
+                style: TextStyle(fontSize: 12, color: context.textMuted),
               ),
             ],
           ),
@@ -454,6 +448,21 @@ class _Sidebar extends StatelessWidget {
       child: Column(
         children: [
           _buildBrand(context),
+          // The pin is the only way back from an unpinned, collapsed rail.
+          // It used to live inside the expanded brand row, so collapsing the
+          // rail removed the control that could pin it open again. Keep a
+          // compact copy under the logo whenever the labels are hidden.
+          if (!expanded && wide)
+            IconButton(
+              tooltip: pinned ? 'Unpin sidebar' : 'Pin sidebar',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                size: 16,
+                color: pinned ? TabangColors.crimson : context.textMuted,
+              ),
+              onPressed: onTogglePin,
+            ),
           const SizedBox(height: TabangSpace.xs),
           Expanded(
             child: ListView.builder(
@@ -483,8 +492,9 @@ class _Sidebar extends StatelessWidget {
       child: Row(
         // The logo centres in the collapsed rail instead of hugging the left
         // edge, matching the centred icons below it.
-        mainAxisAlignment:
-            expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+        mainAxisAlignment: expanded
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.center,
         children: [
           Container(
             decoration: BoxDecoration(
@@ -530,10 +540,7 @@ class _Sidebar extends StatelessWidget {
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: context.textMuted,
-                    ),
+                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
                   ),
                 ],
               ),
@@ -587,8 +594,8 @@ class _Sidebar extends StatelessWidget {
       child: Material(
         color: selected
             ? (context.isDark
-                ? const Color(0xFF4A1C18)
-                : TabangColors.crimsonSoft)
+                  ? const Color(0xFF4A1C18)
+                  : TabangColors.crimsonSoft)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(TabangRadius.sm),
         child: InkWell(
@@ -626,8 +633,9 @@ class _Sidebar extends StatelessWidget {
                           destination.label,
                           style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: selected ? primary : context.textColor,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -646,9 +654,7 @@ class _Sidebar extends StatelessWidget {
         ),
       ),
     );
-    return expanded
-        ? item
-        : Tooltip(message: destination.label, child: item);
+    return expanded ? item : Tooltip(message: destination.label, child: item);
   }
 
   Widget _buildQuickLinks(BuildContext context) {
@@ -716,8 +722,9 @@ class _Sidebar extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(TabangSpace.sm),
             child: Row(
-              mainAxisAlignment:
-                  expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+              mainAxisAlignment: expanded
+                  ? MainAxisAlignment.start
+                  : MainAxisAlignment.center,
               children: [
                 ClipOval(
                   child: SizedBox(
@@ -816,10 +823,7 @@ List<PopupMenuEntry<String>> accountMenuItems(
                   '${user.email} · ${user.role.label}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: context.textMuted,
-                  ),
+                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
                 ),
               ],
             ),

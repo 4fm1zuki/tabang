@@ -57,10 +57,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The vector map is mounted with the simplified-map header format.
-    expect(find.text('Digos City Barangay Map'), findsOneWidget);
-    expect(find.text('DAVAO DEL SUR · PHILIPPINES'), findsOneWidget);
+    // The vector map is mounted. The title card is desktop-only and the old
+    // eyebrow/"2D VECTOR MAP" chrome is gone.
     expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(find.text('Digos City Barangay Map'), findsNothing);
+    expect(find.text('2D VECTOR MAP'), findsNothing);
+    expect(find.text('ALL'), findsOneWidget);
 
     // Repeated taps must not wedge the page.
     final mapCentre = tester.getCenter(find.byType(DigosVectorMap));
@@ -100,9 +102,11 @@ void main() {
     expect(find.text('ALL'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsOneWidget);
     expect(find.byIcon(Icons.remove), findsOneWidget);
-    // Legend now documents the base map layers plus donor density.
-    expect(find.text('MAP LAYERS'), findsOneWidget);
+    // The legend keeps the donor-density key. The boundary / pin layer rows
+    // were removed: the map already shows them, and they made the panel read
+    // as a layers menu.
     expect(find.text('DONOR DENSITY'), findsOneWidget);
+    expect(find.text('Digos City boundary'), findsNothing);
     expect(find.textContaining('Available donors'), findsOneWidget);
 
     // The overlay controls must be tappable.
