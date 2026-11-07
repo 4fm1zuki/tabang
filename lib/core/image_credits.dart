@@ -31,7 +31,8 @@ class ImageCredit {
 
   String get compact => '$author · $license';
 
-  bool get isOriginal => kind == 'avatar' || kind == 'illustration' || kind == 'icon';
+  bool get isOriginal =>
+      kind == 'avatar' || kind == 'illustration' || kind == 'icon';
 }
 
 const String kAvatarDirectory = 'assets/images/avatars/';
@@ -44,8 +45,7 @@ const List<ImageCredit> kImageCredits = [
     author: 'Tech. Sgt. Nicholas Alder, U.S. Air Force',
     license: 'Public domain',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:Ramstein_blood_donation_expands;_saves_lives_(7395800).jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Ramstein_blood_donation_expands;_saves_lives_(7395800).jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_hydration.jpg',
@@ -53,8 +53,7 @@ const List<ImageCredit> kImageCredits = [
     author: 'Photos-public-domain.com',
     license: 'Public domain',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:Water_droplets_on_blue_glass_surface.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Water_droplets_on_blue_glass_surface.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_nutrition.jpg',
@@ -62,8 +61,7 @@ const List<ImageCredit> kImageCredits = [
     author: 'Daderot',
     license: 'CC0',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:Salad_greens_and_vegetables_-_Cambridge,_MA.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Salad_greens_and_vegetables_-_Cambridge,_MA.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_recovery.jpg',
@@ -71,17 +69,16 @@ const List<ImageCredit> kImageCredits = [
     author: 'Judgefloro',
     license: 'CC0',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_03.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_03.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_screening.jpg',
     title: 'U.S. Naval Hospital Guam phlebotomist draws blood',
-    author: 'Mass Communication Specialist 2nd Class Gabrielle Blake, U.S. Navy',
+    author:
+        'Mass Communication Specialist 2nd Class Gabrielle Blake, U.S. Navy',
     license: 'Public domain',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:US_Navy_120126-N-GE301-042_U.S._Naval_Hospital_Guam%27s_phlebotomist_Dio_Patague_draws_blood_from_the_arm_of_Hospital_Corpsman_1st_Class_Karla_Manuel.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:US_Navy_120126-N-GE301-042_U.S._Naval_Hospital_Guam%27s_phlebotomist_Dio_Patague_draws_blood_from_the_arm_of_Hospital_Corpsman_1st_Class_Karla_Manuel.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_drive.jpg',
@@ -89,8 +86,7 @@ const List<ImageCredit> kImageCredits = [
     author: 'Judgefloro',
     license: 'CC0',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_07.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_07.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/drive_community.jpg',
@@ -98,8 +94,7 @@ const List<ImageCredit> kImageCredits = [
     author: 'Judgefloro',
     license: 'CC0',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_04.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_04.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_story.jpg',
@@ -107,8 +102,7 @@ const List<ImageCredit> kImageCredits = [
     author: "Photographer's Mate 1st Class Michael R. McCormick, U.S. Navy",
     license: 'Public domain',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:US_Navy_060531-N-3931M-035_Jennifer_E._Marcos,_a_medical_technician_and_chapter_service_representative_for_the_Philippine_National_Red_Cross,_draws_blood.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:US_Navy_060531-N-3931M-035_Jennifer_E._Marcos,_a_medical_technician_and_chapter_service_representative_for_the_Philippine_National_Red_Cross,_draws_blood.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_privacy.jpg',
@@ -207,5 +201,6 @@ List<ImageCredit> get photoCredits =>
     kImageCredits.where((c) => c.kind == 'photo').toList(growable: false);
 
 /// Credits for the original educational illustrations.
-List<ImageCredit> get illustrationCredits =>
-    kImageCredits.where((c) => c.kind == 'illustration').toList(growable: false);
+List<ImageCredit> get illustrationCredits => kImageCredits
+    .where((c) => c.kind == 'illustration')
+    .toList(growable: false);

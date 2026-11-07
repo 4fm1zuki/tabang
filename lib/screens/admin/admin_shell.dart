@@ -13,6 +13,7 @@ import '../shared/settings_page.dart';
 import 'admin_overview.dart';
 import 'chat_moderation_page.dart';
 import 'inventory_management.dart';
+import 'operations_map_page.dart';
 import 'user_management_page.dart';
 
 /// Navigation shell for clinical staff and administrators.
@@ -80,8 +81,8 @@ class _AdminShellState extends State<AdminShell> {
         ..clear()
         ..[_index] = _buildPage(_index);
     } else if (oldWidget.themeMode != widget.themeMode &&
-        _pages.containsKey(5)) {
-      _pages[5] = _buildPage(5);
+        _pages.containsKey(6)) {
+      _pages[6] = _buildPage(6);
     }
   }
 
@@ -94,6 +95,7 @@ class _AdminShellState extends State<AdminShell> {
 
   static const _destinations = <_Destination>[
     _Destination('Overview', Icons.dashboard_outlined, Icons.dashboard),
+    _Destination('Operations', Icons.map_outlined, Icons.map),
     _Destination('Inventory', Icons.inventory_2_outlined, Icons.inventory_2),
     _Destination('Users', Icons.people_outline, Icons.people),
     _Destination('Moderation', Icons.gavel_outlined, Icons.gavel),
@@ -102,8 +104,8 @@ class _AdminShellState extends State<AdminShell> {
     _Destination('About & Help', Icons.help_outline, Icons.help),
   ];
 
-  /// Bottom-bar slots on phones and small tablets. About & Help stays in the
-  /// account menu so the bar keeps six readable destinations.
+  /// Bottom-bar slots on phones and small tablets. Settings and About & Help
+  /// stay in the account menu so the bar keeps six readable destinations.
   static const _phoneIndices = <int>[0, 1, 2, 3, 4, 5];
 
   @override
@@ -131,9 +133,9 @@ class _AdminShellState extends State<AdminShell> {
             children: [
               _AdminPhoneHeader(
                 user: widget.user,
-                onOpenProfile: () => _pushStandalone(4),
-                onOpenSettings: () => _pushStandalone(5),
-                onOpenHelp: () => _pushStandalone(6),
+                onOpenProfile: () => _pushStandalone(5),
+                onOpenSettings: () => _pushStandalone(6),
+                onOpenHelp: () => _pushStandalone(7),
               ),
               Expanded(child: content),
               NavigationBar(
@@ -201,25 +203,37 @@ class _AdminShellState extends State<AdminShell> {
   Widget _buildPage(int index) {
     switch (index) {
       case 0:
-        return const AdminOverviewPage();
+        return AdminOverviewPage(
+          user: widget.user,
+          onOpenInventory: () => _select(2),
+        );
       case 1:
-        return InventoryManagementPage(currentUser: widget.user);
+        return OperationsMapPage(
+          user: widget.user,
+          onOpenInventory: () => _select(2),
+          onOpenUsers: () => _select(3),
+        );
       case 2:
-        return UserManagementPage(currentUser: widget.user);
+        return InventoryManagementPage(currentUser: widget.user);
       case 3:
-        return const ChatModerationPage();
+        return UserManagementPage(currentUser: widget.user);
       case 4:
-        return ProfilePage(user: widget.user);
+        return ChatModerationPage(currentUser: widget.user);
       case 5:
+        return ProfilePage(user: widget.user);
+      case 6:
         return SettingsPage(
           user: widget.user,
           themeMode: widget.themeMode,
           onThemeModeChanged: widget.onThemeModeChanged,
         );
-      case 6:
-        return AboutHelpPage(onOpenMessages: () => _select(3));
+      case 7:
+        return AboutHelpPage(onOpenMessages: () => _select(4));
       default:
-        return const AdminOverviewPage();
+        return AdminOverviewPage(
+          user: widget.user,
+          onOpenInventory: () => _select(2),
+        );
     }
   }
 }
@@ -613,19 +627,51 @@ class _AdminSidebar extends StatelessWidget {
               '${user.role.label} · ${user.email}',
               style: TextStyle(fontSize: 12.5, color: context.textMuted),
             ),
-            const SizedBox(height: TabangSpace.lg),
-            const Divider(),
             const SizedBox(height: TabangSpace.md),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  TabangRepository.instance.signOut();
-                },
-                icon: const Icon(Icons.logout, size: 16),
-                label: const Text('Sign out'),
+            const Divider(),
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.person_outline, size: 19),
+              title: const Text('Profile', style: TextStyle(fontSize: 13.5)),
+              onTap: () {
+                Navigator.pop(context);
+                onSelect(5);
+              },
+            ),
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.settings_outlined, size: 19),
+              title: const Text('Settings', style: TextStyle(fontSize: 13.5)),
+              onTap: () {
+                Navigator.pop(context);
+                onSelect(6);
+              },
+            ),
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.help_outline, size: 19),
+              title: const Text(
+                'About & Help',
+                style: TextStyle(fontSize: 13.5),
               ),
+              onTap: () {
+                Navigator.pop(context);
+                onSelect(7);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.logout, size: 19),
+              title: const Text('Sign out', style: TextStyle(fontSize: 13.5)),
+              onTap: () {
+                Navigator.pop(context);
+                TabangRepository.instance.signOut();
+              },
             ),
           ],
         ),

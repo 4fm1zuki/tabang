@@ -57,7 +57,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
       if (_roleFilter != null && u.role != _roleFilter) return false;
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
-        final matches = u.fullName.toLowerCase().contains(q) ||
+        final matches =
+            u.fullName.toLowerCase().contains(q) ||
             u.alias.toLowerCase().contains(q) ||
             u.email.toLowerCase().contains(q) ||
             u.barangay.toLowerCase().contains(q);
@@ -204,9 +205,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         ),
                         validator: (v) =>
                             RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                                    .hasMatch(v?.trim() ?? '')
-                                ? null
-                                : 'Enter a valid email',
+                                .hasMatch(v?.trim() ?? '')
+                            ? null
+                            : 'Enter a valid email',
                       ),
                       const SizedBox(height: TabangSpace.md),
                       TextFormField(
@@ -223,32 +224,33 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       DropdownButtonFormField<String>(
                         initialValue: barangay,
                         isExpanded: true,
-                        decoration:
-                            const InputDecoration(labelText: 'Barangay'),
-                        items: DigosBarangays.all
-                            .map((b) => DropdownMenuItem(
-                                  value: b,
-                                  child: Text(b),
-                                ))
-                            .toList(),
-                        onChanged: (v) => setDialogState(
-                          () => barangay = v ?? barangay,
+                        decoration: const InputDecoration(
+                          labelText: 'Barangay',
                         ),
+                        items: DigosBarangays.all
+                            .map(
+                              (b) => DropdownMenuItem(value: b, child: Text(b)),
+                            )
+                            .toList(),
+                        onChanged: (v) =>
+                            setDialogState(() => barangay = v ?? barangay),
                       ),
                       if (isDonor) ...[
                         const SizedBox(height: TabangSpace.md),
                         DropdownButtonFormField<BloodType>(
                           initialValue: bloodType,
-                          decoration:
-                              const InputDecoration(labelText: 'Blood type'),
+                          decoration: const InputDecoration(
+                            labelText: 'Blood type',
+                          ),
                           items: BloodType.values
-                              .map((t) => DropdownMenuItem(
-                                    value: t,
-                                    child: Text(t.label),
-                                  ))
+                              .map(
+                                (t) => DropdownMenuItem(
+                                  value: t,
+                                  child: Text(t.label),
+                                ),
+                              )
                               .toList(),
-                          onChanged: (v) =>
-                              setDialogState(() => bloodType = v),
+                          onChanged: (v) => setDialogState(() => bloodType = v),
                           validator: (v) =>
                               v == null ? 'Select the blood type' : null,
                         ),
@@ -260,14 +262,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             suffixIcon: Icon(Icons.event_outlined, size: 18),
                           ),
                           controller: TextEditingController(
-                            text: birthDate == null ? '' : formatDate(birthDate!),
+                            text: birthDate == null
+                                ? ''
+                                : formatDate(birthDate!),
                           ),
                           onTap: () async {
                             final now = DateTime.now();
                             final picked = await showDatePicker(
                               context: dialogContext,
-                              initialDate:
-                                  DateTime(now.year - 25, now.month, now.day),
+                              initialDate: DateTime(
+                                now.year - 25,
+                                now.month,
+                                now.day,
+                              ),
                               firstDate: DateTime(now.year - 100),
                               lastDate: now,
                             );
@@ -275,23 +282,23 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               setDialogState(() => birthDate = picked);
                             }
                           },
-                          validator: (_) =>
-                              birthDate == null ? 'Select the birth date' : null,
+                          validator: (_) => birthDate == null
+                              ? 'Select the birth date'
+                              : null,
                         ),
                         const SizedBox(height: TabangSpace.md),
                         TextFormField(
                           controller: weightController,
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: const InputDecoration(
                             labelText: 'Weight (kg)',
                             helperText: 'At least 50 kg is required to donate',
                           ),
                           validator: (v) {
                             final weight = double.tryParse(v?.trim() ?? '');
-                            if (weight == null ||
-                                weight < 20 ||
-                                weight > 300) {
+                            if (weight == null || weight < 20 || weight > 300) {
                               return 'Enter a weight between 20 and 300 kg';
                             }
                             return null;
@@ -497,12 +504,16 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 child: DropdownButtonFormField<AccountStatus?>(
                   initialValue: _statusFilter,
                   isExpanded: true,
-                  decoration:
-                      const InputDecoration(labelText: 'Status', isDense: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Status',
+                    isDense: true,
+                  ),
                   style: TextStyle(fontSize: 12.5, color: context.textColor),
                   items: [
                     const DropdownMenuItem<AccountStatus?>(
-                        value: null, child: Text('All statuses')),
+                      value: null,
+                      child: Text('All statuses'),
+                    ),
                     ...AccountStatus.values.map(
                       (s) => DropdownMenuItem<AccountStatus?>(
                         value: s,
@@ -518,12 +529,16 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 child: DropdownButtonFormField<UserRole?>(
                   initialValue: _roleFilter,
                   isExpanded: true,
-                  decoration:
-                      const InputDecoration(labelText: 'Role', isDense: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Role',
+                    isDense: true,
+                  ),
                   style: TextStyle(fontSize: 12.5, color: context.textColor),
                   items: [
                     const DropdownMenuItem<UserRole?>(
-                        value: null, child: Text('All roles')),
+                      value: null,
+                      child: Text('All roles'),
+                    ),
                     ...UserRole.values.map(
                       (r) => DropdownMenuItem<UserRole?>(
                         value: r,
@@ -544,10 +559,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
               title: 'No users match these filters',
             )
           else
-            ...users.map((u) => Padding(
-                  padding: const EdgeInsets.only(bottom: TabangSpace.md),
-                  child: _buildUserCard(context, u),
-                )),
+            ...users.map(
+              (u) => Padding(
+                padding: const EdgeInsets.only(bottom: TabangSpace.md),
+                child: _buildUserCard(context, u),
+              ),
+            ),
         ],
       ),
     );
@@ -642,17 +659,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       '${formatRelative(application.submittedAt)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.textMuted,
-                      ),
+                      style: TextStyle(fontSize: 12, color: context.textMuted),
                     ),
                   ],
                 ),
               ),
               StatusPill(
                 application.status.label,
-                tone: application.status ==
+                tone:
+                    application.status ==
                         DonorApplicationStatus.documentsRequested
                     ? Tone.info
                     : Tone.warning,
@@ -664,8 +679,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
           Text(
             application.hasExistingCard
                 ? 'Already has a PRC donor card'
-                    '${application.cardNumber == null ? '' : ' · ${application.cardNumber}'}'
-                    ' — verify the card on site'
+                      '${application.cardNumber == null ? '' : ' · ${application.cardNumber}'}'
+                      ' — verify the card on site'
                 : 'Needs a new donor card — full first-time process on site',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -709,8 +724,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 ),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 38),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: TabangSpace.md),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TabangSpace.md,
+                  ),
                 ),
                 icon: const Icon(Icons.verified_outlined, size: 16),
                 label: const Text('Verify donor'),
@@ -725,8 +741,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 ),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 38),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: TabangSpace.md),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TabangSpace.md,
+                  ),
                 ),
                 icon: const Icon(Icons.request_page_outlined, size: 16),
                 label: const Text('Request documents'),
@@ -783,20 +800,28 @@ class _UserManagementPageState extends State<UserManagementPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _applicationDetail(dialogContext, 'Applicant',
-                    user?.fullName ?? application.userId),
                 _applicationDetail(
-                    dialogContext, 'Alias', user?.alias ?? '—'),
+                  dialogContext,
+                  'Applicant',
+                  user?.fullName ?? application.userId,
+                ),
+                _applicationDetail(dialogContext, 'Alias', user?.alias ?? '—'),
                 _applicationDetail(
-                    dialogContext, 'Barangay', user?.barangay ?? '—'),
-                _applicationDetail(dialogContext, 'Blood type',
-                    user?.bloodType?.label ?? 'Not known yet'),
+                  dialogContext,
+                  'Barangay',
+                  user?.barangay ?? '—',
+                ),
+                _applicationDetail(
+                  dialogContext,
+                  'Blood type',
+                  user?.bloodType?.label ?? 'Not known yet',
+                ),
                 _applicationDetail(
                   dialogContext,
                   'Donor card',
                   application.hasExistingCard
                       ? 'Has a card'
-                          '${application.cardNumber == null ? '' : ' · ${application.cardNumber}'}'
+                            '${application.cardNumber == null ? '' : ' · ${application.cardNumber}'}'
                       : 'Needs a new card',
                 ),
                 _applicationDetail(
@@ -808,14 +833,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 ),
                 if (application.note != null && application.note!.isNotEmpty)
                   _applicationDetail(
-                      dialogContext, 'Applicant note', application.note!),
+                    dialogContext,
+                    'Applicant note',
+                    application.note!,
+                  ),
                 _applicationDetail(
                   dialogContext,
                   'Submitted',
                   formatRelative(application.submittedAt),
                 ),
                 _applicationDetail(
-                    dialogContext, 'Status', application.status.label),
+                  dialogContext,
+                  'Status',
+                  application.status.label,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Medical data is collected on the PRC interview sheet at the '
@@ -972,8 +1003,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     const SizedBox(height: 3),
                     Text(
                       '${user.alias} · ${user.email} · ${user.barangay}',
-                      style:
-                          TextStyle(fontSize: 12, color: context.textMuted),
+                      style: TextStyle(fontSize: 12, color: context.textMuted),
                     ),
                     if (isDonor) ...[
                       const SizedBox(height: 3),
@@ -1048,7 +1078,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
 
     final isDonor = user.role == UserRole.donor;
-    final canRecord = isDonor &&
+    final canRecord =
+        isDonor &&
         user.status != AccountStatus.suspended &&
         user.status != AccountStatus.unverified;
 
@@ -1094,10 +1125,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ),
         if (user.status == AccountStatus.suspended)
           ElevatedButton.icon(
-            onPressed: () => _repo.setUserStatus(
-              user.id,
-              AccountStatus.verified,
-            ),
+            onPressed: () =>
+                _repo.setUserStatus(user.id, AccountStatus.verified),
             icon: const Icon(Icons.lock_open, size: 14),
             label: const Text('Reinstate'),
             style: ElevatedButton.styleFrom(
@@ -1152,10 +1181,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     labelText: 'Component donated',
                   ),
                   items: BloodComponent.values
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c.label),
-                          ))
+                      .map(
+                        (c) => DropdownMenuItem(value: c, child: Text(c.label)),
+                      )
                       .toList(),
                   onChanged: (v) =>
                       setDialogState(() => component = v ?? component),

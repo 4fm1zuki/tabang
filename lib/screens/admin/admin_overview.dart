@@ -16,7 +16,14 @@ import '../../widgets/common.dart';
 /// by [TabangRepository.summary] and friends, so the numbers always agree with
 /// the tables on the other admin pages.
 class AdminOverviewPage extends StatefulWidget {
-  const AdminOverviewPage({super.key});
+  const AdminOverviewPage({super.key, this.user, this.onOpenInventory});
+
+  /// The signed-in staff/admin, used to show that account's capabilities.
+  final AppUser? user;
+
+  /// Jumps to the Inventory & requests page; wired by [AdminShell] so the
+  /// exception cards are a drill-through, not a dead end.
+  final VoidCallback? onOpenInventory;
 
   @override
   State<AdminOverviewPage> createState() => _AdminOverviewPageState();
@@ -41,6 +48,131 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     if (mounted) setState(() {});
   }
 
+  /// Makes the staff/admin split visible instead of implicit: the two roles
+  /// share day-to-day chapter work, and only an admin manages accounts.
+  Widget _buildPermissionsCard(BuildContext context) {
+    final role = widget.user?.role ?? UserRole.staff;
+    final other = role == UserRole.admin ? UserRole.staff : UserRole.admin;
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionLabel('Roles & permissions'),
+          const SizedBox(height: 4),
+          Text(
+            'You are signed in as ${role.label}. Clinical Personnel run the '
+            'day-to-day chapter work; System Administrators add everything on '
+            'top, including account and staff management.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: context.textMuted,
+            ),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = [
+                _permissionColumn(context, role, highlight: true),
+                _permissionColumn(context, other, highlight: false),
+              ];
+              if (constraints.maxWidth >= 640) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: columns[0]),
+                    const SizedBox(width: TabangSpace.lg),
+                    Expanded(child: columns[1]),
+                  ],
+                );
+              }
+              return Column(
+                children: [
+                  columns[0],
+                  const SizedBox(height: TabangSpace.md),
+                  columns[1],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _permissionColumn(
+    BuildContext context,
+    UserRole role, {
+    required bool highlight,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(TabangSpace.md),
+      decoration: BoxDecoration(
+        color: context.surfaceAlt,
+        borderRadius: BorderRadius.circular(TabangRadius.sm),
+        border: Border.all(
+          color: highlight
+              ? TabangColors.crimson.withValues(alpha: 0.45)
+              : context.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                role == UserRole.admin
+                    ? Icons.admin_panel_settings_outlined
+                    : Icons.medical_services_outlined,
+                size: 16,
+                color: highlight ? TabangColors.crimson : context.textMuted,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  role.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final line in role.capabilities)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.check,
+                    size: 13,
+                    color: TabangColors.success,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      line,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.4,
+                        color: context.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final summary = _repo.summary();
@@ -61,8 +193,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
         children: [
           PageHeader(
             title: 'Statistics',
-            subtitle:
-                'Supply, donor engagement and barangay coverage for Digos City.',
+            subtitle: 'Supply, donor engagement and barangay coverage for Digos City.',
             actions: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -76,8 +207,11 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.science_outlined,
-                        size: 12, color: TabangColors.info),
+                    const Icon(
+                      Icons.science_outlined,
+                      size: 12,
+                      color: TabangColors.info,
+                    ),
                     const SizedBox(width: 5),
                     Text(
                       'SIMULATED DATA',
@@ -96,6 +230,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             ],
           ),
           const SizedBox(height: TabangSpace.lg),
+
+          _buildPermissionsCard(context),
+          const SizedBox(height: TabangSpace.xl),
 
           _buildScoreHero(context, score, summary),
           const SizedBox(height: TabangSpace.xl),
@@ -151,7 +288,10 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             builder: (context, constraints) {
               final stacked = constraints.maxWidth < 1000;
               final expiringCard = _buildExpiringCard(context, expiring);
-              final requestsCard = _buildOpenRequestsCard(context, openRequests);
+              final requestsCard = _buildOpenRequestsCard(
+                context,
+                openRequests,
+              );
               if (stacked) {
                 return Column(
                   children: [
@@ -210,13 +350,13 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     final statusTone = score.value >= 75
         ? Tone.success
         : score.value >= 50
-            ? Tone.warning
-            : Tone.danger;
+        ? Tone.warning
+        : Tone.danger;
     final statusLabel = score.value >= 75
         ? 'Stable'
         : score.value >= 50
-            ? 'Watch'
-            : 'Constrained';
+        ? 'Watch'
+        : 'Constrained';
 
     return Container(
       width: double.infinity,
@@ -263,7 +403,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             ),
           ),
           Padding(
-            padding: EdgeInsets.all(context.isPhone ? TabangSpace.lg : TabangSpace.xl),
+            padding: EdgeInsets.all(
+              context.isPhone ? TabangSpace.lg : TabangSpace.xl,
+            ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 720;
@@ -346,8 +488,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                                   style: TextStyle(
                                     fontSize: 12.5,
                                     height: 1.4,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.78),
+                                    color: Colors.white.withValues(alpha: 0.78),
                                   ),
                                 ),
                               ],
@@ -577,8 +718,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
         final columns = constraints.maxWidth < 560
             ? 2
             : constraints.maxWidth < 900
-                ? 2
-                : 4;
+            ? 2
+            : 4;
         final width =
             (constraints.maxWidth - TabangSpace.md * (columns - 1)) / columns;
         final cards = [
@@ -628,18 +769,13 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
 
   // ------------------------------------------------------------ supply cards
 
-  Widget _buildBloodTypeCard(
-    BuildContext context,
-    List<BloodTypeStat> stats,
-  ) {
+  Widget _buildBloodTypeCard(BuildContext context, List<BloodTypeStat> stats) {
     final maxValue = stats.fold<int>(
       1,
       (m, s) => s.donated > m ? s.donated : (s.requested > m ? s.requested : m),
     );
     final withDemand = stats.where((s) => s.requested > 0).toList();
-    final covered = withDemand
-        .where((s) => s.donated >= s.requested)
-        .length;
+    final covered = withDemand.where((s) => s.donated >= s.requested).length;
 
     return SurfaceCard(
       child: Column(
@@ -713,7 +849,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                   SizedBox(
                     width: 46,
                     child: StatusPill(
-                      stat.balance >= 0 ? '+${stat.balance}' : '${stat.balance}',
+                      stat.balance >= 0
+                          ? '+${stat.balance}'
+                          : '${stat.balance}',
                       tone: stat.balance >= 0 ? Tone.success : Tone.danger,
                       dense: true,
                     ),
@@ -737,18 +875,12 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, color: context.textMuted),
-        ),
+        Text(label, style: TextStyle(fontSize: 12, color: context.textMuted)),
       ],
     );
   }
 
-  Widget _buildBarangayCard(
-    BuildContext context,
-    List<BarangayStat> stats,
-  ) {
+  Widget _buildBarangayCard(BuildContext context, List<BarangayStat> stats) {
     final top = stats.take(8).toList();
     final maxCount = top.isEmpty
         ? 1
@@ -853,8 +985,11 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.warning_amber_rounded,
-                  size: 15, color: TabangColors.warning),
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: 15,
+                color: TabangColors.warning,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -924,16 +1059,29 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
         children: [
           Row(
             children: [
-              Text(
-                'Open blood requests',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: context.textColor,
+              Expanded(
+                child: Text(
+                  'Open blood requests',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.textColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
               StatusPill('${requests.length}', tone: Tone.info, dense: true),
+              if (widget.onOpenInventory != null)
+                IconButton(
+                  tooltip: 'Open inventory queue',
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    Icons.open_in_new,
+                    size: 16,
+                    color: context.textMuted,
+                  ),
+                  onPressed: widget.onOpenInventory,
+                ),
             ],
           ),
           const SizedBox(height: TabangSpace.md),
@@ -1013,11 +1161,13 @@ class _ReadinessScore {
   }) {
     final supply = (summary.unitsAvailable / 32).clamp(0.0, 1.0);
     final donors = (summary.activeDonors / 20).clamp(0.0, 1.0);
-    final requestPressure =
-        summary.openRequests == 0 ? 1.0 : (1 - summary.openRequests / 16).clamp(0.0, 1.0);
+    final requestPressure = summary.openRequests == 0
+        ? 1.0
+        : (1 - summary.openRequests / 16).clamp(0.0, 1.0);
     final total = summary.unitsAvailable + expiringCount;
-    final shelfLife =
-        total == 0 ? 1.0 : (1 - expiringCount / total).clamp(0.0, 1.0);
+    final shelfLife = total == 0
+        ? 1.0
+        : (1 - expiringCount / total).clamp(0.0, 1.0);
 
     final components = [
       _ScoreComponent('Supply coverage', supply, 0.35),
@@ -1104,13 +1254,13 @@ class _KpiCard extends StatelessWidget {
   final double progress;
 
   Color get _color => switch (tone) {
-        Tone.success => TabangColors.success,
-        Tone.warning => TabangColors.warning,
-        Tone.danger => TabangColors.danger,
-        Tone.info => TabangColors.info,
-        Tone.brand => TabangColors.crimson,
-        Tone.neutral => TabangColors.info,
-      };
+    Tone.success => TabangColors.success,
+    Tone.warning => TabangColors.warning,
+    Tone.danger => TabangColors.danger,
+    Tone.info => TabangColors.info,
+    Tone.brand => TabangColors.crimson,
+    Tone.neutral => TabangColors.info,
+  };
 
   @override
   Widget build(BuildContext context) {

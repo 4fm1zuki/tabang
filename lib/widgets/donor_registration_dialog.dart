@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/eligibility.dart';
 import '../core/models.dart';
 import '../core/repository.dart';
 import '../theme.dart';
@@ -37,10 +38,12 @@ class _DonorRegistrationDialog extends StatefulWidget {
 class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
   final _cardNumber = TextEditingController();
   final _note = TextEditingController();
+  final _weight = TextEditingController();
 
   /// Null until the applicant picks one of the two paths.
   bool? _hasCard;
   BloodType? _bloodType;
+  DateTime? _birthDate;
   DateTime? _preferredVisit;
   bool _submitting = false;
   String? _error;
@@ -49,13 +52,43 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
   void initState() {
     super.initState();
     _bloodType = widget.user.bloodType;
+    _birthDate = widget.user.birthDate;
+    _weight.text = widget.user.weightKg?.toString() ?? '';
   }
 
   @override
   void dispose() {
     _cardNumber.dispose();
     _note.dispose();
+    _weight.dispose();
     super.dispose();
+  }
+
+  /// Birth date and weight are the two eligibility inputs the chapter cannot
+  /// verify remotely; collecting them here means a donor verified from the
+  /// queue can actually be matched instead of failing on missing weight.
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(now.year - 25, now.month, now.day),
+      firstDate: DateTime(now.year - 66, 1, 1),
+      lastDate: now,
+      helpText: 'Your date of birth',
+    );
+    if (picked != null) setState(() => _birthDate = picked);
+  }
+
+  int? get _age {
+    final dob = _birthDate;
+    if (dob == null) return null;
+    final now = DateTime.now();
+    var years = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      years--;
+    }
+    return years;
   }
 
   Future<void> _pickVisit() async {
@@ -75,6 +108,33 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
       setState(() => _error = 'Choose whether you already have a donor card.');
       return;
     }
+    final age = _age;
+    if (age == null) {
+      setState(() => _error = 'Add your date of birth.');
+      return;
+    }
+    if (age < EligibilityEngine.minimumAge ||
+        age > EligibilityEngine.maximumAge) {
+      setState(
+        () => _error =
+            'Donors must be between ${EligibilityEngine.minimumAge} and '
+            '${EligibilityEngine.maximumAge} years old.',
+      );
+      return;
+    }
+    final weight = double.tryParse(_weight.text.trim());
+    if (weight == null) {
+      setState(() => _error = 'Add your weight in kilograms.');
+      return;
+    }
+    if (weight < EligibilityEngine.minimumWeightKg) {
+      setState(
+        () => _error =
+            'Donors must weigh at least '
+            '${EligibilityEngine.minimumWeightKg.toStringAsFixed(0)} kg.',
+      );
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -87,6 +147,8 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
           ? _cardNumber.text.trim()
           : null,
       bloodType: _bloodType,
+      birthDate: _birthDate,
+      weightKg: weight,
       preferredVisit: _preferredVisit,
       note: _note.text.trim().isEmpty ? null : _note.text.trim(),
     );
@@ -195,12 +257,50 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
               const SizedBox(height: TabangSpace.md),
               InkWell(
                 borderRadius: BorderRadius.circular(TabangRadius.sm),
+                onTap: _pickBirthDate,
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Date of birth',
+                    helperText: 'Donors must be 18–65 years old',
+                    prefixIcon: Icon(Icons.cake_outlined, size: 18),
+                    suffixIcon: Icon(Icons.calendar_today_outlined, size: 16),
+                    isDense: true,
+                  ),
+                  child: Text(
+                    _birthDate == null
+                        ? 'Pick your birth date'
+                        : '${formatDate(_birthDate!)}'
+                              '${_age == null ? '' : ' · $_age years old'}',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: _birthDate == null
+                          ? context.textMuted
+                          : context.textColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              TextField(
+                controller: _weight,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Weight in kilograms',
+                  helperText: 'Donors must weigh at least 50 kg',
+                  prefixIcon: Icon(Icons.monitor_weight_outlined, size: 18),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              InkWell(
+                borderRadius: BorderRadius.circular(TabangRadius.sm),
                 onTap: _pickVisit,
                 child: InputDecorator(
                   decoration: const InputDecoration(
                     labelText: 'Planned visit (optional)',
-                    helperText:
-                        'Tells the chapter which day to expect you',
+                    helperText: 'Tells the chapter which day to expect you',
                     prefixIcon: Icon(Icons.event_available_outlined, size: 18),
                     suffixIcon: Icon(Icons.calendar_today_outlined, size: 16),
                     isDense: true,
@@ -293,8 +393,9 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
       ),
       actions: [
         TextButton(
-          onPressed:
-              _submitting ? null : () => Navigator.of(context).pop(false),
+          onPressed: _submitting
+              ? null
+              : () => Navigator.of(context).pop(false),
           child: const Text('Cancel'),
         ),
         FilledButton.icon(
@@ -304,7 +405,9 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
                   width: 15,
                   height: 15,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Icon(Icons.send_outlined, size: 17),
           label: Text(_submitting ? 'Sending…' : 'Send to chapter'),
@@ -329,8 +432,8 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
         decoration: BoxDecoration(
           color: selected
               ? (context.isDark
-                  ? TabangColors.crimson.withValues(alpha: 0.14)
-                  : TabangColors.crimsonSoft.withValues(alpha: 0.6))
+                    ? TabangColors.crimson.withValues(alpha: 0.14)
+                    : TabangColors.crimsonSoft.withValues(alpha: 0.6))
               : Colors.transparent,
           borderRadius: BorderRadius.circular(TabangRadius.sm),
           border: Border.all(
@@ -371,9 +474,7 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
               ),
             ),
             Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
               size: 18,
               color: selected ? TabangColors.crimson : context.textMuted,
             ),

@@ -4,6 +4,7 @@ import '../../core/eligibility.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/chapter_identity.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
 
@@ -137,6 +138,11 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           const SizedBox(height: TabangSpace.lg),
 
+          if (user.role.isAdminSide) ...[
+            _buildChapterAffiliationCard(context, user),
+            const SizedBox(height: TabangSpace.lg),
+          ],
+
           if (isDonor) ...[
             _buildEligibilityCard(context, user),
             const SizedBox(height: TabangSpace.lg),
@@ -145,6 +151,60 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
 
           _buildDetailsCard(context, user),
+        ],
+      ),
+    );
+  }
+
+  /// Staff and admin are the people behind the chapter account. The card makes
+  /// that official identity explicit: user-facing replies are posted as the
+  /// organization, not as a personal alias.
+  Widget _buildChapterAffiliationCard(BuildContext context, AppUser user) {
+    return SurfaceCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ChapterMark(size: 42),
+          const SizedBox(width: TabangSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        TabangRepository.chapterName,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: context.textColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const VerifiedBadge(size: 15),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${user.role.label} · ${TabangRepository.chapterSubtitle}',
+                  style: TextStyle(fontSize: 12, color: context.textMuted),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Replies you send in chapter threads are posted under this '
+                  'organization identity. Your personal alias stays visible '
+                  'only to the chapter console.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.45,
+                    color: context.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

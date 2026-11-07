@@ -26,10 +26,7 @@ class BarcodePainter extends CustomPainter {
         final on = ((code >> (j % 6)) & 1) == 1;
         final w = (j == 0 ? 1.8 : 1.0) * barWidth;
         if (on) {
-          canvas.drawRect(
-            Rect.fromLTWH(x, 0, w, size.height),
-            paint,
-          );
+          canvas.drawRect(Rect.fromLTWH(x, 0, w, size.height), paint);
         }
         x += w + barWidth * 0.7;
       }
@@ -71,7 +68,9 @@ class UnitBarcode extends StatelessWidget {
         SizedBox(
           width: width,
           height: height,
-          child: CustomPaint(painter: BarcodePainter(data: data, color: color)),
+          child: CustomPaint(
+            painter: BarcodePainter(data: data, color: color),
+          ),
         ),
         const SizedBox(height: 4),
         Text(

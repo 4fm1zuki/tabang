@@ -199,7 +199,8 @@ Future<void> showWelcomeGuide(
               const SizedBox(height: TabangSpace.lg),
               for (var i = 0; i < steps.length; i++) ...[
                 _GuideRow(index: i + 1, step: steps[i]),
-                if (i != steps.length - 1) const SizedBox(height: TabangSpace.md),
+                if (i != steps.length - 1)
+                  const SizedBox(height: TabangSpace.md),
               ],
               const SizedBox(height: TabangSpace.xl),
               // One action only: "Skip" and "Got it" both just closed the

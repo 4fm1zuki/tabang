@@ -50,8 +50,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     final now = DateTime.now();
     return _repo.units.where((u) {
       if (_typeFilter != null && u.bloodType != _typeFilter) return false;
-      if (_statusFilter != null &&
-          u.effectiveStatus(now) != _statusFilter) {
+      if (_statusFilter != null && u.effectiveStatus(now) != _statusFilter) {
         return false;
       }
       return true;
@@ -65,24 +64,42 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PageHeader(
+          PageHeader(
             title: 'Inventory & requests',
-            subtitle:
-                'Manage blood units, monitor expiry, and work the request queue.',
+            subtitle: 'Manage blood units, monitor expiry, and work the request queue.',
+            actions: [
+              if (widget.currentUser.role.canManageInventory)
+                FilledButton.icon(
+                  onPressed: () => _showAddUnitDialog(context),
+                  icon: const Icon(Icons.add, size: 15),
+                  label: const Text('Add unit'),
+                ),
+            ],
           ),
           const SizedBox(height: TabangSpace.xl),
 
           // Tabs
-          Row(
+          Wrap(
+            spacing: TabangSpace.sm,
+            runSpacing: TabangSpace.sm,
             children: [
               _tabButton(context, 0, 'Blood units', _repo.units.length),
-              const SizedBox(width: TabangSpace.sm),
               _tabButton(context, 1, 'Requests', _repo.requests.length),
+              _tabButton(
+                context,
+                2,
+                'Appointments',
+                _repo.pendingAppointments.length,
+              ),
             ],
           ),
           const SizedBox(height: TabangSpace.lg),
 
-          if (_tab == 0) _buildUnitsTab(context) else _buildRequestsTab(context),
+          switch (_tab) {
+            0 => _buildUnitsTab(context),
+            1 => _buildRequestsTab(context),
+            _ => _buildAppointmentsTab(context),
+          },
         ],
       ),
     );
@@ -156,16 +173,22 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               child: DropdownButtonFormField<BloodType?>(
                 initialValue: _typeFilter,
                 isExpanded: true,
-                decoration:
-                    const InputDecoration(labelText: 'Blood type', isDense: true),
+                decoration: const InputDecoration(
+                  labelText: 'Blood type',
+                  isDense: true,
+                ),
                 style: TextStyle(fontSize: 12.5, color: context.textColor),
                 items: [
                   const DropdownMenuItem<BloodType?>(
-                      value: null, child: Text('All types')),
-                  ...BloodType.values.map((t) => DropdownMenuItem<BloodType?>(
-                        value: t,
-                        child: Text(t.label),
-                      )),
+                    value: null,
+                    child: Text('All types'),
+                  ),
+                  ...BloodType.values.map(
+                    (t) => DropdownMenuItem<BloodType?>(
+                      value: t,
+                      child: Text(t.label),
+                    ),
+                  ),
                 ],
                 onChanged: (v) => setState(() => _typeFilter = v),
               ),
@@ -175,16 +198,22 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               child: DropdownButtonFormField<UnitStatus?>(
                 initialValue: _statusFilter,
                 isExpanded: true,
-                decoration:
-                    const InputDecoration(labelText: 'Status', isDense: true),
+                decoration: const InputDecoration(
+                  labelText: 'Status',
+                  isDense: true,
+                ),
                 style: TextStyle(fontSize: 12.5, color: context.textColor),
                 items: [
                   const DropdownMenuItem<UnitStatus?>(
-                      value: null, child: Text('All statuses')),
-                  ...UnitStatus.values.map((s) => DropdownMenuItem<UnitStatus?>(
-                        value: s,
-                        child: Text(s.label),
-                      )),
+                    value: null,
+                    child: Text('All statuses'),
+                  ),
+                  ...UnitStatus.values.map(
+                    (s) => DropdownMenuItem<UnitStatus?>(
+                      value: s,
+                      child: Text(s.label),
+                    ),
+                  ),
                 ],
                 onChanged: (v) => setState(() => _statusFilter = v),
               ),
@@ -229,9 +258,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: first
-            ? null
-            : Border(top: BorderSide(color: context.border)),
+        border: first ? null : Border(top: BorderSide(color: context.border)),
       ),
       child: InkWell(
         onTap: () => _showUnitDetails(context, unit, now),
@@ -281,11 +308,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     unit.timeLeft(now),
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight:
-                          expiring ? FontWeight.w700 : FontWeight.w600,
-                      color: expiring
-                          ? TabangColors.danger
-                          : context.textMuted,
+                      fontWeight: expiring ? FontWeight.w700 : FontWeight.w600,
+                      color: expiring ? TabangColors.danger : context.textMuted,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -299,21 +323,31 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               const SizedBox(width: 4),
               PopupMenuButton<UnitStatus>(
                 tooltip: 'Change status',
-                icon: Icon(Icons.more_horiz,
-                    size: 18, color: context.textMuted),
-                onSelected: (status) =>
-                    _repo.setUnitStatus(unit.barcode, status),
+                icon: Icon(
+                  Icons.more_horiz,
+                  size: 18,
+                  color: context.textMuted,
+                ),
+                onSelected: (status) => _repo.setUnitStatus(
+                  unit.barcode,
+                  status,
+                  actorId: widget.currentUser.id,
+                ),
                 itemBuilder: (context) => UnitStatus.values
-                    .where((s) =>
-                        s != effective &&
-                        !(s == UnitStatus.available && unit.isExpiredAt(now)))
-                    .map((s) => PopupMenuItem(
-                          value: s,
-                          child: Text(
-                            'Mark ${s.label.toLowerCase()}',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ))
+                    .where(
+                      (s) =>
+                          s != effective &&
+                          !(s == UnitStatus.available && unit.isExpiredAt(now)),
+                    )
+                    .map(
+                      (s) => PopupMenuItem(
+                        value: s,
+                        child: Text(
+                          'Mark ${s.label.toLowerCase()}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],
@@ -323,14 +357,11 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     );
   }
 
-  void _showUnitDetails(
-    BuildContext context,
-    BloodUnit unit,
-    DateTime now,
-  ) {
+  void _showUnitDetails(BuildContext context, BloodUnit unit, DateTime now) {
     final effective = unit.effectiveStatus(now);
-    final holder =
-        unit.reservedBy == null ? null : _repo.userById(unit.reservedBy!);
+    final holder = unit.reservedBy == null
+        ? null
+        : _repo.userById(unit.reservedBy!);
 
     showDialog<void>(
       context: context,
@@ -363,7 +394,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 _detail(dialogContext, 'Status', effective.label),
                 _detail(dialogContext, 'Storage', unit.storageBay),
                 _detail(
-                    dialogContext, 'Collected', formatDate(unit.collectedOn)),
+                  dialogContext,
+                  'Collected',
+                  formatDate(unit.collectedOn),
+                ),
                 _detail(dialogContext, 'Expires', formatDate(unit.expiresOn)),
                 _detail(dialogContext, 'Remaining', unit.timeLeft(now)),
                 _detail(
@@ -381,13 +415,33 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                   ),
                 if (unit.reservationNote != null &&
                     unit.reservationNote!.isNotEmpty)
-                  _detail(
-                      dialogContext, 'Hold note', unit.reservationNote!),
+                  _detail(dialogContext, 'Hold note', unit.reservationNote!),
               ],
             ),
           ),
         ),
         actions: [
+          if (widget.currentUser.role.canManageInventory &&
+              unit.reservedBy != null)
+            TextButton(
+              onPressed: () {
+                final ok = _repo.releaseUnit(
+                  unit.barcode,
+                  actorId: widget.currentUser.id,
+                );
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? '${unit.barcode} released back to available stock.'
+                          : 'Could not release ${unit.barcode}.',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Release to stock'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
@@ -442,18 +496,16 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           'Fulfilment is staff-only. Donor responses are offers; the '
           'requester selects a donor in the community app, and staff mark the '
           'request fulfilled after the donation is recorded.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.5,
-            color: context.textMuted,
-          ),
+          style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
         ),
         const SizedBox(height: TabangSpace.md),
         ...requests.map((request) {
-          final compatibleDonors = _repo.findDonors(
-            compatibleWith: request.bloodType,
-            component: request.component,
-          ).length;
+          final compatibleDonors = _repo
+              .findDonors(
+                compatibleWith: request.bloodType,
+                component: request.component,
+              )
+              .length;
           final compatibleUnits = _repo
               .compatibleUnitsFor(
                 recipientType: request.bloodType,
@@ -469,13 +521,13 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           void updateStatus(RequestStatus status) {
             final ok = switch (status) {
               RequestStatus.fulfilled => _repo.markRequestFulfilled(
-                  request.id,
-                  actorId: widget.currentUser.id,
-                ),
+                request.id,
+                actorId: widget.currentUser.id,
+              ),
               RequestStatus.cancelled => _repo.cancelRequest(
-                  request.id,
-                  actorId: widget.currentUser.id,
-                ),
+                request.id,
+                actorId: widget.currentUser.id,
+              ),
               RequestStatus.matched || RequestStatus.open => false,
             };
             ScaffoldMessenger.of(context).showSnackBar(
@@ -535,8 +587,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                               '${request.unitsNeeded} units outstanding · '
                               '${request.hospital}',
                               style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: context.textMuted),
+                                fontSize: 12.5,
+                                color: context.textMuted,
+                              ),
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -546,18 +599,19 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                               ' · ${request.barangay}'
                               ' · ${formatRelative(request.createdAt)}',
                               style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.textMuted),
+                                fontSize: 12,
+                                color: context.textMuted,
+                              ),
                             ),
                             const SizedBox(height: 3),
                             Text(
                               request.source == RequestSource.bloodBank
                                   ? '$compatibleUnits compatible units in '
-                                      'stock · ${responses.length} donor '
-                                      'responses'
+                                        'stock · ${responses.length} donor '
+                                        'responses'
                                   : '$compatibleDonors eligible compatible '
-                                      'donors · ${responses.length} responses '
-                                      '($selected selected)',
+                                        'donors · ${responses.length} responses '
+                                        '($selected selected)',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: context.textMuted,
@@ -577,25 +631,48 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                           ],
                         ),
                       ),
+                      if (widget.currentUser.role.canFulfillRequests &&
+                          request.source == RequestSource.donorNetwork &&
+                          request.status == RequestStatus.open &&
+                          responses.any(
+                            (r) => r.status == ResponseStatus.pending,
+                          ))
+                        IconButton(
+                          tooltip: 'Select donor',
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            Icons.how_to_reg_outlined,
+                            size: 17,
+                            color: context.textMuted,
+                          ),
+                          onPressed: () => _showSelectDonor(context, request),
+                        ),
                       if (request.status == RequestStatus.open ||
                           request.status == RequestStatus.matched)
                         PopupMenuButton<RequestStatus>(
                           tooltip: 'Update request',
-                          icon: Icon(Icons.more_vert,
-                              size: 17, color: context.textMuted),
+                          icon: Icon(
+                            Icons.more_vert,
+                            size: 17,
+                            color: context.textMuted,
+                          ),
                           onSelected: updateStatus,
                           itemBuilder: (context) => [
                             if (request.status == RequestStatus.matched ||
                                 request.source == RequestSource.bloodBank)
                               const PopupMenuItem(
                                 value: RequestStatus.fulfilled,
-                                child: Text('Mark fulfilled (staff only)',
-                                    style: TextStyle(fontSize: 12)),
+                                child: Text(
+                                  'Mark fulfilled (staff only)',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                               ),
                             const PopupMenuItem(
                               value: RequestStatus.cancelled,
-                              child: Text('Cancel request',
-                                  style: TextStyle(fontSize: 12)),
+                              child: Text(
+                                'Cancel request',
+                                style: TextStyle(fontSize: 12),
+                              ),
                             ),
                           ],
                         ),
@@ -614,6 +691,344 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             ),
           );
         }),
+      ],
+    );
+  }
+
+  /// Confirm and track appointment-with-blood slots. This queue used to be
+  /// invisible on the staff side even though requesters could book.
+  Widget _buildAppointmentsTab(BuildContext context) {
+    final appointments = _repo.appointments;
+    if (appointments.isEmpty) {
+      return const EmptyState(
+        art: TabangArt.inventory,
+        title: 'No appointments booked',
+      );
+    }
+    return SurfaceCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < appointments.length; i++)
+            _buildAppointmentRow(context, appointments[i], first: i == 0),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppointmentRow(
+    BuildContext context,
+    DonationAppointment appointment, {
+    required bool first,
+  }) {
+    final requester = _repo.userById(appointment.requesterId);
+    final pending = appointment.status.toLowerCase().contains('pending');
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: first ? null : Border(top: BorderSide(color: context.border)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TabangSpace.lg,
+          vertical: TabangSpace.md,
+        ),
+        child: Row(
+          children: [
+            BloodTypeChip(appointment.bloodType, size: 32),
+            const SizedBox(width: TabangSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appointment.patientName,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: context.textColor,
+                    ),
+                  ),
+                  Text(
+                    '${appointment.hospital} · ${appointment.ward} · '
+                    '${appointment.component.label} · ${appointment.units} unit(s)',
+                    style: TextStyle(fontSize: 12, color: context.textMuted),
+                  ),
+                  Text(
+                    '${formatDateTime(appointment.scheduledAt)}'
+                    '${requester == null ? '' : ' · booked by ${requester.alias}'}',
+                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            StatusPill(
+              appointment.status,
+              tone: pending ? Tone.warning : Tone.success,
+              dense: true,
+            ),
+            const SizedBox(width: TabangSpace.sm),
+            if (pending && widget.currentUser.role.canConfirmAppointments)
+              FilledButton(
+                onPressed: () {
+                  final ok = _repo.confirmAppointment(
+                    appointment.id,
+                    actorId: widget.currentUser.id,
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        ok
+                            ? '${appointment.id} confirmed.'
+                            : 'Could not confirm ${appointment.id}.',
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Confirm'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSelectDonor(BuildContext context, BloodRequest request) {
+    final pending = _repo
+        .responsesFor(request.id)
+        .where((r) => r.status == ResponseStatus.pending)
+        .toList();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Select a donor'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Selection needs a reciprocal chat between the requester and '
+                'the donor, and re-checks eligibility at this moment.',
+                style: TextStyle(fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: TabangSpace.sm),
+              for (final response in pending)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(response.donorAlias),
+                  subtitle: Text(response.message ?? 'No message'),
+                  trailing: TextButton(
+                    onPressed: () {
+                      final thread = _repo.selectResponse(
+                        responseId: response.id,
+                        selectedById: widget.currentUser.id,
+                      );
+                      if (thread == null) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Not selectable yet — the requester and donor '
+                              'must both have sent a message first.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      Navigator.pop(dialogContext);
+                    },
+                    child: const Text('Select'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Receive a new bag. Expiry is derived from the component shelf life, so
+  /// staff cannot enter an impossible date.
+  void _showAddUnitDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => _AddUnitDialog(
+        actorId: widget.currentUser.id,
+        onAdded: (unit) {
+          if (unit == null || !context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${unit.barcode} added — expires '
+                '${formatDate(unit.expiresOn)}.',
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Dialog that collects a new bag and calls [TabangRepository.addBloodUnit].
+class _AddUnitDialog extends StatefulWidget {
+  const _AddUnitDialog({required this.actorId, required this.onAdded});
+
+  final String actorId;
+  final ValueChanged<BloodUnit?> onAdded;
+
+  @override
+  State<_AddUnitDialog> createState() => _AddUnitDialogState();
+}
+
+class _AddUnitDialogState extends State<_AddUnitDialog> {
+  final TabangRepository _repo = TabangRepository.instance;
+  final TextEditingController _bay = TextEditingController();
+  final TextEditingController _barcode = TextEditingController();
+
+  BloodType _type = BloodType.oPos;
+  BloodComponent _component = BloodComponent.packedRbc;
+  DateTime _collected = DateTime.now();
+
+  DateTime get _expires => _collected.add(
+    Duration(days: TabangRepository.shelfLifeDays[_component] ?? 42),
+  );
+
+  @override
+  void dispose() {
+    _bay.dispose();
+    _barcode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add blood unit'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<BloodType>(
+                initialValue: _type,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Blood type',
+                  isDense: true,
+                ),
+                items: BloodType.values
+                    .map(
+                      (t) => DropdownMenuItem(value: t, child: Text(t.label)),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _type = v ?? _type),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              DropdownButtonFormField<BloodComponent>(
+                initialValue: _component,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Component',
+                  isDense: true,
+                ),
+                items: BloodComponent.values
+                    .map(
+                      (c) => DropdownMenuItem(value: c, child: Text(c.label)),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _component = v ?? _component),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              TextField(
+                controller: _bay,
+                decoration: const InputDecoration(
+                  labelText: 'Storage bay',
+                  hintText: 'e.g. Fridge A · Shelf 2',
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              TextField(
+                controller: _barcode,
+                decoration: const InputDecoration(
+                  labelText: 'Barcode (optional — generated when blank)',
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Collected on'),
+                subtitle: Text(formatDate(_collected)),
+                trailing: TextButton(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _collected,
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 2),
+                      ),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) setState(() => _collected = picked);
+                  },
+                  child: const Text('Change'),
+                ),
+              ),
+              Text(
+                'Expires ${formatDate(_expires)} '
+                '(${TabangRepository.shelfLifeDays[_component]} days shelf life)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final unit = _repo.addBloodUnit(
+              actorId: widget.actorId,
+              bloodType: _type,
+              component: _component,
+              storageBay: _bay.text,
+              collectedOn: _collected,
+              barcode: _barcode.text,
+            );
+            if (unit == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Could not add the unit — check the barcode and that your '
+                    'role can manage inventory.',
+                  ),
+                ),
+              );
+              return;
+            }
+            widget.onAdded(unit);
+            Navigator.pop(context);
+          },
+          child: const Text('Add to stock'),
+        ),
       ],
     );
   }

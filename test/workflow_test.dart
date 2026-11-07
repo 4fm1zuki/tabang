@@ -554,6 +554,163 @@ void main() {
     });
   });
 
+  group('Chapter identity and staff stock', () {
+    test('a donor registration opens an official chapter thread', () {
+      final result = AuthService.instance.register(
+        fullName: 'Chapter Chat',
+        alias: 'Chapter 01',
+        email: 'chapter01@tabang.app',
+        password: 'password123',
+        phone: '+63 900 111 7777',
+        barangay: 'Zone 1',
+      );
+      expect(result.ok, isTrue);
+      final userId = result.user!.id;
+
+      repo.submitDonorApplication(
+        userId: userId,
+        hasExistingCard: false,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(1998, 3, 3),
+        weightKg: 62,
+      );
+
+      final thread = repo.threadBetween(
+        userId,
+        TabangRepository.chapterAccountId,
+      );
+      expect(thread, isNotNull);
+      expect(thread!.messages, isNotEmpty);
+      expect(thread.messages.first.senderId, TabangRepository.chapterAccountId);
+      expect(repo.isChapterThread(thread), isTrue);
+      expect(repo.displayNameFor(thread, userId), TabangRepository.chapterName);
+      // Another donor's application does not create a second chapter thread.
+      final threadsBefore = repo.threads.length;
+      repo.setDonorApplicationStatus(
+        userId,
+        DonorApplicationStatus.documentsRequested,
+        requestedDocuments: const ['Valid ID'],
+      );
+      expect(repo.threads.length, threadsBefore);
+      expect(
+        repo
+            .threadBetween(userId, TabangRepository.chapterAccountId)!
+            .messages
+            .last
+            .senderId,
+        TabangRepository.chapterAccountId,
+      );
+    });
+
+    test(
+      'a donor verified from the queue is matchable (weight backfilled)',
+      () {
+        final result = AuthService.instance.register(
+          fullName: 'Queue Donor',
+          alias: 'Queue 01',
+          email: 'queue01@tabang.app',
+          password: 'password123',
+          phone: '+63 900 111 8888',
+          barangay: 'Zone 2',
+        );
+        expect(result.ok, isTrue);
+        final userId = result.user!.id;
+
+        repo.submitDonorApplication(
+          userId: userId,
+          hasExistingCard: true,
+          cardNumber: 'PRC-123',
+          bloodType: BloodType.aPos,
+          birthDate: DateTime(1995, 5, 5),
+          weightKg: 58,
+        );
+        expect(
+          EligibilityEngine.evaluate(repo.userById(userId)!).isEligible,
+          isFalse,
+          reason: 'unverified until the chapter checks the card',
+        );
+
+        repo.setDonorApplicationStatus(userId, DonorApplicationStatus.verified);
+        final verified = repo.userById(userId)!;
+        expect(verified.bloodCardVerified, isTrue);
+        expect(verified.weightKg, 58);
+        expect(
+          EligibilityEngine.evaluate(verified).isEligible,
+          isTrue,
+          reason: 'the queue decision must not leave the donor unmatchable',
+        );
+      },
+    );
+
+    test('staff can add stock and the expiry follows the component', () {
+      final before = repo.units.length;
+      final unit = repo.addBloodUnit(
+        actorId: 'USR-010', // clinical personnel
+        bloodType: BloodType.bPos,
+        component: BloodComponent.platelets,
+        storageBay: 'Fridge B · Shelf 1',
+        collectedOn: DateTime(2026, 1, 1),
+      );
+      expect(unit, isNotNull);
+      expect(repo.units.length, before + 1);
+      expect(
+        unit!.expiresOn,
+        DateTime(2026, 1, 1).add(const Duration(days: 5)),
+      );
+      expect(unit.status, UnitStatus.available);
+
+      // Community members cannot add stock, even with a valid payload.
+      expect(
+        repo.addBloodUnit(
+          actorId: 'USR-001', // donor
+          bloodType: BloodType.oNeg,
+          component: BloodComponent.packedRbc,
+          storageBay: 'Fridge A',
+        ),
+        isNull,
+      );
+
+      // A barcode that already exists is refused.
+      expect(
+        repo.addBloodUnit(
+          actorId: 'USR-010',
+          bloodType: BloodType.bPos,
+          component: BloodComponent.platelets,
+          storageBay: 'Fridge B · Shelf 1',
+          barcode: unit.barcode,
+        ),
+        isNull,
+      );
+    });
+
+    test('staff-only status changes are ignored for community actors', () {
+      final unit = repo.availableUnits.first;
+      final original = unit.effectiveStatus(DateTime.now());
+      repo.setUnitStatus(
+        unit.barcode,
+        UnitStatus.quarantined,
+        actorId: 'USR-001',
+      );
+      expect(
+        repo.units
+            .firstWhere((u) => u.barcode == unit.barcode)
+            .effectiveStatus(DateTime.now()),
+        original,
+      );
+      repo.setUnitStatus(
+        unit.barcode,
+        UnitStatus.quarantined,
+        actorId: 'USR-010',
+      );
+      expect(
+        repo.units
+            .firstWhere((u) => u.barcode == unit.barcode)
+            .effectiveStatus(DateTime.now()),
+        UnitStatus.quarantined,
+      );
+    });
+  });
+
   group('Bilateral identity reveal', () {
     test('reveal requires the other participant to accept', () {
       expect(repo.requestIdentityReveal('ROOM-101', 'USR-009'), isTrue);

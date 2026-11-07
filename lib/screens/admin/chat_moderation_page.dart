@@ -3,16 +3,20 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/chapter_identity.dart';
 import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
 
 /// Chat moderation console.
 ///
-/// Staff review flagged conversations, clear or escalate flags, and mute
-/// threads. The previous build displayed moderation data but every action was
-/// inert; these buttons mutate the shared repository.
+/// Staff review flagged conversations, clear or escalate flags, mute threads
+/// and reply to the official chapter thread. The previous build displayed
+/// moderation data but every action was inert; these buttons mutate the shared
+/// repository.
 class ChatModerationPage extends StatefulWidget {
-  const ChatModerationPage({super.key});
+  const ChatModerationPage({super.key, required this.currentUser});
+
+  final AppUser currentUser;
 
   @override
   State<ChatModerationPage> createState() => _ChatModerationPageState();
@@ -20,6 +24,7 @@ class ChatModerationPage extends StatefulWidget {
 
 class _ChatModerationPageState extends State<ChatModerationPage> {
   final TabangRepository _repo = TabangRepository.instance;
+  final TextEditingController _reply = TextEditingController();
 
   String? _selectedThreadId;
   bool _onlyFlagged = true;
@@ -33,6 +38,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
   @override
   void dispose() {
     _repo.removeListener(_refresh);
+    _reply.dispose();
     super.dispose();
   }
 
@@ -41,9 +47,48 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
   }
 
   List<ChatThread> get _threads {
-    final all = _repo.threads;
-    if (!_onlyFlagged) return all;
-    return all.where((t) => t.hasFlaggedMessages).toList();
+    var all = _repo.threads;
+    if (_onlyFlagged) {
+      all = all.where((t) => t.hasFlaggedMessages).toList();
+    }
+    return [...all]..sort((a, b) {
+      final aTime =
+          a.lastMessage?.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime =
+          b.lastMessage?.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+  }
+
+  String _pairLabel(ChatThread thread) {
+    final a = _repo.isChapterAccount(thread.participantAId)
+        ? TabangRepository.chapterName
+        : thread.participantAAlias;
+    final b = _repo.isChapterAccount(thread.participantBId)
+        ? TabangRepository.chapterName
+        : thread.participantBAlias;
+    return '$a ↔ $b';
+  }
+
+  bool _canReply(ChatThread thread) =>
+      thread.participantAId == widget.currentUser.id ||
+      thread.participantBId == widget.currentUser.id ||
+      _repo.isChapterThread(thread);
+
+  void _sendReply(ChatThread thread) {
+    final text = _reply.text.trim();
+    if (text.isEmpty || !_canReply(thread)) return;
+    // If the signed-in operator is not a participant (for example an admin
+    // answering a donor's registration thread), the reply goes out under the
+    // official chapter identity rather than impersonating a person.
+    final senderId =
+        thread.participantAId == widget.currentUser.id ||
+            thread.participantBId == widget.currentUser.id
+        ? widget.currentUser.id
+        : TabangRepository.chapterAccountId;
+    _repo.sendMessage(thread.id, senderId, text);
+    _reply.clear();
+    setState(() {});
   }
 
   ChatThread? get _active {
@@ -59,8 +104,10 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
   Widget build(BuildContext context) {
     final threads = _threads;
     final active = _active;
-    final flaggedTotal = _repo.threads
-        .fold<int>(0, (sum, t) => sum + t.flaggedCount);
+    final flaggedTotal = _repo.threads.fold<int>(
+      0,
+      (sum, t) => sum + t.flaggedCount,
+    );
     final openReports = _repo.reports
         .where((r) => r.status == ReportStatus.open)
         .length;
@@ -119,7 +166,9 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                         Text(
                           'Flagged only',
                           style: TextStyle(
-                              fontSize: 12, color: context.textMuted),
+                            fontSize: 12,
+                            color: context.textMuted,
+                          ),
                         ),
                         const SizedBox(width: 6),
                         Switch(
@@ -160,12 +209,12 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                           return Material(
                             color: selected
                                 ? (context.isDark
-                                    ? const Color(0xFF3A1917)
-                                    : TabangColors.crimsonSoft)
+                                      ? const Color(0xFF3A1917)
+                                      : TabangColors.crimsonSoft)
                                 : Colors.transparent,
                             child: InkWell(
-                              onTap: () => setState(
-                                  () => _selectedThreadId = thread.id),
+                              onTap: () =>
+                                  setState(() => _selectedThreadId = thread.id),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: TabangSpace.lg,
@@ -178,8 +227,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                       children: [
                                         Expanded(
                                           child: Text(
-                                            '${thread.participantAAlias} ↔ '
-                                            '${thread.participantBAlias}',
+                                            _pairLabel(thread),
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w700,
@@ -198,8 +246,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      thread.lastMessage?.text ??
-                                          'No messages',
+                                      thread.lastMessage?.text ?? 'No messages',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -327,8 +374,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${thread.participantAAlias} ↔ '
-                                      '${thread.participantBAlias}',
+                                      _pairLabel(thread),
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
@@ -395,19 +441,33 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${thread.participantAAlias} ↔ ${thread.participantBAlias}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: context.textColor,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _pairLabel(thread),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: context.textColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (_repo.isChapterThread(thread))
+                          const Padding(
+                            padding: EdgeInsets.only(left: 5),
+                            child: VerifiedBadge(size: 14),
+                          ),
+                      ],
                     ),
                     Text(
                       'Room ${thread.id} · ${thread.messages.length} messages · '
                       '${thread.flaggedCount} flagged',
-                      style:
-                          TextStyle(fontSize: 11.5, color: context.textMuted),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: context.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -442,9 +502,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
             color: context.surfaceAlt,
             child: ListView(
               padding: EdgeInsets.all(
-                MediaQuery.sizeOf(context).width < 600
-                    ? 16
-                    : TabangSpace.xl,
+                MediaQuery.sizeOf(context).width < 600 ? 16 : TabangSpace.xl,
               ),
               children: thread.messages
                   .map((m) => _buildMessage(context, thread, m))
@@ -452,6 +510,53 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
             ),
           ),
         ),
+        // Staff reply box. Moderation used to be read-only, which left the
+        // chapter support thread unanswered even though users could see it.
+        if (_canReply(thread))
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: TabangSpace.xl,
+              vertical: TabangSpace.sm,
+            ),
+            decoration: BoxDecoration(
+              color: context.surface,
+              border: Border(top: BorderSide(color: context.border)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _reply,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: _repo.isChapterThread(thread)
+                          ? 'Reply as the chapter…'
+                          : 'Reply in this thread…',
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _sendReply(thread),
+                  ),
+                ),
+                const SizedBox(width: TabangSpace.sm),
+                IconButton(
+                  tooltip: 'Send reply',
+                  icon: const Icon(Icons.send, size: 18),
+                  onPressed: () => _sendReply(thread),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(TabangSpace.md),
+            color: context.surfaceAlt,
+            child: Text(
+              'Read-only: this is a coordination thread between two community '
+              'members. Staff can reply in chapter threads.',
+              style: TextStyle(fontSize: 11.5, color: context.textMuted),
+            ),
+          ),
       ],
     );
   }
@@ -479,14 +584,26 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
         children: [
           Row(
             children: [
-              Text(
-                message.senderAlias,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: context.textColor,
+              Flexible(
+                child: Text(
+                  message.senderId == TabangRepository.chapterAccountId
+                      ? TabangRepository.chapterName
+                      : message.senderId == 'system'
+                      ? '${message.senderAlias} · system'
+                      : message.senderAlias,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: context.textColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (message.senderId == TabangRepository.chapterAccountId)
+                const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: VerifiedBadge(size: 13),
+                ),
               const SizedBox(width: TabangSpace.sm),
               Text(
                 formatRelative(message.sentAt),
@@ -563,7 +680,8 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                   ? const EmptyState(
                       art: TabangArt.messages,
                       title: 'No reports',
-                      message: 'No community member has reported a conversation.',
+                      message:
+                          'No community member has reported a conversation.',
                     )
                   : ListView.separated(
                       itemCount: reports.length,
@@ -665,17 +783,25 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
     ChatMessage message,
   ) {
     final sender = _repo.userById(message.senderId);
+    final protectedSender =
+        message.senderId == 'system' ||
+        _repo.isChapterAccount(message.senderId) ||
+        sender == null;
 
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Issue a warning'),
         content: Text(
-          sender == null
+          message.senderId == 'system'
+              ? 'System notices cannot be warned. Clear the flag instead.'
+              : _repo.isChapterAccount(message.senderId)
+              ? 'The official chapter account cannot be warned.'
+              : sender == null
               ? 'This message was sent by an account that no longer exists.'
               : 'Issue a formal warning to ${sender.fullName} '
-                  '(${sender.alias}) for this message?\n\n'
-                  'Three warnings suspend the account automatically.',
+                    '(${sender.alias}) for this message?\n\n'
+                    'Three warnings suspend the account automatically.',
           style: const TextStyle(fontSize: 13, height: 1.6),
         ),
         actions: [
@@ -683,18 +809,19 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              if (sender != null) _repo.warnUser(sender.id);
-              _repo.flagMessage(
-                thread.id,
-                message.id,
-                ModerationFlag.inappropriate,
-              );
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('Issue warning'),
-          ),
+          if (!protectedSender)
+            ElevatedButton(
+              onPressed: () {
+                _repo.warnUser(sender.id);
+                _repo.flagMessage(
+                  thread.id,
+                  message.id,
+                  ModerationFlag.inappropriate,
+                );
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Issue warning'),
+            ),
         ],
       ),
     );

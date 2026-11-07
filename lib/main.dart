@@ -75,16 +75,13 @@ class _TabangAppState extends State<TabangApp> {
       // and the bottom bar never collides with gesture navigation.
       builder: (context, child) => ColoredBox(
         color: Theme.of(context).scaffoldBackgroundColor,
-        child: SafeArea(
-          child: child ?? const SizedBox.shrink(),
-        ),
+        child: SafeArea(child: child ?? const SizedBox.shrink()),
       ),
       home: _buildHome(user),
     );
   }
 
   Widget _buildHome(AppUser? user) {
-
     if (user == null) {
       return LoginScreen(
         themeMode: _themeMode,
@@ -118,10 +115,10 @@ class TabangScrollBehavior extends MaterialScrollBehavior {
 
   @override
   Set<PointerDeviceKind> get dragDevices => const {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.stylus,
-        PointerDeviceKind.invertedStylus,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+  };
 }

@@ -66,8 +66,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
   /// Chapter hours: weekdays 8am-8pm, weekends 8am-5pm.
   bool get _isOpenNow {
     final now = DateTime.now();
-    final weekend = now.weekday == DateTime.saturday ||
-        now.weekday == DateTime.sunday;
+    final weekend =
+        now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
     return weekend
         ? now.hour >= 8 && now.hour < 17
         : now.hour >= 8 && now.hour < 20;
@@ -80,7 +80,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
     return _repo.units.where((unit) {
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
-        final matches = unit.barcode.toLowerCase().contains(q) ||
+        final matches =
+            unit.barcode.toLowerCase().contains(q) ||
             unit.product.toLowerCase().contains(q) ||
             unit.storageBay.toLowerCase().contains(q);
         if (!matches) return false;
@@ -116,8 +117,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
         children: [
           PageHeader(
             title: 'Blood Bank',
-            subtitle:
-                'Live stock at the Davao del Sur chapter, holds and appointment slots.',
+            subtitle: 'Live stock at the Davao del Sur chapter, holds and appointment slots.',
             actions: [
               if (_canRequest)
                 FilledButton.icon(
@@ -212,17 +212,14 @@ class _BloodBankPageState extends State<BloodBankPage> {
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
           TextSpan(
-            text: '$labels ${types.length == 1 ? 'has' : 'have'} no units '
+            text:
+                '$labels ${types.length == 1 ? 'has' : 'have'} no units '
                 'available in any component. Eligible donors are prioritised '
                 'for emergency release.',
           ),
         ],
       ),
-      style: TextStyle(
-        fontSize: 12.5,
-        height: 1.45,
-        color: context.textColor,
-      ),
+      style: TextStyle(fontSize: 12.5, height: 1.45, color: context.textColor),
     );
 
     return Container(
@@ -236,9 +233,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
       decoration: BoxDecoration(
         color: context.warningBg,
         borderRadius: BorderRadius.circular(TabangRadius.sm),
-        border: Border.all(
-          color: TabangColors.warning.withValues(alpha: 0.38),
-        ),
+        border: Border.all(color: TabangColors.warning.withValues(alpha: 0.38)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -301,8 +296,11 @@ class _BloodBankPageState extends State<BloodBankPage> {
                   gradient: TabangGradients.brand,
                   borderRadius: BorderRadius.circular(TabangRadius.sm),
                 ),
-                child: const Icon(Icons.bloodtype,
-                    color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.bloodtype,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: TabangSpace.md),
               Expanded(
@@ -320,12 +318,18 @@ class _BloodBankPageState extends State<BloodBankPage> {
                     const SizedBox(height: 3),
                     Text(
                       'Quezon Avenue, Davao–Cotabato Rd, Digos City',
-                      style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: context.textMuted,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Weekdays 8:00 AM – 8:00 PM · Weekends 8:00 AM – 5:00 PM',
-                      style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: context.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -578,10 +582,10 @@ class _BloodBankPageState extends State<BloodBankPage> {
         final columns = constraints.maxWidth < 420
             ? 2
             : constraints.maxWidth < 720
-                ? 3
-                : constraints.maxWidth < 1100
-                    ? 4
-                    : 8;
+            ? 3
+            : constraints.maxWidth < 1100
+            ? 4
+            : 8;
         return Wrap(
           spacing: TabangSpace.md,
           runSpacing: TabangSpace.md,
@@ -590,20 +594,19 @@ class _BloodBankPageState extends State<BloodBankPage> {
             final tone = count == 0
                 ? Tone.danger
                 : count <= 1
-                    ? Tone.warning
-                    : Tone.success;
+                ? Tone.warning
+                : Tone.success;
             final selected = _unitType == type;
             return SizedBox(
               width:
                   (constraints.maxWidth - TabangSpace.md * (columns - 1)) /
-                      columns,
+                  columns,
               child: SurfaceCard(
                 padding: EdgeInsets.zero,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(TabangRadius.md),
-                  onTap: () => setState(
-                    () => _unitType = selected ? null : type,
-                  ),
+                  onTap: () =>
+                      setState(() => _unitType = selected ? null : type),
                   child: Container(
                     padding: const EdgeInsets.all(TabangSpace.md),
                     decoration: BoxDecoration(
@@ -642,8 +645,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
                                 color: tone == Tone.success
                                     ? TabangColors.success
                                     : tone == Tone.warning
-                                        ? TabangColors.warning
-                                        : TabangColors.danger,
+                                    ? TabangColors.warning
+                                    : TabangColors.danger,
                               ),
                             ),
                           ],
@@ -653,8 +656,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
                           count == 0
                               ? 'Out of stock'
                               : count <= 1
-                                  ? 'Low stock'
-                                  : 'Available',
+                              ? 'Low stock'
+                              : 'Available',
                           style: TextStyle(
                             fontSize: 11.5,
                             color: context.textMuted,
@@ -662,16 +665,17 @@ class _BloodBankPageState extends State<BloodBankPage> {
                         ),
                         const SizedBox(height: 6),
                         ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(TabangRadius.pill),
+                          borderRadius: BorderRadius.circular(
+                            TabangRadius.pill,
+                          ),
                           child: LinearProgressIndicator(
                             minHeight: 4,
                             value: maxCount == 0 ? 0 : count / maxCount,
                             color: tone == Tone.success
                                 ? TabangColors.success
                                 : tone == Tone.warning
-                                    ? TabangColors.warning
-                                    : TabangColors.danger,
+                                ? TabangColors.warning
+                                : TabangColors.danger,
                           ),
                         ),
                       ],
@@ -724,10 +728,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
               child: Text('All types'),
             ),
             ...BloodType.values.map(
-              (t) => DropdownMenuItem<BloodType?>(
-                value: t,
-                child: Text(t.label),
-              ),
+              (t) =>
+                  DropdownMenuItem<BloodType?>(value: t, child: Text(t.label)),
             ),
           ],
           onChanged: (v) => setState(() => _unitType = v),
@@ -778,10 +780,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
               child: Text('All statuses'),
             ),
             ...UnitStatus.values.map(
-              (s) => DropdownMenuItem<UnitStatus?>(
-                value: s,
-                child: Text(s.label),
-              ),
+              (s) =>
+                  DropdownMenuItem<UnitStatus?>(value: s, child: Text(s.label)),
             ),
           ],
           onChanged: (v) => setState(() => _status = v),
@@ -837,9 +837,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
             ? TabangColors.crimson.withValues(alpha: 0.16)
             : TabangColors.crimsonSoft,
         borderRadius: BorderRadius.circular(TabangRadius.sm),
-        border: Border.all(
-          color: TabangColors.crimson.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: TabangColors.crimson.withValues(alpha: 0.3)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -872,8 +870,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
             onPressed: _reserveSelected,
             style: FilledButton.styleFrom(
               minimumSize: const Size(0, 36),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: TabangSpace.md),
+              padding: const EdgeInsets.symmetric(horizontal: TabangSpace.md),
             ),
             icon: const Icon(Icons.lock_clock_outlined, size: 15),
             label: const Text(
@@ -925,7 +922,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
       reserved == 0
           ? 'Those units are no longer available.'
           : 'Reserved $reserved unit${reserved == 1 ? '' : 's'}. '
-              'Chapter staff will confirm release.',
+                'Chapter staff will confirm release.',
     );
   }
 
@@ -964,8 +961,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
         final columns = constraints.maxWidth >= 1000
             ? 3
             : constraints.maxWidth >= 660
-                ? 2
-                : 1;
+            ? 2
+            : 1;
         final cardWidth =
             (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(
@@ -1080,7 +1077,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
                     mine
                         ? 'You'
                         : (_repo.userById(unit.reservedBy!)?.alias ??
-                            'Another community member'),
+                              'Another community member'),
                   ),
                 if (unit.reservedAt != null)
                   _detail(
@@ -1212,14 +1209,12 @@ class _BloodBankPageState extends State<BloodBankPage> {
                   DropdownButtonFormField<BloodComponent>(
                     initialValue: component,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Component',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Component'),
                     items: BloodComponent.values
-                        .map((c) => DropdownMenuItem(
-                              value: c,
-                              child: Text(c.label),
-                            ))
+                        .map(
+                          (c) =>
+                              DropdownMenuItem(value: c, child: Text(c.label)),
+                        )
                         .toList(),
                     onChanged: (v) =>
                         setDialogState(() => component = v ?? component),
@@ -1228,18 +1223,18 @@ class _BloodBankPageState extends State<BloodBankPage> {
                   Text(
                     component == BloodComponent.plasma
                         ? 'Plasma compatibility is the reverse of red cells: '
-                            'AB plasma is the universal plasma donor, and O '
-                            'plasma can only go to an O recipient. Rh is not '
-                            'used for plasma in this prototype.'
+                              'AB plasma is the universal plasma donor, and O '
+                              'plasma can only go to an O recipient. Rh is not '
+                              'used for plasma in this prototype.'
                         : component == BloodComponent.platelets
-                            ? 'Platelets use the ABO/Rh red-cell baseline in '
-                                'this prototype. ABO-identical units are '
-                                'preferred clinically; HLA and antigen-negative '
-                                'selection are out of scope.'
-                            : 'A recipient can safely receive red cells from '
-                                'any donor type listed against them. O- is the '
-                                'universal red-cell donor; AB+ is the universal '
-                                'recipient.',
+                        ? 'Platelets use the ABO/Rh red-cell baseline in '
+                              'this prototype. ABO-identical units are '
+                              'preferred clinically; HLA and antigen-negative '
+                              'selection are out of scope.'
+                        : 'A recipient can safely receive red cells from '
+                              'any donor type listed against them. O- is the '
+                              'universal red-cell donor; AB+ is the universal '
+                              'recipient.',
                     style: TextStyle(fontSize: 12, color: context.textMuted),
                   ),
                   const SizedBox(height: TabangSpace.lg),
@@ -1254,16 +1249,24 @@ class _BloodBankPageState extends State<BloodBankPage> {
                         children: [
                           BloodTypeChip(recipient, size: 28),
                           const SizedBox(width: TabangSpace.md),
-                          Icon(Icons.arrow_back,
-                              size: 13, color: context.textMuted),
+                          Icon(
+                            Icons.arrow_back,
+                            size: 13,
+                            color: context.textMuted,
+                          ),
                           const SizedBox(width: TabangSpace.md),
                           Expanded(
                             child: Wrap(
                               spacing: 4,
                               runSpacing: 4,
                               children: donors
-                                  .map((d) => StatusPill(d.label,
-                                      tone: Tone.neutral, dense: true))
+                                  .map(
+                                    (d) => StatusPill(
+                                      d.label,
+                                      tone: Tone.neutral,
+                                      dense: true,
+                                    ),
+                                  )
                                   .toList(),
                             ),
                           ),
@@ -1341,11 +1344,11 @@ class _UnitCardState extends State<_UnitCard> {
         decoration: BoxDecoration(
           color: widget.selected
               ? (context.isDark
-                  ? TabangColors.crimson.withValues(alpha: 0.18)
-                  : TabangColors.crimsonSoft.withValues(alpha: 0.55))
+                    ? TabangColors.crimson.withValues(alpha: 0.18)
+                    : TabangColors.crimsonSoft.withValues(alpha: 0.55))
               : _hovered
-                  ? context.surfaceAlt
-                  : context.surface,
+              ? context.surfaceAlt
+              : context.surface,
           borderRadius: BorderRadius.circular(TabangRadius.md),
           border: Border.all(
             color: widget.selected ? TabangColors.crimson : context.border,
@@ -1416,8 +1419,9 @@ class _UnitCardState extends State<_UnitCard> {
                       unit.timeLeft(now),
                       style: TextStyle(
                         fontSize: 12.5,
-                        fontWeight:
-                            expiringSoon ? FontWeight.w700 : FontWeight.w600,
+                        fontWeight: expiringSoon
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                         color: expiringSoon
                             ? TabangColors.danger
                             : context.textMuted,
@@ -1425,9 +1429,17 @@ class _UnitCardState extends State<_UnitCard> {
                     ),
                     const Spacer(),
                     if (mine)
-                      const StatusPill('Held by you', tone: Tone.brand, dense: true)
+                      const StatusPill(
+                        'Held by you',
+                        tone: Tone.brand,
+                        dense: true,
+                      )
                     else if (held)
-                      const StatusPill('On hold', tone: Tone.neutral, dense: true),
+                      const StatusPill(
+                        'On hold',
+                        tone: Tone.neutral,
+                        dense: true,
+                      ),
                   ],
                 ),
                 const SizedBox(height: TabangSpace.sm),
@@ -1734,10 +1746,12 @@ class _AppointmentDialogState extends State<_AppointmentDialog> {
                         prefixIcon: Icon(Icons.water_drop_outlined, size: 18),
                       ),
                       items: BloodType.values
-                          .map((t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(t.label),
-                              ))
+                          .map(
+                            (t) => DropdownMenuItem(
+                              value: t,
+                              child: Text(t.label),
+                            ),
+                          )
                           .toList(),
                       onChanged: (v) => setState(() => _bloodType = v),
                     );
@@ -1788,10 +1802,9 @@ class _AppointmentDialogState extends State<_AppointmentDialog> {
                     prefixIcon: Icon(Icons.science_outlined, size: 18),
                   ),
                   items: BloodComponent.values
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c.label),
-                          ))
+                      .map(
+                        (c) => DropdownMenuItem(value: c, child: Text(c.label)),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => _component = v),
                 ),
@@ -1807,10 +1820,12 @@ class _AppointmentDialogState extends State<_AppointmentDialog> {
                     prefixIcon: Icon(Icons.local_hospital_outlined, size: 18),
                   ),
                   items: DigosFacilities.names
-                      .map((name) => DropdownMenuItem(
-                            value: name,
-                            child: Text(name, overflow: TextOverflow.ellipsis),
-                          ))
+                      .map(
+                        (name) => DropdownMenuItem(
+                          value: name,
+                          child: Text(name, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => _hospital = v),
                 ),
@@ -1860,7 +1875,9 @@ class _AppointmentDialogState extends State<_AppointmentDialog> {
                             prefixIcon: Icon(Icons.schedule, size: 17),
                           ),
                           child: Text(
-                            _time == null ? 'Choose time' : _time!.format(context),
+                            _time == null
+                                ? 'Choose time'
+                                : _time!.format(context),
                             style: TextStyle(
                               fontSize: 12.5,
                               color: _time == null

@@ -59,8 +59,12 @@ autofill.
 | Staff | `staff@tabang.app` | `staff1234` |
 | Admin | `admin@tabang.app` | `admin1234` |
 
-Administrative roles are seeded only. Self-registration always creates a
-community account: new users can request blood and browse donors immediately,
+The staff and admin sign-ins are the people behind the official chapter
+account: when they reply to a user thread it appears as
+*Philippine Red Cross — Davao del Sur Chapter* with a verified badge, never as
+a personal name. Administrative roles are seeded only. Self-registration always
+creates a community account: new users can request blood and browse donors
+immediately,
 then opt in to donating through **Donor Hub → Register as a donor**. The
 upgrade asks for blood type, birth date and weight; the account stays
 unverified until chapter staff check the donor's blood card. `AuthService`
@@ -138,9 +142,12 @@ were bypassed.
   sending a message, flipping the switch, or the one-tap **I'm active** button
   all refresh the timer; signing in alone does not, so a returning donor sees
   the away notice and chooses to come back. Registration is
-  **face-to-face**, so the app only records intent: the applicant says whether
-  they already hold a PRC donor card (with an optional card number), picks an
-  optional visit day, and gets the walk-in steps plus what to bring. The
+  **face-to-face**, so the app only records intent and the two eligibility
+  inputs the chapter cannot verify remotely — date of birth and weight — plus
+  whether the applicant already holds a PRC donor card (with an optional card
+  number) and an optional visit day. The registration opens the official
+  chapter thread immediately, so the applicant can talk to the chapter and
+  receives document requests and verification updates there. The
   medical interview, examination, blood typing and screening stay on the PRC
   interview sheet at the chapter; the account becomes a donor immediately but
   stays *unverified*, and the eligibility engine will not match an unverified
@@ -163,7 +170,14 @@ were bypassed.
 - **Messages** — double-blind coordination threads, bilateral identity reveal
   (request then accept), block/unblock with a 48-hour re-block cooldown,
   persisted reports to staff, and the **chapter support thread** created by the
-  Help page's feedback form.
+  Help page's feedback form. The chapter thread is an organization identity, not
+  a person: it shows the Philippine Red Cross — Davao del Sur Chapter name, a
+  blue verified tick and an info card, and it never exposes a staff member's
+  real name. Registering as a donor opens that thread automatically, and every
+  staff decision on the application (documents requested, verified, not
+  accepted) posts an official update there. The conversation list can be sorted
+  **Most recent** or **Alphabetical (A–Z)**; the chapter sorts alongside people
+  in both modes.
 - **Profile** — a per-component eligibility view with multi-select chips:
   checking whole blood, packed red cells, platelets and plasma together shows a
   separate cooldown row for each component, so one donation type no longer hides
@@ -187,23 +201,40 @@ were bypassed.
 - **Statistics** — a KIN-SCORE-style hierarchy: one weighted readiness score
   with a gauge and four labelled subscores, primary KPI cards with progress
   bars, supply/community detail, then supporting exceptions. Every figure is
-  computed from the repository. **User management** opens with the donor
-  registrations awaiting staff — card on file, planned visit, notes — where
-  each one can be verified, returned for documents or not accepted. On phones
-  and small tablets the staff console uses the same bottom-bar shell as the
-  community app; the icon rail is desktop-only.
+  computed from the repository, and an explicit **Roles & permissions** card
+  spells out what Clinical Personnel and System Administrators can each do.
+  The open-requests card links straight to the inventory queue. **User
+  management** opens with the donor registrations awaiting staff — card on
+  file, planned visit, notes — where each one can be verified, returned for
+  documents or not accepted. On phones and small tablets the staff console uses
+  the same bottom-bar shell as the community app; the icon rail is desktop-only.
+- **Operations** — a staff/admin map of the same Digos template, switched to the
+  amber **open-request heat layer** instead of donor density. Tapping a
+  barangay scopes the side panel to that barangay: eligible donors, pending
+  registrations, open requests with responders, and donor applications waiting
+  for review. Staff can open a request's details, select a donor response
+  (still gated by the reciprocal-chat rule), mark a request fulfilled, and jump
+  to the inventory queue or user management. This is the operational counterpart
+  to the community Find Donor map.
 - **Inventory** — units are a tappable list; selecting one opens the full
   record including the barcode graphic and the name of the person holding it.
-- **Inventory** — change unit status, monitor effective expiry pressure, confirm
-  holds and appointments, and work the request queue. Only staff/admin can mark
-  a request fulfilled.
+- **Inventory** — staff receive new stock with **Add unit** (blood type,
+  component, storage bay, collection date, optional barcode; expiry is derived
+  from the component shelf life), change unit status, release a held bag back to
+  available stock after screening, monitor effective expiry pressure, confirm
+  booked **appointments** in a dedicated queue, work the request queue, and
+  select donor responses when a requester is unavailable. Only staff/admin can
+  mark a request fulfilled.
 - **Users** — create walk-in accounts with fixed-choice fields and a one-time
   temporary password, verify blood cards, issue warnings, suspend and reinstate
   donor and recipient accounts, and record a completed donation with its
   component. Staff cannot manage their own account, another staff account, or
   an admin; only an admin can manage another staff member or add staff.
 - **Moderation** — review flagged messages, clear or escalate flags, mute
-  threads, and resolve or dismiss the persisted user-report queue.
+  threads, resolve or dismiss the persisted user-report queue, and **reply**
+  from the console: staff answer the official chapter threads under the
+  organization identity, while person-to-person coordination threads stay
+  read-only. Threads are listed most-recent first.
 
 ---
 
@@ -494,7 +525,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**79 tests** cover:
+**86 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -525,6 +556,11 @@ flutter test
   with the `away` reason and never reaches the directory; `markActive` clears
   it, and the seed keeps exactly 15 eligible donors alongside the two
   deliberate away cases.
+- **Chapter identity and staff stock** — a donor registration opens exactly one
+  official chapter thread and status decisions post updates there; a donor
+  verified from the queue is matchable because birth date and weight were
+  captured; staff can add stock with the expiry derived from the component
+  shelf life; community actors are refused stock additions and status changes.
 - **Donor authoring and anonymity** — a donor can post a request that another
   donor can serve, and both the response alias and the map/directory handle are
   `Donor #<id>` tokens that never expose the nickname or legal name.
@@ -548,7 +584,8 @@ flutter test
   the wide desktop layout including the fit-city button, shrinks the phone
   control stack, and selects a barangay on tap. The Donor Hub additionally
   renders the automatic-away notice and clears it through the **I'm active**
-  action.
+  action, the staff Operations map renders its request layer, and Inventory
+  exposes Add unit plus the appointment queue.
 - **Narrow-screen layout** — Discover, Blood Bank (including unit selection and
   the appointment dialog) and Statistics render at a 360 × 780 phone viewport
   without overflow; the unit list reflows to one column and the appointment
@@ -560,6 +597,8 @@ flutter test
   pinned open again.
 - **Barangay canonicalisation** — parenthetical stripping, case/punctuation
   normalisation, and round-tripping all 26 names.
+- **Map topology** — all 75 shared arcs stitch 26 complete barangay rings and
+  the 60 internal border arcs, so a truncated arc table cannot crash the map.
 
 `flutter analyze` is clean for this build.
 

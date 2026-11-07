@@ -186,6 +186,43 @@ enum UserRole {
   bool get canRegisterAsDonor =>
       this == UserRole.user || this == UserRole.recipient;
 
+  /// Staff and admin verify blood cards and decide donor applications.
+  bool get canVerifyDonors => isAdminSide;
+
+  /// Staff and admin run the shelf: new units, status changes, releases.
+  bool get canManageInventory => isAdminSide;
+
+  /// Staff and admin work the request queue and confirm appointments.
+  bool get canFulfillRequests => isAdminSide;
+  bool get canConfirmAppointments => isAdminSide;
+
+  /// Moderation is shared by the chapter console.
+  bool get canModerate => isAdminSide;
+
+  /// Only an admin adds staff or manages another staff/admin account.
+  bool get canAddStaff => this == UserRole.admin;
+  bool get canManageStaff => this == UserRole.admin;
+
+  /// Short human-readable capability list for the permissions card.
+  List<String> get capabilities => switch (this) {
+    UserRole.admin => const [
+      'Everything Clinical Personnel can do',
+      'Create and manage all accounts, including staff',
+      'Issue warnings, suspend and reinstate',
+      'Full audit of inventory, requests and moderation',
+    ],
+    UserRole.staff => const [
+      'Verify blood cards and decide donor applications',
+      'Add stock, change unit status and release units',
+      'Work the request queue and confirm appointments',
+      'Moderate chat, warnings and reports',
+    ],
+    _ => const [
+      'Request blood and message donors',
+      'Register as a donor from Donor Hub',
+    ],
+  };
+
   static UserRole? tryParse(String? raw) {
     if (raw == null) return null;
     for (final role in UserRole.values) {

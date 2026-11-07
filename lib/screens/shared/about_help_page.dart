@@ -749,9 +749,13 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Straight to a human: the chapter support thread accepts system
-        // questions, data corrections and feedback.
-        _buildFeedbackCard(context),
-        const SizedBox(height: TabangSpace.lg),
+        // questions, data corrections and feedback. Admin-side users reply to
+        // that thread in Moderation, so they do not get a second send form
+        // addressed to themselves.
+        if (_repo.currentUser?.role.isAdminSide != true) ...[
+          _buildFeedbackCard(context),
+          const SizedBox(height: TabangSpace.lg),
+        ],
         for (final category in categories) _buildCategory(context, category),
       ],
     );
@@ -772,7 +776,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
               const SizedBox(width: TabangSpace.sm),
               Expanded(
                 child: Text(
-                  'Still stuck? Message chapter staff',
+                  'Still stuck? Message the PRC chapter',
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
@@ -832,7 +836,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Message chapter staff'),
+          title: const Text('Message the chapter'),
           content: SizedBox(
             width: 460,
             child: Column(

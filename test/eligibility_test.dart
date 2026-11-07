@@ -72,17 +72,19 @@ void main() {
     });
 
     test('A+ recipient accepts O-, O+, A-, A+ only', () {
-      expect(
-        Compatibility.donorsFor(BloodType.aPos).toSet(),
-        {BloodType.oNeg, BloodType.oPos, BloodType.aNeg, BloodType.aPos},
-      );
+      expect(Compatibility.donorsFor(BloodType.aPos).toSet(), {
+        BloodType.oNeg,
+        BloodType.oPos,
+        BloodType.aNeg,
+        BloodType.aPos,
+      });
     });
 
     test('B- recipient accepts O- and B- only', () {
-      expect(
-        Compatibility.donorsFor(BloodType.bNeg).toSet(),
-        {BloodType.oNeg, BloodType.bNeg},
-      );
+      expect(Compatibility.donorsFor(BloodType.bNeg).toSet(), {
+        BloodType.oNeg,
+        BloodType.bNeg,
+      });
     });
 
     test('every blood type has at least one donor source', () {
@@ -220,10 +222,7 @@ void main() {
     });
 
     test('nextEligibleDate returns null when already eligible', () {
-      expect(
-        EligibilityEngine.nextEligibleDate(donor(), now: now),
-        isNull,
-      );
+      expect(EligibilityEngine.nextEligibleDate(donor(), now: now), isNull);
     });
 
     test('nextEligibleDate is last donation plus the cooldown window', () {

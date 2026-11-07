@@ -27,10 +27,7 @@ String _urgencyBlurb(RequestUrgency urgency) {
   }
 }
 
-Future<void> showBloodRequestDialog(
-  BuildContext context,
-  AppUser user,
-) async {
+Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
   final repo = TabangRepository.instance;
   final formKey = GlobalKey<FormState>();
   final patientController = TextEditingController();
@@ -50,10 +47,7 @@ Future<void> showBloodRequestDialog(
       builder: (dialogContext, setDialogState) {
         final unitsNeeded = int.tryParse(unitsController.text.trim()) ?? 1;
         final availableUnits = repo
-            .compatibleUnitsFor(
-              recipientType: bloodType,
-              component: component,
-            )
+            .compatibleUnitsFor(recipientType: bloodType, component: component)
             .length;
         final hasStock = availableUnits > 0;
 
@@ -114,13 +108,12 @@ Future<void> showBloodRequestDialog(
                         labelText: 'Participating facility',
                       ),
                       items: DigosFacilities.names
-                          .map((h) => DropdownMenuItem(
-                                value: h,
-                                child: Text(
-                                  h,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
+                          .map(
+                            (h) => DropdownMenuItem(
+                              value: h,
+                              child: Text(h, overflow: TextOverflow.ellipsis),
+                            ),
+                          )
                           .toList(),
                       onChanged: (v) =>
                           setDialogState(() => hospital = v ?? hospital),
@@ -136,10 +129,12 @@ Future<void> showBloodRequestDialog(
                               labelText: 'Blood type',
                             ),
                             items: BloodType.values
-                                .map((t) => DropdownMenuItem(
-                                      value: t,
-                                      child: Text(t.label),
-                                    ))
+                                .map(
+                                  (t) => DropdownMenuItem(
+                                    value: t,
+                                    child: Text(t.label),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (v) => setDialogState(
                               () => bloodType = v ?? bloodType,
@@ -176,13 +171,15 @@ Future<void> showBloodRequestDialog(
                               labelText: 'Component',
                             ),
                             items: BloodComponent.values
-                                .map((c) => DropdownMenuItem(
-                                      value: c,
-                                      child: Text(
-                                        c.label,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ))
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(
+                                      c.label,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (v) => setDialogState(
                               () => component = v ?? component,
@@ -198,14 +195,15 @@ Future<void> showBloodRequestDialog(
                               labelText: 'Urgency',
                             ),
                             items: RequestUrgency.values
-                                .map((u) => DropdownMenuItem(
-                                      value: u,
-                                      child: Text(u.label),
-                                    ))
+                                .map(
+                                  (u) => DropdownMenuItem(
+                                    value: u,
+                                    child: Text(u.label),
+                                  ),
+                                )
                                 .toList(),
-                            onChanged: (v) => setDialogState(
-                              () => urgency = v ?? urgency,
-                            ),
+                            onChanged: (v) =>
+                                setDialogState(() => urgency = v ?? urgency),
                           ),
                         ),
                       ],
@@ -225,10 +223,9 @@ Future<void> showBloodRequestDialog(
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Barangay'),
                       items: DigosBarangays.all
-                          .map((b) => DropdownMenuItem(
-                                value: b,
-                                child: Text(b),
-                              ))
+                          .map(
+                            (b) => DropdownMenuItem(value: b, child: Text(b)),
+                          )
                           .toList(),
                       onChanged: (v) =>
                           setDialogState(() => barangay = v ?? barangay),
@@ -259,15 +256,15 @@ Future<void> showBloodRequestDialog(
                             child: Text(
                               hasStock
                                   ? '$availableUnits compatible '
-                                      '${component.label.toLowerCase()} unit'
-                                      '${availableUnits == 1 ? '' : 's'} '
-                                      'in stock. Submit to the blood bank for '
-                                      'processing, or post to the donor '
-                                      'network.'
+                                        '${component.label.toLowerCase()} unit'
+                                        '${availableUnits == 1 ? '' : 's'} '
+                                        'in stock. Submit to the blood bank for '
+                                        'processing, or post to the donor '
+                                        'network.'
                                   : 'No compatible '
-                                      '${component.label.toLowerCase()} stock '
-                                      'right now. Post to the donor network so '
-                                      'eligible donors can respond.',
+                                        '${component.label.toLowerCase()} stock '
+                                        'right now. Post to the donor network so '
+                                        'eligible donors can respond.',
                               style: const TextStyle(
                                 fontSize: 11.5,
                                 height: 1.5,
@@ -313,13 +310,9 @@ Future<void> showBloodRequestDialog(
               ),
             ElevatedButton(
               onPressed: () => submit(
-                hasStock
-                    ? RequestSource.bloodBank
-                    : RequestSource.donorNetwork,
+                hasStock ? RequestSource.bloodBank : RequestSource.donorNetwork,
               ),
-              child: Text(
-                hasStock ? 'Submit to blood bank' : 'Post to donors',
-              ),
+              child: Text(hasStock ? 'Submit to blood bank' : 'Post to donors'),
             ),
           ],
         );

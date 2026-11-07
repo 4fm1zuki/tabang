@@ -64,7 +64,8 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           const PageHeader(
             title: 'Settings',
-            subtitle: 'Appearance, notifications, privacy and account controls.',
+            subtitle:
+                'Appearance, notifications, privacy and account controls.',
             actions: [
               HelpTip(
                 title: 'About these settings',
@@ -87,18 +88,33 @@ class _SettingsPageState extends State<SettingsPage> {
                 'in dark mode, with its own map-style toggle, because '
                 'cartography reads better on a light surface.',
             children: [
-              _themeOption(context, ThemeMode.light, Icons.light_mode_outlined,
-                  'Light', 'Default · always use the light theme'),
-              _themeOption(context, ThemeMode.dark, Icons.dark_mode_outlined,
-                  'Dark', 'Always use the dark theme'),
-              _themeOption(context, ThemeMode.system, Icons.brightness_auto,
-                  'System', 'Follow your device setting'),
+              _themeOption(
+                context,
+                ThemeMode.light,
+                Icons.light_mode_outlined,
+                'Light',
+                'Default · always use the light theme',
+              ),
+              _themeOption(
+                context,
+                ThemeMode.dark,
+                Icons.dark_mode_outlined,
+                'Dark',
+                'Always use the dark theme',
+              ),
+              _themeOption(
+                context,
+                ThemeMode.system,
+                Icons.brightness_auto,
+                'System',
+                'Follow your device setting',
+              ),
               const SizedBox(height: TabangSpace.sm),
               _note(
                 context,
                 Icons.contrast,
                 'TABANG uses Material 3 typography and surfaces. Dark mode '
-                    'raises secondary-text contrast instead of dimming it.',
+                'raises secondary-text contrast instead of dimming it.',
               ),
             ],
           ),
@@ -119,34 +135,28 @@ class _SettingsPageState extends State<SettingsPage> {
                 'Blood request alerts',
                 'Show compatible requests and donor responses in my summary',
                 user.notifyRequests,
-                (v) => _repo.updateUser(
-                  user.copyWith(notifyRequests: v),
-                ),
+                (v) => _repo.updateUser(user.copyWith(notifyRequests: v)),
               ),
               _switchRow(
                 context,
                 'Chat messages',
                 'Show conversation updates in my summary',
                 user.notifyChat,
-                (v) => _repo.updateUser(
-                  user.copyWith(notifyChat: v),
-                ),
+                (v) => _repo.updateUser(user.copyWith(notifyChat: v)),
               ),
               _switchRow(
                 context,
                 'News and drives',
                 'Show upcoming blood drives and campaigns in my summary',
                 user.notifyNews,
-                (v) => _repo.updateUser(
-                  user.copyWith(notifyNews: v),
-                ),
+                (v) => _repo.updateUser(user.copyWith(notifyNews: v)),
               ),
               const SizedBox(height: TabangSpace.sm),
               _note(
                 context,
                 Icons.notifications_none,
                 'Notifications are in-app only. TABANG never sends SMS or '
-                    'email in this build.',
+                'email in this build.',
               ),
             ],
           ),
@@ -177,9 +187,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   'Exact addresses are never shown; turn this off to hide '
                       'your barangay in the donor directory',
                   user.shareBarangay,
-                  (v) => _repo.updateUser(
-                    user.copyWith(shareBarangay: v),
-                  ),
+                  (v) => _repo.updateUser(user.copyWith(shareBarangay: v)),
                 ),
               ],
             ),
@@ -200,8 +208,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 context,
                 Icons.shield_outlined,
                 'Your real name and exact address are never shown to other '
-                    'users. Donors and recipients appear as aliases until both '
-                    'sides agree to reveal their identity.',
+                'users. Donors and recipients appear as aliases until both '
+                'sides agree to reveal their identity.',
               ),
               const SizedBox(height: TabangSpace.sm),
               _dataRow(context, 'Public identity', user.alias),
@@ -327,14 +335,15 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style:
-                          TextStyle(fontSize: 12.5, color: context.textMuted),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: context.textMuted,
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (help != null)
-                HelpTip(title: title, message: help),
+              if (help != null) HelpTip(title: title, message: help),
             ],
           ),
           const SizedBox(height: TabangSpace.lg),
@@ -421,8 +430,8 @@ class _SettingsPageState extends State<SettingsPage> {
         decoration: BoxDecoration(
           color: selected
               ? (context.isDark
-                  ? TabangColors.crimson.withValues(alpha: 0.16)
-                  : TabangColors.crimsonSoft)
+                    ? TabangColors.crimson.withValues(alpha: 0.16)
+                    : TabangColors.crimsonSoft)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(TabangRadius.sm),
           border: Border.all(
@@ -463,9 +472,7 @@ class _SettingsPageState extends State<SettingsPage> {
               onChanged: (v) {
                 if (v != null) widget.onThemeModeChanged(v);
               },
-              child: Radio<ThemeMode>(
-                value: mode,
-              ),
+              child: Radio<ThemeMode>(value: mode),
             ),
           ],
         ),

@@ -245,6 +245,44 @@ class TabangRepository {
     return counts;
   }
 
+  /// Open (not yet matched/closed) requests per barangay. Drives the staff
+  /// operations map's request heat layer.
+  Map<String, int> openRequestsByBarangay() {
+    final counts = <String, int>{};
+    for (final request in _requests) {
+      if (request.status != RequestStatus.open &&
+          request.status != RequestStatus.matched) {
+        continue;
+      }
+      counts[request.barangay] = (counts[request.barangay] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Donor registrations waiting on chapter staff, per barangay.
+  Map<String, int> pendingApplicationsByBarangay() {
+    final counts = <String, int>{};
+    for (final application in openDonorApplications) {
+      final barangay = userById(application.userId)?.barangay;
+      if (barangay == null) continue;
+      counts[barangay] = (counts[barangay] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Requests in [barangay] that chapter staff can still act on, newest first.
+  List<BloodRequest> openRequestsIn(String barangay) {
+    return _requests
+        .where(
+          (r) =>
+              r.barangay == barangay &&
+              (r.status == RequestStatus.open ||
+                  r.status == RequestStatus.matched),
+        )
+        .toList(growable: false)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
   List<BloodUnit> get availableUnits =>
       _units.where((u) => u.isUsable).toList(growable: false);
 
@@ -328,6 +366,13 @@ class TabangRepository {
     }
     return null;
   }
+
+  /// Appointments still waiting for chapter confirmation, soonest slot first.
+  List<DonationAppointment> get pendingAppointments =>
+      [..._appointments]
+          .where((a) => a.status.toLowerCase().contains('pending'))
+          .toList(growable: false)
+        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
 
   /// Appointments belonging to one requester, newest first.
   List<DonationAppointment> appointmentsFor(String userId) =>
@@ -558,6 +603,8 @@ class TabangRepository {
     required bool hasExistingCard,
     String? cardNumber,
     BloodType? bloodType,
+    DateTime? birthDate,
+    double? weightKg,
     DateTime? preferredVisit,
     String? note,
   }) {
@@ -570,11 +617,20 @@ class TabangRepository {
     final resubmitting = user.role == UserRole.donor && !user.bloodCardVerified;
     if (!freshApplicant && !resubmitting) return null;
 
+    // Birth date and weight are the two eligibility inputs the chapter cannot
+    // verify remotely. When provided they are stored now so a donor verified
+    // from the queue is immediately matchable instead of failing on
+    // `weightMissing` forever.
+    final effectiveBirthDate = birthDate ?? user.birthDate;
+    final effectiveWeight = weightKg ?? user.weightKg;
+
     if (freshApplicant) {
       updateUser(
         user.copyWith(
           role: UserRole.donor,
           bloodType: bloodType,
+          birthDate: effectiveBirthDate,
+          weightKg: effectiveWeight,
           status: AccountStatus.unverified,
           bloodCardVerified: false,
           isAvailable: true,
@@ -584,6 +640,8 @@ class TabangRepository {
       updateUser(
         user.copyWith(
           bloodType: bloodType ?? user.bloodType,
+          birthDate: effectiveBirthDate,
+          weightKg: effectiveWeight,
           status: AccountStatus.unverified,
           bloodCardVerified: false,
         ),
@@ -613,11 +671,22 @@ class TabangRepository {
             ],
     );
     _donorApplications.add(application);
+    ensureChapterThread(
+      userId,
+      welcome:
+          'Registration received — thank you for stepping forward. This is the '
+          'official thread of the $chapterName. Chapter staff will review '
+          'your form during office hours and update you here. Bring your valid '
+          'ID${hasExistingCard ? ' and PRC donor card' : ''} to the chapter for '
+          'the interview, blood typing and screening.',
+    );
     _notify();
     return application;
   }
 
-  /// Staff decision on a donor application.
+  /// Staff decision on a donor application. The applicant gets an official
+  /// update in their chapter thread so they do not have to keep reopening
+  /// Donor Hub to learn the outcome.
   void setDonorApplicationStatus(
     String userId,
     DonorApplicationStatus status, {
@@ -631,10 +700,34 @@ class TabangRepository {
       staffNote: note,
       requestedDocuments: requestedDocuments,
     );
-    if (status == DonorApplicationStatus.verified) {
-      // verifyUser notifies, so this path must not notify twice.
-      verifyUser(userId);
-      return;
+
+    switch (status) {
+      case DonorApplicationStatus.pending:
+        break;
+      case DonorApplicationStatus.documentsRequested:
+        final docs = requestedDocuments == null || requestedDocuments.isEmpty
+            ? 'the documents listed in Donor Hub'
+            : requestedDocuments.join(', ');
+        postChapterNotice(
+          userId,
+          'Before we can verify your card we still need: $docs. Reply here or '
+          'visit the chapter during office hours.',
+        );
+      case DonorApplicationStatus.verified:
+        postChapterNotice(
+          userId,
+          'Your blood card is verified — you can now appear in the donor '
+          'directory and answer requests when eligible. Thank you!',
+        );
+        // verifyUser notifies, so this path must not notify twice.
+        verifyUser(userId);
+        return;
+      case DonorApplicationStatus.rejected:
+        postChapterNotice(
+          userId,
+          'We could not accept the registration as submitted. '
+          '${note == null || note.trim().isEmpty ? 'Please visit the chapter so we can review it together.' : note.trim()}',
+        );
     }
     _notify();
   }
@@ -896,7 +989,14 @@ class TabangRepository {
     return true;
   }
 
-  void setUnitStatus(String barcode, UnitStatus status) {
+  void setUnitStatus(String barcode, UnitStatus status, {String? actorId}) {
+    // When a caller identifies itself, the inventory capability is enforced.
+    // Legacy call sites without an actor keep working for seeded data and
+    // tests; every screen passes the acting staff/admin id.
+    if (actorId != null) {
+      final actor = userById(actorId);
+      if (actor == null || !actor.role.canManageInventory) return;
+    }
     final index = _units.indexWhere((u) => u.barcode == barcode);
     if (index == -1) return;
     final u = _units[index];
@@ -967,8 +1067,59 @@ class TabangRepository {
     final actor = userById(actorId);
     if (actor == null || !actor.role.isAdminSide) return false;
     if (cancelReservation(barcode: barcode, userId: actorId)) return true;
-    setUnitStatus(barcode, UnitStatus.available);
+    setUnitStatus(barcode, UnitStatus.available, actorId: actorId);
     return true;
+  }
+
+  /// Component shelf lives used when a new bag is received, matching the seed
+  /// data so inventory ages consistently.
+  static const Map<BloodComponent, int> shelfLifeDays = {
+    BloodComponent.wholeBlood: 42,
+    BloodComponent.packedRbc: 42,
+    BloodComponent.platelets: 5,
+    BloodComponent.plasma: 365,
+  };
+
+  /// Receive a new bag into the shelf.
+  ///
+  /// Only chapter staff and admins may add stock. The expiry is derived from
+  /// the component's shelf life so a manually-added unit can never claim an
+  /// impossible date; a custom barcode is accepted when the chapter already
+  /// labelled the bag.
+  BloodUnit? addBloodUnit({
+    required String actorId,
+    required BloodType bloodType,
+    required BloodComponent component,
+    required String storageBay,
+    DateTime? collectedOn,
+    String? barcode,
+  }) {
+    final actor = userById(actorId);
+    if (actor == null || !actor.role.canManageInventory) return null;
+    final collected = collectedOn ?? DateTime.now();
+    final expires = collected.add(
+      Duration(days: shelfLifeDays[component] ?? 42),
+    );
+    final provided = barcode?.trim();
+    final batch = _units.where((u) => u.component == component).length + 1;
+    final code = (provided == null || provided.isEmpty)
+        ? '${component.code}-${7700 + batch}-${bloodType.label}'
+        : provided;
+    if (_units.any((u) => u.barcode == code)) return null;
+
+    final unit = BloodUnit(
+      barcode: code,
+      bloodType: bloodType,
+      component: component,
+      storageBay: storageBay.trim().isEmpty ? 'Unassigned' : storageBay.trim(),
+      status: UnitStatus.available,
+      collectedOn: collected,
+      expiresOn: expires,
+    );
+    _units.insert(0, unit);
+    markActive(actorId);
+    _notify();
+    return unit;
   }
 
   /// Book a blood-bank appointment. Staff confirm the slot; the record does not
@@ -1081,33 +1232,84 @@ class TabangRepository {
     return thread;
   }
 
-  /// Chapter staff account that receives support messages.
-  static const String staffAccountId = 'USR-010';
+  /// Official chapter account that receives support messages and donor
+  /// registrations. Its display identity is [chapterName], never the staff
+  /// member's alias.
+  static const String chapterAccountId = 'USR-010';
 
-  /// Send a system question, data correction or feedback to chapter staff.
+  /// Backwards-compatible alias used by older call sites.
+  static const String staffAccountId = chapterAccountId;
+
+  /// Official organization name shown on every chapter thread and profile.
+  static const String chapterName =
+      'Philippine Red Cross — Davao del Sur Chapter';
+  static const String chapterSubtitle =
+      'Official chapter account · Quezon Avenue, Digos City';
+
+  bool isChapterAccount(String? userId) => userId == chapterAccountId;
+
+  bool isChapterThread(ChatThread thread) =>
+      thread.participantAId == chapterAccountId ||
+      thread.participantBId == chapterAccountId;
+
+  /// The name a chat list or header should show for [thread]. The chapter is
+  /// always branded as the organization, not as the staff member's alias.
+  String displayNameFor(ChatThread thread, String? selfId) {
+    if (isChapterThread(thread)) return chapterName;
+    final otherId = thread.participantAId == selfId
+        ? thread.participantBId
+        : thread.participantAId;
+    return userById(otherId)?.alias ??
+        (otherId == thread.participantAId
+            ? thread.participantAAlias
+            : thread.participantBAlias);
+  }
+
+  /// Opens (or reuses) the official chapter thread for [userId]. Used when a
+  /// donor registers and whenever chapter staff need to reach a community user
+  /// outside a person-to-person coordination thread.
+  ChatThread? ensureChapterThread(String userId, {String? welcome}) {
+    if (userId == chapterAccountId) return null;
+    return startConversation(
+      initiatorId: chapterAccountId,
+      otherId: userId,
+      firstMessage: welcome,
+    );
+  }
+
+  /// Posts an official chapter update into the user's chapter thread, creating
+  /// the thread when it does not exist yet.
+  void postChapterNotice(String userId, String text) {
+    final thread = ensureChapterThread(userId);
+    if (thread == null) return;
+    sendMessage(thread.id, chapterAccountId, text);
+  }
+
+  /// Send a system question, data correction or feedback to the chapter.
   ///
-  /// Opens (or reuses) the thread with the staff account, posts the message
-  /// with its category, and adds an acknowledgement from staff so the report
-  /// visibly lands in a real conversation.
+  /// Opens (or reuses) the chapter thread, posts the message with its category,
+  /// and adds an acknowledgement from the chapter so the report visibly lands
+  /// in a real conversation.
   ChatThread? sendStaffFeedback({
     required String userId,
     required String category,
     required String message,
   }) {
+    if (userId == chapterAccountId) return null;
     final thread = startConversation(
       initiatorId: userId,
-      otherId: staffAccountId,
+      otherId: chapterAccountId,
       firstMessage: '[$category] ${message.trim()}',
     );
     if (thread == null) return null;
     sendMessage(
       thread.id,
-      staffAccountId,
+      chapterAccountId,
       'Thanks — your ${category.toLowerCase()} was received. Chapter staff '
       'review messages during office hours (Mon–Sat, 8:00 AM – 5:00 PM) and '
       'will reply in this thread.',
     );
-    return threadBetween(userId, staffAccountId);
+    return threadBetween(userId, chapterAccountId);
   }
 
   /// True when both participants have sent at least one human message. System
@@ -1400,6 +1602,10 @@ class TabangRepository {
     _appointments.clear();
     _blocks.clear();
     _unblockedAt.clear();
+    // These two were the leak that let an earlier test's donor application or
+    // drive interest survive into the next test.
+    _donorApplications.clear();
+    _driveInterests.clear();
     currentUser = null;
     _seed();
     _notify();

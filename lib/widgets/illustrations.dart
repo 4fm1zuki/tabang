@@ -10,14 +10,7 @@ import '../theme.dart';
 /// blend into light and dark surfaces, stay crisp at any density, and add no
 /// download weight. The soft radial wash has a fully transparent edge, which
 /// is what makes the art sit in the card rather than on top of it.
-enum TabangArt {
-  requests,
-  donors,
-  messages,
-  inventory,
-  welcome,
-  search,
-}
+enum TabangArt { requests, donors, messages, inventory, welcome, search }
 
 class TabangIllustration extends StatelessWidget {
   const TabangIllustration(this.art, {super.key, this.size = 132});
@@ -133,10 +126,7 @@ class TabangIllustration extends StatelessWidget {
               decoration: BoxDecoration(
                 color: accentBg,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: context.surface,
-                  width: 2,
-                ),
+                border: Border.all(color: context.surface, width: 2),
               ),
               child: Icon(
                 config.accent,
@@ -186,6 +176,5 @@ class _DotRingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DotRingPainter oldDelegate) =>
-      oldDelegate.color != color;
+  bool shouldRepaint(_DotRingPainter oldDelegate) => oldDelegate.color != color;
 }

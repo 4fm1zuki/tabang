@@ -190,6 +190,23 @@ Color digosHeatColor(int count, {required bool dark}) {
   return const Color(0xFF961D13);
 }
 
+/// Staff operations ramp for the open-request layer. Amber → deep red so it
+/// reads as workload rather than donor density.
+Color digosRequestColor(int count, {required bool dark}) {
+  if (dark) {
+    if (count == 0) return const Color(0xFF241C1A);
+    if (count <= 1) return const Color(0xFF5B4316);
+    if (count <= 3) return const Color(0xFF8E6420);
+    if (count <= 6) return const Color(0xFFC0842E);
+    return const Color(0xFFE5A94B);
+  }
+  if (count == 0) return const Color(0xFFEDE4DF);
+  if (count <= 1) return const Color(0xFFF7DFA8);
+  if (count <= 3) return const Color(0xFFEDB55B);
+  if (count <= 6) return const Color(0xFFD97F2B);
+  return const Color(0xFFA33F16);
+}
+
 /// The Digos City vector map used by Find Donor.
 ///
 /// Adopted from the standalone `digos_barangay_map` project: OpenStreetMap
@@ -208,6 +225,7 @@ class DigosVectorMap extends StatefulWidget {
     required this.onSelectBarangay,
     required this.onDriveTap,
     required this.onFacilityTap,
+    this.requestCounts,
     this.onInteractionStart,
     this.onInteractionEnd,
   });
@@ -217,6 +235,11 @@ class DigosVectorMap extends StatefulWidget {
 
   /// Canonical barangay name → eligible donors.
   final Map<String, int> donorCounts;
+
+  /// Canonical barangay name → open requests. When supplied, the fill layer
+  /// switches from the donor-density ramp to the staff request ramp; the
+  /// caller is responsible for the matching legend.
+  final Map<String, int>? requestCounts;
 
   /// Active drives with their venue coordinates.
   final List<DigosDriveMarker> drives;
@@ -797,8 +820,13 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       );
     }
 
-    final count = widget.donorCounts[canonical] ?? 0;
-    final base = digosHeatColor(count, dark: dark);
+    final requestCounts = widget.requestCounts;
+    final count = requestCounts != null
+        ? (requestCounts[canonical] ?? 0)
+        : (widget.donorCounts[canonical] ?? 0);
+    final base = requestCounts != null
+        ? digosRequestColor(count, dark: dark)
+        : digosHeatColor(count, dark: dark);
     final fill = hovered
         ? Color.alphaBlend(
             (dark ? Colors.white : Colors.black).withValues(alpha: 0.08),
@@ -808,8 +836,14 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
 
     return Polygon(
       points: feature.ring,
-      // Translucent so the street map stays visible underneath.
-      color: fill.withValues(alpha: digosHeatOpacity(count)),
+      // Requests are a workload layer, so even zero-request barangays keep a
+      // slightly stronger wash than the donor ramp's near-invisible empty
+      // state; the map should read as "nothing open here" at a glance.
+      color: fill.withValues(
+        alpha: requestCounts != null
+            ? (count == 0 ? 0.10 : digosHeatOpacity(count) + 0.08)
+            : digosHeatOpacity(count),
+      ),
       borderStrokeWidth: 0,
     );
   }

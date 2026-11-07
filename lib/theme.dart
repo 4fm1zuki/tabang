@@ -120,15 +120,23 @@ class TabangSpace {
 extension TabangThemeX on BuildContext {
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 
-  Color get surface => isDark ? TabangColors.darkSurface : TabangColors.lightSurface;
-  Color get surfaceAlt => isDark ? TabangColors.darkSurfaceAlt : TabangColors.lightSurfaceAlt;
-  Color get border => isDark ? TabangColors.darkBorder : TabangColors.lightBorder;
-  Color get textColor => isDark ? TabangColors.darkText : TabangColors.lightText;
-  Color get textMuted => isDark ? TabangColors.darkTextMuted : TabangColors.lightTextMuted;
+  Color get surface =>
+      isDark ? TabangColors.darkSurface : TabangColors.lightSurface;
+  Color get surfaceAlt =>
+      isDark ? TabangColors.darkSurfaceAlt : TabangColors.lightSurfaceAlt;
+  Color get border =>
+      isDark ? TabangColors.darkBorder : TabangColors.lightBorder;
+  Color get textColor =>
+      isDark ? TabangColors.darkText : TabangColors.lightText;
+  Color get textMuted =>
+      isDark ? TabangColors.darkTextMuted : TabangColors.lightTextMuted;
 
-  Color get successBg => isDark ? const Color(0xFF14301F) : TabangColors.successSoft;
-  Color get warningBg => isDark ? const Color(0xFF33280D) : TabangColors.warningSoft;
-  Color get dangerBg => isDark ? const Color(0xFF3A1917) : TabangColors.dangerSoft;
+  Color get successBg =>
+      isDark ? const Color(0xFF14301F) : TabangColors.successSoft;
+  Color get warningBg =>
+      isDark ? const Color(0xFF33280D) : TabangColors.warningSoft;
+  Color get dangerBg =>
+      isDark ? const Color(0xFF3A1917) : TabangColors.dangerSoft;
   Color get infoBg => isDark ? const Color(0xFF132A42) : TabangColors.infoSoft;
 }
 
@@ -144,60 +152,81 @@ class TabangTheme {
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
 
-    final scheme = ColorScheme.fromSeed(
-      seedColor: TabangColors.crimson,
-      brightness: brightness,
-    ).copyWith(
-      primary: isDark ? const Color(0xFFFFB4A8) : TabangColors.crimson,
-      onPrimary: isDark ? const Color(0xFF56100B) : Colors.white,
-      primaryContainer:
-          isDark ? const Color(0xFF7A1B15) : TabangColors.crimsonSoft,
-      onPrimaryContainer:
-          isDark ? const Color(0xFFFFDAD4) : TabangColors.crimsonDark,
-      // Teal supports the crimson without competing with it. Gold is kept as a
-      // tertiary accent for recognition/SDG callouts, not for primary actions:
-      // gold-filled buttons on a dark surface read as disabled olive.
-      secondary: isDark ? const Color(0xFF9CD5CA) : TabangColors.teal,
-      onSecondary: isDark ? const Color(0xFF00201B) : Colors.white,
-      secondaryContainer:
-          isDark ? const Color(0xFF12463E) : TabangColors.tealSoft,
-      onSecondaryContainer:
-          isDark ? const Color(0xFFB8EAE0) : const Color(0xFF0C3B33),
-      tertiary: isDark ? const Color(0xFFFFD27A) : TabangColors.gold,
-      onTertiary: isDark ? const Color(0xFF3F2A00) : Colors.white,
-      tertiaryContainer:
-          isDark ? const Color(0xFF5A430D) : TabangColors.goldSoft,
-      onTertiaryContainer:
-          isDark ? const Color(0xFFFFE7B0) : const Color(0xFF4A3400),
-      surface: isDark ? TabangColors.darkSurface : TabangColors.lightSurface,
-      onSurface: isDark ? TabangColors.darkText : TabangColors.lightText,
-      surfaceContainerLowest:
-          isDark ? const Color(0xFF120E0D) : Colors.white,
-      surfaceContainerLow:
-          isDark ? TabangColors.darkSurface : const Color(0xFFFBF7F5),
-      surfaceContainer:
-          isDark ? const Color(0xFF261F1D) : const Color(0xFFF5F0EE),
-      surfaceContainerHigh:
-          isDark ? TabangColors.darkSurfaceAlt : const Color(0xFFF0EAE8),
-      surfaceContainerHighest:
-          isDark ? const Color(0xFF3A302D) : const Color(0xFFEAE3E0),
-      onSurfaceVariant:
-          isDark ? TabangColors.darkTextMuted : TabangColors.lightTextMuted,
-      outline: isDark ? const Color(0xFF6F5D56) : const Color(0xFFB8ADA8),
-      outlineVariant: isDark ? const Color(0xFF3A3330) : TabangColors.lightBorder,
-      error: isDark ? const Color(0xFFFFB4AB) : TabangColors.danger,
-      onError: isDark ? const Color(0xFF690005) : Colors.white,
-      errorContainer:
-          isDark ? const Color(0xFF7A1B15) : TabangColors.dangerSoft,
-      onErrorContainer:
-          isDark ? const Color(0xFFFFDAD6) : TabangColors.crimsonDark,
-    );
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: TabangColors.crimson,
+          brightness: brightness,
+        ).copyWith(
+          primary: isDark ? const Color(0xFFFFB4A8) : TabangColors.crimson,
+          onPrimary: isDark ? const Color(0xFF56100B) : Colors.white,
+          primaryContainer: isDark
+              ? const Color(0xFF7A1B15)
+              : TabangColors.crimsonSoft,
+          onPrimaryContainer: isDark
+              ? const Color(0xFFFFDAD4)
+              : TabangColors.crimsonDark,
+          // Teal supports the crimson without competing with it. Gold is kept as a
+          // tertiary accent for recognition/SDG callouts, not for primary actions:
+          // gold-filled buttons on a dark surface read as disabled olive.
+          secondary: isDark ? const Color(0xFF9CD5CA) : TabangColors.teal,
+          onSecondary: isDark ? const Color(0xFF00201B) : Colors.white,
+          secondaryContainer: isDark
+              ? const Color(0xFF12463E)
+              : TabangColors.tealSoft,
+          onSecondaryContainer: isDark
+              ? const Color(0xFFB8EAE0)
+              : const Color(0xFF0C3B33),
+          tertiary: isDark ? const Color(0xFFFFD27A) : TabangColors.gold,
+          onTertiary: isDark ? const Color(0xFF3F2A00) : Colors.white,
+          tertiaryContainer: isDark
+              ? const Color(0xFF5A430D)
+              : TabangColors.goldSoft,
+          onTertiaryContainer: isDark
+              ? const Color(0xFFFFE7B0)
+              : const Color(0xFF4A3400),
+          surface: isDark
+              ? TabangColors.darkSurface
+              : TabangColors.lightSurface,
+          onSurface: isDark ? TabangColors.darkText : TabangColors.lightText,
+          surfaceContainerLowest: isDark
+              ? const Color(0xFF120E0D)
+              : Colors.white,
+          surfaceContainerLow: isDark
+              ? TabangColors.darkSurface
+              : const Color(0xFFFBF7F5),
+          surfaceContainer: isDark
+              ? const Color(0xFF261F1D)
+              : const Color(0xFFF5F0EE),
+          surfaceContainerHigh: isDark
+              ? TabangColors.darkSurfaceAlt
+              : const Color(0xFFF0EAE8),
+          surfaceContainerHighest: isDark
+              ? const Color(0xFF3A302D)
+              : const Color(0xFFEAE3E0),
+          onSurfaceVariant: isDark
+              ? TabangColors.darkTextMuted
+              : TabangColors.lightTextMuted,
+          outline: isDark ? const Color(0xFF6F5D56) : const Color(0xFFB8ADA8),
+          outlineVariant: isDark
+              ? const Color(0xFF3A3330)
+              : TabangColors.lightBorder,
+          error: isDark ? const Color(0xFFFFB4AB) : TabangColors.danger,
+          onError: isDark ? const Color(0xFF690005) : Colors.white,
+          errorContainer: isDark
+              ? const Color(0xFF7A1B15)
+              : TabangColors.dangerSoft,
+          onErrorContainer: isDark
+              ? const Color(0xFFFFDAD6)
+              : TabangColors.crimsonDark,
+        );
 
     final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: isDark ? TabangColors.darkBg : TabangColors.lightBg,
+      scaffoldBackgroundColor: isDark
+          ? TabangColors.darkBg
+          : TabangColors.lightBg,
       fontFamily: 'Roboto',
       visualDensity: VisualDensity.standard,
       // InkRipple paints a normal anti-aliased circle on every platform.
@@ -262,7 +291,9 @@ class TabangTheme {
         ),
         bodySmall: text.bodySmall?.copyWith(
           fontSize: 12.5,
-          color: isDark ? TabangColors.darkTextMuted : TabangColors.lightTextMuted,
+          color: isDark
+              ? TabangColors.darkTextMuted
+              : TabangColors.lightTextMuted,
           height: 1.45,
         ),
         labelLarge: text.labelLarge?.copyWith(
@@ -307,8 +338,8 @@ class TabangTheme {
             color: selected
                 ? (isDark ? const Color(0xFFFFB4A8) : TabangColors.crimson)
                 : (isDark
-                    ? TabangColors.darkTextMuted
-                    : TabangColors.lightTextMuted),
+                      ? TabangColors.darkTextMuted
+                      : TabangColors.lightTextMuted),
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -319,8 +350,8 @@ class TabangTheme {
             color: selected
                 ? (isDark ? const Color(0xFFFFDAD4) : TabangColors.crimsonDark)
                 : (isDark
-                    ? TabangColors.darkTextMuted
-                    : TabangColors.lightTextMuted),
+                      ? TabangColors.darkTextMuted
+                      : TabangColors.lightTextMuted),
           );
         }),
       ),
@@ -371,25 +402,28 @@ class TabangTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(TabangRadius.sm),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: TabangSpace.lg),
+        contentPadding: const EdgeInsets.symmetric(horizontal: TabangSpace.lg),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: isDark ? const Color(0xFFFFB4A8) : TabangColors.crimson,
-        linearTrackColor:
-            isDark ? const Color(0xFF332C2A) : TabangColors.crimsonSoft,
-        circularTrackColor:
-            isDark ? const Color(0xFF332C2A) : TabangColors.crimsonSoft,
+        linearTrackColor: isDark
+            ? const Color(0xFF332C2A)
+            : TabangColors.crimsonSoft,
+        circularTrackColor: isDark
+            ? const Color(0xFF332C2A)
+            : TabangColors.crimsonSoft,
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? (isDark ? const Color(0xFF56100B) : Colors.white)
-                : scheme.onSurfaceVariant),
-        trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? (isDark ? const Color(0xFFFFB4A8) : TabangColors.crimson)
-                : scheme.surfaceContainerHighest),
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? (isDark ? const Color(0xFF56100B) : Colors.white)
+              : scheme.onSurfaceVariant,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? (isDark ? const Color(0xFFFFB4A8) : TabangColors.crimson)
+              : scheme.surfaceContainerHighest,
+        ),
       ),
       dividerTheme: DividerThemeData(
         color: isDark ? TabangColors.darkBorder : TabangColors.lightBorder,
@@ -416,11 +450,15 @@ class TabangTheme {
         ),
         hintStyle: TextStyle(
           fontSize: 13,
-          color: isDark ? TabangColors.darkTextMuted : TabangColors.lightTextMuted,
+          color: isDark
+              ? TabangColors.darkTextMuted
+              : TabangColors.lightTextMuted,
         ),
         labelStyle: TextStyle(
           fontSize: 13,
-          color: isDark ? TabangColors.darkTextMuted : TabangColors.lightTextMuted,
+          color: isDark
+              ? TabangColors.darkTextMuted
+              : TabangColors.lightTextMuted,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(TabangRadius.sm),
@@ -492,7 +530,9 @@ class TabangTheme {
       ),
       chipTheme: ChipThemeData(
         side: BorderSide.none,
-        backgroundColor: isDark ? TabangColors.darkSurfaceAlt : TabangColors.lightSurfaceAlt,
+        backgroundColor: isDark
+            ? TabangColors.darkSurfaceAlt
+            : TabangColors.lightSurfaceAlt,
         labelStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -517,7 +557,9 @@ class TabangTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: isDark ? TabangColors.darkSurfaceAlt : TabangColors.lightText,
+        backgroundColor: isDark
+            ? TabangColors.darkSurfaceAlt
+            : TabangColors.lightText,
         contentTextStyle: TextStyle(
           fontSize: 13,
           color: isDark ? TabangColors.darkText : Colors.white,

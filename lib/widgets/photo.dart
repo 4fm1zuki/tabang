@@ -208,8 +208,8 @@ class PhotoCredit extends StatelessWidget {
       alignment: alignment == TextAlign.center
           ? Alignment.center
           : alignment == TextAlign.end
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
+          ? Alignment.centerRight
+          : Alignment.centerLeft,
       child: chip,
     );
   }
@@ -220,10 +220,7 @@ class PhotoCredit extends StatelessWidget {
 /// Photographs show the exact Commons-style source link. Original TABANG
 /// artwork has no external source to link to, so that row is omitted entirely
 /// rather than showing an empty or misleading URL.
-Future<void> showImageCreditDialog(
-  BuildContext context,
-  ImageCredit credit,
-) {
+Future<void> showImageCreditDialog(BuildContext context, ImageCredit credit) {
   final prefix = switch (credit.kind) {
     'photo' => 'Photo',
     'avatar' => 'Illustration',
@@ -252,7 +249,10 @@ Future<void> showImageCreditDialog(
               const SizedBox(height: 8),
               Text(
                 '${credit.author} · ${credit.license}',
-                style: TextStyle(fontSize: 12.5, color: dialogContext.textMuted),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: dialogContext.textMuted,
+                ),
               ),
               // No asset path here: file directories are implementation
               // detail, not something a reader needs.

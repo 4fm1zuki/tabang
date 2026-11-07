@@ -23,11 +23,7 @@ import '../../widgets/photo.dart';
 /// not here: Discover is for orientation and education, while stock alerts
 /// belong beside the inventory they describe.
 class DiscoverPage extends StatefulWidget {
-  const DiscoverPage({
-    super.key,
-    required this.user,
-    this.onNavigate,
-  });
+  const DiscoverPage({super.key, required this.user, this.onNavigate});
 
   final AppUser user;
 
@@ -73,10 +69,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
     if (_query.trim().isNotEmpty) {
       final q = _query.toLowerCase();
       return all
-          .where((c) =>
-              c.title.toLowerCase().contains(q) ||
-              c.subtitle.toLowerCase().contains(q) ||
-              c.tag.toLowerCase().contains(q))
+          .where(
+            (c) =>
+                c.title.toLowerCase().contains(q) ||
+                c.subtitle.toLowerCase().contains(q) ||
+                c.tag.toLowerCase().contains(q),
+          )
           .toList();
     }
     if (_category == ContentCategory.explore) return all;
@@ -98,15 +96,19 @@ class _DiscoverPageState extends State<DiscoverPage> {
       orElse: () => _repo.content.first,
     );
     final announcements = _repo.content
-        .where((c) =>
-            c.id != hero.id &&
-            (c.category == ContentCategory.explore ||
-                c.category == ContentCategory.stories))
+        .where(
+          (c) =>
+              c.id != hero.id &&
+              (c.category == ContentCategory.explore ||
+                  c.category == ContentCategory.stories),
+        )
         .toList(growable: false);
     final learning = _repo.content
-        .where((c) =>
-            c.category == ContentCategory.tips ||
-            c.category == ContentCategory.eligibility)
+        .where(
+          (c) =>
+              c.category == ContentCategory.tips ||
+              c.category == ContentCategory.eligibility,
+        )
         .toList(growable: false);
 
     return SingleChildScrollView(
@@ -116,8 +118,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         children: [
           PageHeader(
             title: 'Discover',
-            subtitle:
-                'Updates, donation guidance and upcoming drives across Digos City.',
+            subtitle: 'Updates, donation guidance and upcoming drives across Digos City.',
             actions: [
               SizedBox(
                 width: context.isPhone ? double.infinity : 240,
@@ -214,19 +215,17 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     'as the schedule is confirmed.',
               )
             else
-              _buildRail(
-                context,
-                [
-                  for (var i = 0; i < _upcomingDrives.length; i++)
-                    _buildDriveCard(context, _upcomingDrives[i], i),
-                ],
-              ),
+              _buildRail(context, [
+                for (var i = 0; i < _upcomingDrives.length; i++)
+                  _buildDriveCard(context, _upcomingDrives[i], i),
+              ]),
             const SizedBox(height: TabangSpace.xxl),
 
             _buildSectionHeader(
               context,
               'Announcements & stories',
-              subtitle: 'Updates from the donor network and the people it helps.',
+              subtitle:
+                  'Updates from the donor network and the people it helps.',
               action: _sectionAction(
                 context,
                 'Stories',
@@ -244,8 +243,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
             _buildSectionHeader(
               context,
               'Learn & prepare',
-              subtitle:
-                  'Short, clinically aligned guidance before and after donating.',
+              subtitle: 'Short, clinically aligned guidance before and after donating.',
               action: _sectionAction(
                 context,
                 'All guides',
@@ -282,13 +280,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     'as the schedule is confirmed.',
               )
             else
-              _buildRail(
-                context,
-                [
-                  for (var i = 0; i < _upcomingDrives.length; i++)
-                    _buildDriveCard(context, _upcomingDrives[i], i),
-                ],
-              ),
+              _buildRail(context, [
+                for (var i = 0; i < _upcomingDrives.length; i++)
+                  _buildDriveCard(context, _upcomingDrives[i], i),
+              ]),
             const SizedBox(height: TabangSpace.xl),
             _buildVisitPlanner(context),
           ] else ...[
@@ -300,10 +295,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   : 'Everything the chapter has published in this category.',
             ),
             if (items.isEmpty)
-              const EmptyState(
-                art: TabangArt.search,
-                title: 'Nothing here yet',
-              )
+              const EmptyState(art: TabangArt.search, title: 'Nothing here yet')
             else
               _buildRail(
                 context,
@@ -376,9 +368,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         color: const Color(0xFF241715),
         // No large coloured shadow: it forced an extra save-layer on every
         // frame and made the feed feel heavier than it is.
-        border: Border.all(
-          color: TabangColors.crimson.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: TabangColors.crimson.withValues(alpha: 0.35)),
       ),
       child: Stack(
         alignment: Alignment.bottomLeft,
@@ -568,8 +558,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         final cardWidth = context.isPhone
             ? math.min(constraints.maxWidth - 36, 286.0)
             : constraints.maxWidth > 1100
-                ? 300.0
-                : 278.0;
+            ? 300.0
+            : 278.0;
         return _ContentRail(
           cardWidth: cardWidth,
           trailingGap: TabangSpace.md,
@@ -657,15 +647,15 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.people_outline,
-                        size: 14, color: context.textMuted),
+                    Icon(
+                      Icons.people_outline,
+                      size: 14,
+                      color: context.textMuted,
+                    ),
                     const SizedBox(width: 5),
                     Text(
                       '${drive.expectedDonors} expected',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.textMuted,
-                      ),
+                      style: TextStyle(fontSize: 12, color: context.textMuted),
                     ),
                   ],
                 ),
@@ -727,20 +717,19 @@ class _DiscoverPageState extends State<DiscoverPage> {
         final columns = constraints.maxWidth > 1180
             ? 3
             : constraints.maxWidth > 760
-                ? 2
-                : 1;
+            ? 2
+            : 1;
         const gap = TabangSpace.lg;
-        final width =
-            (constraints.maxWidth - gap * (columns - 1)) / columns;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
 
         return Wrap(
           spacing: gap,
           runSpacing: gap,
           children: items
-              .map((item) => SizedBox(
-                    width: width,
-                    child: _buildCard(context, item),
-                  ))
+              .map(
+                (item) =>
+                    SizedBox(width: width, child: _buildCard(context, item)),
+              )
               .toList(),
         );
       },
@@ -848,11 +837,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _Fact(Icons.badge_outlined, 'Bring a valid ID', 'and your donor card'),
       _Fact(Icons.restaurant_outlined, 'Eat a light meal', 'within 4 hours'),
       _Fact(Icons.timer_outlined, 'Allow 45 minutes', 'screening + donation'),
-      _Fact(
-        Icons.local_hospital_outlined,
-        'Book a slot',
-        'at the blood bank',
-      ),
+      _Fact(Icons.local_hospital_outlined, 'Book a slot', 'at the blood bank'),
     ];
     return SurfaceCard(
       child: Column(
@@ -860,8 +845,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.event_available_outlined,
-                  size: 18, color: TabangColors.crimson),
+              const Icon(
+                Icons.event_available_outlined,
+                size: 18,
+                color: TabangColors.crimson,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -876,10 +864,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
               TextButton.icon(
                 onPressed: () => widget.onNavigate?.call(1),
                 icon: const Icon(Icons.arrow_forward, size: 14),
-                label: const Text(
-                  'Blood Bank',
-                  style: TextStyle(fontSize: 11),
-                ),
+                label: const Text('Blood Bank', style: TextStyle(fontSize: 11)),
               ),
             ],
           ),
@@ -969,7 +954,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         ? 'assets/images/drive_community.jpg'
         : 'assets/images/content_drive.jpg';
     final now = DateTime.now();
-    final isToday = drive.startsAt.year == now.year &&
+    final isToday =
+        drive.startsAt.year == now.year &&
         drive.startsAt.month == now.month &&
         drive.startsAt.day == now.day;
 
@@ -1160,7 +1146,6 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     color: context.textColor,
                   ),
                 ),
-
               ],
             ),
           ),
@@ -1283,9 +1268,7 @@ class _ContentRailState extends State<_ContentRail> {
         border: Border.all(color: context.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: context.isDark ? 0.45 : 0.18,
-            ),
+            color: Colors.black.withValues(alpha: context.isDark ? 0.45 : 0.18),
             blurRadius: 12,
             offset: const Offset(0, 3),
           ),
@@ -1336,8 +1319,10 @@ class _ContentRailState extends State<_ContentRail> {
         : event.scrollDelta.dx;
     if (delta == 0) return;
     final position = _controller.position;
-    final target = (_controller.offset + delta)
-        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    final target = (_controller.offset + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
     if (target == _controller.offset) return;
     _controller.jumpTo(target);
   }
@@ -1356,75 +1341,75 @@ class _ContentRailState extends State<_ContentRail> {
         _unfocus();
       },
       child: MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() {
-        _hovered = false;
-        // Hovering away releases the wheel focus, so the page scrolls
-        // vertically again without needing an extra click.
-        if (_focused) _focused = false;
-        if (_focusedRail == this) _focusedRail = null;
-      }),
-      child: Listener(
-      onPointerSignal: _handlePointerSignal,
-      child: Stack(
-      children: [
-        Scrollbar(
-          controller: _controller,
-          scrollbarOrientation: ScrollbarOrientation.bottom,
-          child: SingleChildScrollView(
-            controller: _controller,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.only(bottom: TabangSpace.md),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < widget.children.length; i++)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      right: i == widget.children.length - 1
-                          ? 0
-                          : widget.trailingGap,
-                    ),
-                    child: SizedBox(
-                      width: widget.cardWidth,
-                      child: widget.children[i],
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() {
+          _hovered = false;
+          // Hovering away releases the wheel focus, so the page scrolls
+          // vertically again without needing an extra click.
+          if (_focused) _focused = false;
+          if (_focusedRail == this) _focusedRail = null;
+        }),
+        child: Listener(
+          onPointerSignal: _handlePointerSignal,
+          child: Stack(
+            children: [
+              Scrollbar(
+                controller: _controller,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
+                child: SingleChildScrollView(
+                  controller: _controller,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(bottom: TabangSpace.md),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < widget.children.length; i++)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            right: i == widget.children.length - 1
+                                ? 0
+                                : widget.trailingGap,
+                          ),
+                          child: SizedBox(
+                            width: widget.cardWidth,
+                            child: widget.children[i],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              if (showArrows && _canBack)
+                Positioned(
+                  left: 2,
+                  top: 0,
+                  bottom: TabangSpace.md,
+                  child: Center(
+                    child: _arrow(
+                      icon: Icons.chevron_left,
+                      tooltip: 'Scroll left',
+                      enabled: true,
+                      onPressed: () => _scrollBy(-widget.cardWidth * 1.15),
                     ),
                   ),
-              ],
-            ),
+                ),
+              if (showArrows && _canForward)
+                Positioned(
+                  right: 2,
+                  top: 0,
+                  bottom: TabangSpace.md,
+                  child: Center(
+                    child: _arrow(
+                      icon: Icons.chevron_right,
+                      tooltip: 'Scroll right',
+                      enabled: true,
+                      onPressed: () => _scrollBy(widget.cardWidth * 1.15),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-        if (showArrows && _canBack)
-          Positioned(
-            left: 2,
-            top: 0,
-            bottom: TabangSpace.md,
-            child: Center(
-              child: _arrow(
-                icon: Icons.chevron_left,
-                tooltip: 'Scroll left',
-                enabled: true,
-                onPressed: () => _scrollBy(-widget.cardWidth * 1.15),
-              ),
-            ),
-          ),
-        if (showArrows && _canForward)
-          Positioned(
-            right: 2,
-            top: 0,
-            bottom: TabangSpace.md,
-            child: Center(
-              child: _arrow(
-                icon: Icons.chevron_right,
-                tooltip: 'Scroll right',
-                enabled: true,
-                onPressed: () => _scrollBy(widget.cardWidth * 1.15),
-              ),
-            ),
-          ),
-      ],
-      ),
-      ),
       ),
     );
   }

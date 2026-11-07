@@ -160,8 +160,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           _step == 0
                               ? 'Join TABANG'
                               : _step == 1
-                                  ? 'Your details'
-                                  : 'Secure your account',
+                              ? 'Your details'
+                              : 'Secure your account',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
@@ -180,10 +180,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Text(
                     _step == 0
                         ? 'First, tell us who you are. Your real name is '
-                            'never shown to other users.'
+                              'never shown to other users.'
                         : _step == 1
-                            ? 'A few details so we can match you safely.'
-                            : 'Review everything, then choose a password.',
+                        ? 'A few details so we can match you safely.'
+                        : 'Review everything, then choose a password.',
                     style: TextStyle(
                       fontSize: 12.5,
                       color: context.textMuted,
@@ -204,8 +204,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.error_outline,
-                              size: 16, color: TabangColors.danger),
+                          const Icon(
+                            Icons.error_outline,
+                            size: 16,
+                            color: TabangColors.danger,
+                          ),
                           const SizedBox(width: TabangSpace.sm),
                           Expanded(
                             child: Text(
@@ -230,8 +233,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: context.isDark
                             ? TabangColors.crimson.withValues(alpha: 0.16)
                             : TabangColors.crimsonSoft,
-                        borderRadius:
-                            BorderRadius.circular(TabangRadius.md),
+                        borderRadius: BorderRadius.circular(TabangRadius.md),
                         border: Border.all(
                           color: TabangColors.crimson.withValues(alpha: 0.3),
                         ),
@@ -276,19 +278,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: TabangSpace.xl),
                     _label(context, 'Personal details'),
-                  const SizedBox(height: TabangSpace.sm),
-                  TextFormField(
-                    controller: _fullNameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(
-                      labelText: 'Full name',
-                      prefixIcon: Icon(Icons.person_outline, size: 18),
+                    const SizedBox(height: TabangSpace.sm),
+                    TextFormField(
+                      controller: _fullNameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Full name',
+                        prefixIcon: Icon(Icons.person_outline, size: 18),
+                      ),
+                      validator: (v) => (v == null || v.trim().length < 3)
+                          ? 'Enter your full name'
+                          : null,
                     ),
-                    validator: (v) => (v == null || v.trim().length < 3)
-                        ? 'Enter your full name'
-                        : null,
-                  ),
-                  const SizedBox(height: TabangSpace.md),
+                    const SizedBox(height: TabangSpace.md),
                     TextFormField(
                       controller: _aliasController,
                       decoration: const InputDecoration(
@@ -314,98 +316,103 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   if (_step == 1) ...[
                     _label(context, 'Contact & location'),
                     const SizedBox(height: TabangSpace.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email address',
-                            prefixIcon: Icon(Icons.alternate_email, size: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Email address',
+                              prefixIcon: Icon(Icons.alternate_email, size: 18),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Enter your email';
+                              }
+                              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                  .hasMatch(v.trim())) {
+                                return 'Enter a valid email';
+                              }
+                              return null;
+                            },
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Enter your email';
-                            }
-                            if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                                .hasMatch(v.trim())) {
-                              return 'Enter a valid email';
-                            }
-                            return null;
-                          },
+                        ),
+                        const SizedBox(width: TabangSpace.md),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            decoration: const InputDecoration(
+                              labelText: 'Contact number',
+                              prefixIcon: Icon(Icons.phone_outlined, size: 18),
+                            ),
+                            validator: (v) => (v == null || v.trim().length < 7)
+                                ? 'Enter a contact number'
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: TabangSpace.md),
+                    TextFormField(
+                      controller: _birthDateController,
+                      readOnly: true,
+                      onTap: _pickBirthDate,
+                      decoration: const InputDecoration(
+                        labelText: 'Birth date',
+                        prefixIcon: Icon(Icons.cake_outlined, size: 18),
+                        suffixIcon: Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
                         ),
                       ),
-                      const SizedBox(width: TabangSpace.md),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'Contact number',
-                            prefixIcon: Icon(Icons.phone_outlined, size: 18),
-                          ),
-                          validator: (v) => (v == null || v.trim().length < 7)
-                              ? 'Enter a contact number'
-                              : null,
-                        ),
+                      validator: (_) =>
+                          _birthDate == null ? 'Select your birth date' : null,
+                    ),
+                    const SizedBox(height: TabangSpace.md),
+                    DropdownButtonFormField<String>(
+                      initialValue: _barangay,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Barangay',
+                        prefixIcon: Icon(Icons.location_on_outlined, size: 18),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: TabangSpace.md),
-                  TextFormField(
-                    controller: _birthDateController,
-                    readOnly: true,
-                    onTap: _pickBirthDate,
-                    decoration: const InputDecoration(
-                      labelText: 'Birth date',
-                      prefixIcon: Icon(Icons.cake_outlined, size: 18),
-                      suffixIcon: Icon(Icons.calendar_today_outlined, size: 16),
+                      items: DigosBarangays.all
+                          .map(
+                            (b) => DropdownMenuItem(value: b, child: Text(b)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _barangay = v),
+                      validator: (v) =>
+                          v == null ? 'Select your barangay' : null,
                     ),
-                    validator: (_) =>
-                        _birthDate == null ? 'Select your birth date' : null,
-                  ),
-                  const SizedBox(height: TabangSpace.md),
-                  DropdownButtonFormField<String>(
-                    initialValue: _barangay,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Barangay',
-                      prefixIcon: Icon(Icons.location_on_outlined, size: 18),
-                    ),
-                    items: DigosBarangays.all
-                        .map((b) => DropdownMenuItem(value: b, child: Text(b)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _barangay = v),
-                    validator: (v) => v == null ? 'Select your barangay' : null,
-                  ),
-
                   ],
 
                   if (_step == 2) ...[
                     _label(context, 'Security'),
-                  const SizedBox(height: TabangSpace.sm),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscure,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline, size: 18),
-                      helperText: 'At least 8 characters',
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 18,
+                    const SizedBox(height: TabangSpace.sm),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscure,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: const Icon(Icons.lock_outline, size: 18),
+                        helperText: 'At least 8 characters',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            size: 18,
+                          ),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
-                        onPressed: () => setState(() => _obscure = !_obscure),
                       ),
+                      validator: (v) => (v == null || v.length < 8)
+                          ? 'Use at least 8 characters'
+                          : null,
                     ),
-                    validator: (v) => (v == null || v.length < 8)
-                        ? 'Use at least 8 characters'
-                        : null,
-                  ),
 
                     const SizedBox(height: TabangSpace.lg),
                     _reviewCard(context),
@@ -506,9 +513,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Container(
                   height: 4,
                   decoration: BoxDecoration(
-                    color: i <= _step
-                        ? TabangColors.crimson
-                        : context.border,
+                    color: i <= _step ? TabangColors.crimson : context.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -517,8 +522,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   '${i + 1}. ${labels[i]}',
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight:
-                        i == _step ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: i == _step ? FontWeight.w700 : FontWeight.w500,
                     color: i <= _step
                         ? TabangColors.crimson
                         : context.textMuted,
@@ -551,8 +555,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: TabangSpace.sm),
           _reviewRow(context, 'Account type', UserRole.user.label),
           _reviewRow(context, 'Full name', value(_fullNameController.text)),
-          _reviewRow(context, 'Nickname (public)',
-              value(_aliasController.text.trim())),
+          _reviewRow(
+            context,
+            'Nickname (public)',
+            value(_aliasController.text.trim()),
+          ),
           _reviewRow(context, 'Email', value(_emailController.text.trim())),
           _reviewRow(context, 'Contact', value(_phoneController.text.trim())),
           _reviewRow(context, 'Barangay', value(_barangay)),
@@ -605,5 +612,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
-
 }

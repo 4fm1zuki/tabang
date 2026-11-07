@@ -77,11 +77,7 @@ class HelpTip extends StatelessWidget {
       tooltip: 'What is this?',
       visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      icon: Icon(
-        Icons.help_outline,
-        size: size,
-        color: context.textMuted,
-      ),
+      icon: Icon(Icons.help_outline, size: size, color: context.textMuted),
       onPressed: () => showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -144,8 +140,11 @@ class PageHeader extends StatelessWidget {
         : Tooltip(
             message: subtitle!,
             waitDuration: const Duration(milliseconds: 400),
-            child: Semantics(header: true, label: '$title. ${subtitle!}',
-                child: ExcludeSemantics(child: titleText)),
+            child: Semantics(
+              header: true,
+              label: '$title. ${subtitle!}',
+              child: ExcludeSemantics(child: titleText),
+            ),
           );
 
     if (actions.isEmpty) return heading;
@@ -243,7 +242,9 @@ Color _toneBg(BuildContext context, Tone tone) {
     case Tone.info:
       return context.infoBg;
     case Tone.brand:
-      return context.isDark ? const Color(0xFF3A1917) : TabangColors.crimsonSoft;
+      return context.isDark
+          ? const Color(0xFF3A1917)
+          : TabangColors.crimsonSoft;
     case Tone.neutral:
       return context.surfaceAlt;
   }
@@ -273,8 +274,8 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = onImage
         ? (tone == Tone.neutral
-            ? TabangColors.crimsonDark
-            : _toneFg(context, tone))
+              ? TabangColors.crimsonDark
+              : _toneFg(context, tone))
         : _toneFg(context, tone);
     return Container(
       padding: EdgeInsets.symmetric(
@@ -327,7 +328,9 @@ class BloodTypeChip extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF3A1917) : TabangColors.crimsonSoft,
+        color: context.isDark
+            ? const Color(0xFF3A1917)
+            : TabangColors.crimsonSoft,
         borderRadius: BorderRadius.circular(TabangRadius.xs),
       ),
       child: Text(
@@ -542,10 +545,7 @@ class ProportionBar extends StatelessWidget {
       borderRadius: BorderRadius.circular(TabangRadius.pill),
       child: Stack(
         children: [
-          Container(
-            height: height,
-            color: trackColor ?? context.surfaceAlt,
-          ),
+          Container(height: height, color: trackColor ?? context.surfaceAlt),
           FractionallySizedBox(
             widthFactor: fraction,
             child: Container(
@@ -614,8 +614,18 @@ Tone toneForUnit(UnitStatus status) {
 /// Formats a date as `12 Oct 2026`.
 String formatDate(DateTime date) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
 }

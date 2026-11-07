@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/core/image_credits.dart';
 import 'package:tabang/core/repository.dart';
+import 'package:tabang/screens/admin/inventory_management.dart';
+import 'package:tabang/screens/admin/operations_map_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_hub_page.dart';
 import 'package:tabang/screens/donor/find_donor_page.dart';
@@ -286,6 +288,52 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.bloodtype_outlined), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('staff operations map renders the request layer', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: OperationsMapPage(user: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Operations map'), findsOneWidget);
+    expect(find.text('OPEN REQUESTS'), findsOneWidget);
+    expect(find.text('Inventory queue'), findsOneWidget);
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inventory exposes add-stock and the appointment queue', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: InventoryManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add unit'), findsOneWidget);
+
+    await tester.tap(find.textContaining('Appointments'));
+    await tester.pumpAndSettle();
+    // Seeded APT-001 starts pending, so the confirm control is reachable.
+    expect(find.text('Confirm'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

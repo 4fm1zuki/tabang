@@ -5,8 +5,13 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
+import '../../widgets/chapter_identity.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/photo.dart';
+
+/// How the conversation list is ordered. Both modes sort the chapter thread
+/// alongside people; it is an organization, not an exception to the list.
+enum _ThreadSort { recent, alpha }
 
 /// Messaging between donors and recipients.
 ///
@@ -33,6 +38,7 @@ class _ChatPageState extends State<ChatPage> {
 
   String? _selectedThreadId;
   String _query = '';
+  _ThreadSort _sort = _ThreadSort.recent;
 
   @override
   void initState() {
@@ -54,14 +60,45 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   List<ChatThread> get _threads {
-    final all = _repo.threadsFor(widget.user.id);
-    if (_query.isEmpty) return all;
-    final q = _query.toLowerCase();
-    return all.where((t) {
-      return _otherAlias(t).toLowerCase().contains(q) ||
-          t.messages.any((m) => m.text.toLowerCase().contains(q));
-    }).toList();
+    var all = _repo.threadsFor(widget.user.id);
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      all = all.where((t) {
+        return _displayName(t).toLowerCase().contains(q) ||
+            (t.identityRevealed && _otherUser(t) != null
+                ? _repo
+                      .displayNameFor(t, widget.user.id)
+                      .toLowerCase()
+                      .contains(q)
+                : false) ||
+            t.messages.any((m) => m.text.toLowerCase().contains(q));
+      }).toList();
+    }
+    switch (_sort) {
+      case _ThreadSort.recent:
+        all.sort((a, b) {
+          final aTime =
+              a.lastMessage?.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime =
+              b.lastMessage?.sentAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final byTime = bTime.compareTo(aTime);
+          if (byTime != 0) return byTime;
+          return _displayName(a).compareTo(_displayName(b));
+        });
+      case _ThreadSort.alpha:
+        all.sort(
+          (a, b) =>
+              _displayName(a)
+                  .toLowerCase()
+                  .compareTo(_displayName(b).toLowerCase()),
+        );
+    }
+    return all;
   }
+
+  /// The chapter thread is an organization, not a person: it never reveals a
+  /// staff member's real name and always shows the chapter brand.
+  bool _isChapter(ChatThread thread) => _repo.isChapterThread(thread);
 
   String _otherAlias(ChatThread thread) {
     return thread.participantAId == widget.user.id
@@ -75,12 +112,14 @@ class _ChatPageState extends State<ChatPage> {
         : thread.participantAId;
   }
 
-  AppUser? _otherUser(ChatThread thread) =>
-      _repo.userById(_otherId(thread));
+  AppUser? _otherUser(ChatThread thread) => _repo.userById(_otherId(thread));
 
   /// Real names appear only after both participants consent. Until then the
-  /// thread shows the alias from the paper's double-blind design.
+  /// thread shows the alias from the paper's double-blind design. The chapter
+  /// thread is the exception: it is an organization identity, so it always
+  /// reads as the Philippine Red Cross chapter rather than a staff member.
   String _displayName(ChatThread thread) {
+    if (_isChapter(thread)) return TabangRepository.chapterName;
     final other = _otherUser(thread);
     if (thread.identityRevealed && other != null) return other.fullName;
     return _otherAlias(thread);
@@ -209,6 +248,42 @@ class _ChatPageState extends State<ChatPage> {
                         tone: Tone.neutral,
                         dense: true,
                       ),
+                    const SizedBox(width: 4),
+                    PopupMenuButton<_ThreadSort>(
+                      tooltip: 'Sort conversations',
+                      initialValue: _sort,
+                      onSelected: (v) => setState(() => _sort = v),
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: _ThreadSort.recent,
+                          child: Text(
+                            'Most recent',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ThreadSort.alpha,
+                          child: Text(
+                            'Alphabetical (A–Z)',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.sort, size: 15, color: context.textMuted),
+                          const SizedBox(width: 3),
+                          Text(
+                            _sort == _ThreadSort.recent ? 'Recent' : 'A–Z',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: context.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: TabangSpace.md),
@@ -264,8 +339,8 @@ class _ChatPageState extends State<ChatPage> {
     return Material(
       color: active
           ? (context.isDark
-              ? const Color(0xFF331715)
-              : TabangColors.crimsonSoft.withValues(alpha: 0.55))
+                ? const Color(0xFF331715)
+                : TabangColors.crimsonSoft.withValues(alpha: 0.55))
           : Colors.transparent,
       child: InkWell(
         onTap: () => setState(() => _selectedThreadId = thread.id),
@@ -279,24 +354,32 @@ class _ChatPageState extends State<ChatPage> {
               bottom: BorderSide(color: context.border.withValues(alpha: 0.6)),
             ),
           ),
-          padding: const EdgeInsets.fromLTRB(13, TabangSpace.md, TabangSpace.lg,
-              TabangSpace.md),
+          padding: const EdgeInsets.fromLTRB(
+            13,
+            TabangSpace.md,
+            TabangSpace.lg,
+            TabangSpace.md,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipOval(
-                child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: TabangPhoto(
-                    other?.photoAsset,
-                    semanticLabel: '${_displayName(thread)} profile illustration',
-                    creditLabel: _displayName(thread),
-                    fallbackIcon: Icons.person_outline,
-                    fallbackIconSize: 20,
+              if (_isChapter(thread))
+                const ChapterMark(size: 40)
+              else
+                ClipOval(
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: TabangPhoto(
+                      other?.photoAsset,
+                      semanticLabel:
+                          '${_displayName(thread)} profile illustration',
+                      creditLabel: _displayName(thread),
+                      fallbackIcon: Icons.person_outline,
+                      fallbackIconSize: 20,
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(width: TabangSpace.md),
               Expanded(
                 child: Column(
@@ -315,15 +398,25 @@ class _ChatPageState extends State<ChatPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (_isChapter(thread)) ...[
+                          const SizedBox(width: 4),
+                          const VerifiedBadge(),
+                        ],
                         if (thread.identityRevealed) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.lock_open,
-                              size: 12, color: TabangColors.teal),
+                          const Icon(
+                            Icons.lock_open,
+                            size: 12,
+                            color: TabangColors.teal,
+                          ),
                         ],
                         if (_isBlocked(thread)) ...[
                           const SizedBox(width: 4),
-                          const Icon(Icons.block,
-                              size: 12, color: TabangColors.danger),
+                          const Icon(
+                            Icons.block,
+                            size: 12,
+                            color: TabangColors.danger,
+                          ),
                         ],
                         if (thread.hasFlaggedMessages) ...[
                           const SizedBox(width: 4),
@@ -331,8 +424,11 @@ class _ChatPageState extends State<ChatPage> {
                         ],
                         if (thread.isMuted) ...[
                           const SizedBox(width: 4),
-                          Icon(Icons.volume_off,
-                              size: 12, color: context.textMuted),
+                          Icon(
+                            Icons.volume_off,
+                            size: 12,
+                            color: context.textMuted,
+                          ),
                         ],
                         const Spacer(),
                         if (last != null)
@@ -404,11 +500,14 @@ class _ChatPageState extends State<ChatPage> {
     required bool requestedByMe,
     required bool requestedByOther,
   }) {
+    final chapter = _isChapter(thread);
     return PopupMenuButton<String>(
       tooltip: 'Conversation options',
       icon: const Icon(Icons.more_vert, size: 18),
       onSelected: (value) {
         switch (value) {
+          case 'about':
+            showChapterIdentityDialog(context);
           case 'accept':
             _acceptReveal(context, thread);
           case 'decline':
@@ -426,21 +525,30 @@ class _ChatPageState extends State<ChatPage> {
         }
       },
       itemBuilder: (context) => [
-        if (!thread.identityRevealed && requestedByOther) ...[
-          const PopupMenuItem(value: 'accept', child: Text('Accept reveal')),
-          const PopupMenuItem(value: 'decline', child: Text('Decline reveal')),
-        ] else if (!thread.identityRevealed && !requestedByMe)
-          const PopupMenuItem(value: 'reveal', child: Text('Request reveal')),
+        if (chapter)
+          const PopupMenuItem(value: 'about', child: Text('About this account'))
+        else ...[
+          if (!thread.identityRevealed && requestedByOther) ...[
+            const PopupMenuItem(value: 'accept', child: Text('Accept reveal')),
+            const PopupMenuItem(
+              value: 'decline',
+              child: Text('Decline reveal'),
+            ),
+          ] else if (!thread.identityRevealed && !requestedByMe)
+            const PopupMenuItem(value: 'reveal', child: Text('Request reveal')),
+        ],
         PopupMenuItem(
           value: 'mute',
           child: Text(thread.isMuted ? 'Unmute' : 'Mute'),
         ),
-        const PopupMenuItem(value: 'report', child: Text('Report')),
-        if (!blockedByOther)
-          PopupMenuItem(
-            value: blockedByMe ? 'unblock' : 'block',
-            child: Text(blockedByMe ? 'Unblock user' : 'Block user'),
-          ),
+        if (!chapter) ...[
+          const PopupMenuItem(value: 'report', child: Text('Report')),
+          if (!blockedByOther)
+            PopupMenuItem(
+              value: blockedByMe ? 'unblock' : 'block',
+              child: Text(blockedByMe ? 'Unblock user' : 'Block user'),
+            ),
+        ],
       ],
     );
   }
@@ -479,20 +587,23 @@ class _ChatPageState extends State<ChatPage> {
                   icon: const Icon(Icons.arrow_back, size: 18),
                   onPressed: onBack,
                 ),
-              ClipOval(
-                child: SizedBox(
-                  width: 42,
-                  height: 42,
-                  child: TabangPhoto(
-                    other?.photoAsset,
-                    semanticLabel:
-                        '${_displayName(thread)} profile illustration',
-                    creditLabel: _displayName(thread),
-                    fallbackIcon: Icons.person_outline,
-                    fallbackIconSize: 20,
+              if (_isChapter(thread))
+                const ChapterMark(size: 42)
+              else
+                ClipOval(
+                  child: SizedBox(
+                    width: 42,
+                    height: 42,
+                    child: TabangPhoto(
+                      other?.photoAsset,
+                      semanticLabel:
+                          '${_displayName(thread)} profile illustration',
+                      creditLabel: _displayName(thread),
+                      fallbackIcon: Icons.person_outline,
+                      fallbackIconSize: 20,
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(width: TabangSpace.md),
               Expanded(
                 child: Column(
@@ -512,7 +623,12 @@ class _ChatPageState extends State<ChatPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (other?.bloodType != null) ...[
+                        if (_isChapter(thread))
+                          const Padding(
+                            padding: EdgeInsets.only(left: 5),
+                            child: VerifiedBadge(size: 16),
+                          )
+                        else if (other?.bloodType != null) ...[
                           const SizedBox(width: 6),
                           BloodTypeChip(other!.bloodType!, size: 20),
                         ],
@@ -521,25 +637,29 @@ class _ChatPageState extends State<ChatPage> {
                     Row(
                       children: [
                         Icon(
-                          thread.identityRevealed
+                          _isChapter(thread)
+                              ? Icons.verified_user_outlined
+                              : thread.identityRevealed
                               ? Icons.lock_open
                               : Icons.lock_outline,
                           size: 12,
-                          color: thread.identityRevealed
+                          color: thread.identityRevealed && !_isChapter(thread)
                               ? TabangColors.teal
                               : context.textMuted,
                         ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            thread.identityRevealed
+                            _isChapter(thread)
+                                ? TabangRepository.chapterSubtitle
+                                : thread.identityRevealed
                                 ? (other?.phone ??
-                                    'Contact shared by mutual consent')
+                                      'Contact shared by mutual consent')
                                 : requestedByOther
-                                    ? 'They requested identity reveal'
-                                    : requestedByMe
-                                        ? 'Reveal requested — waiting'
-                                        : 'Identity protected',
+                                ? 'They requested identity reveal'
+                                : requestedByMe
+                                ? 'Reveal requested — waiting'
+                                : 'Identity protected',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11.5,
@@ -562,30 +682,71 @@ class _ChatPageState extends State<ChatPage> {
                   requestedByOther: requestedByOther,
                 )
               else ...[
-                if (!thread.identityRevealed && requestedByOther) ...[
-                  TextButton.icon(
-                    onPressed: () => _acceptReveal(context, thread),
-                    icon: const Icon(Icons.lock_open, size: 14),
-                    label: const Text('Accept reveal'),
-                  ),
+                if (_isChapter(thread))
+                  // The chapter is an organization: no identity reveal, no
+                  // blocking or reporting the official support channel.
                   IconButton(
-                    tooltip: 'Decline reveal',
-                    icon: const Icon(Icons.close, size: 15),
-                    onPressed: () =>
-                        _repo.declineIdentityReveal(thread.id, widget.user.id),
-                  ),
-                ] else if (!thread.identityRevealed && requestedByMe)
-                  const StatusPill(
-                    'Reveal requested',
-                    tone: Tone.info,
-                    dense: true,
+                    tooltip: 'About this account',
+                    icon: const Icon(Icons.info_outline, size: 17),
+                    onPressed: () => showChapterIdentityDialog(context),
                   )
-                else if (!thread.identityRevealed)
-                  TextButton.icon(
-                    onPressed: () => _requestReveal(context, thread),
-                    icon: const Icon(Icons.visibility_outlined, size: 14),
-                    label: const Text('Request reveal'),
+                else ...[
+                  if (!thread.identityRevealed && requestedByOther) ...[
+                    TextButton.icon(
+                      onPressed: () => _acceptReveal(context, thread),
+                      icon: const Icon(Icons.lock_open, size: 14),
+                      label: const Text('Accept reveal'),
+                    ),
+                    IconButton(
+                      tooltip: 'Decline reveal',
+                      icon: const Icon(Icons.close, size: 15),
+                      onPressed: () => _repo.declineIdentityReveal(
+                        thread.id,
+                        widget.user.id,
+                      ),
+                    ),
+                  ] else if (!thread.identityRevealed && requestedByMe)
+                    const StatusPill(
+                      'Reveal requested',
+                      tone: Tone.info,
+                      dense: true,
+                    )
+                  else if (!thread.identityRevealed)
+                    TextButton.icon(
+                      onPressed: () => _requestReveal(context, thread),
+                      icon: const Icon(Icons.visibility_outlined, size: 14),
+                      label: const Text('Request reveal'),
+                    ),
+                  IconButton(
+                    tooltip: 'Report',
+                    icon: const Icon(Icons.flag_outlined, size: 17),
+                    onPressed: () => _showReportDialog(context, thread),
                   ),
+                  if (!blockedByOther)
+                    PopupMenuButton<String>(
+                      tooltip: 'Safety options',
+                      icon: const Icon(Icons.more_vert, size: 17),
+                      onSelected: (value) {
+                        if (value == 'block') {
+                          _block(context, thread);
+                        } else if (value == 'unblock') {
+                          _unblock(context, thread);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        if (blockedByMe)
+                          const PopupMenuItem(
+                            value: 'unblock',
+                            child: Text('Unblock user'),
+                          )
+                        else
+                          const PopupMenuItem(
+                            value: 'block',
+                            child: Text('Block user'),
+                          ),
+                      ],
+                    ),
+                ],
                 IconButton(
                   tooltip: thread.isMuted ? 'Unmute' : 'Mute',
                   icon: Icon(
@@ -597,35 +758,6 @@ class _ChatPageState extends State<ChatPage> {
                   onPressed: () =>
                       _repo.setThreadMuted(thread.id, !thread.isMuted),
                 ),
-                IconButton(
-                  tooltip: 'Report',
-                  icon: const Icon(Icons.flag_outlined, size: 17),
-                  onPressed: () => _showReportDialog(context, thread),
-                ),
-                if (!blockedByOther)
-                  PopupMenuButton<String>(
-                    tooltip: 'Safety options',
-                    icon: const Icon(Icons.more_vert, size: 17),
-                    onSelected: (value) {
-                      if (value == 'block') {
-                        _block(context, thread);
-                      } else if (value == 'unblock') {
-                        _unblock(context, thread);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (blockedByMe)
-                        const PopupMenuItem(
-                          value: 'unblock',
-                          child: Text('Unblock user'),
-                        )
-                      else
-                        const PopupMenuItem(
-                          value: 'block',
-                          child: Text('Block user'),
-                        ),
-                    ],
-                  ),
               ],
             ],
           ),
@@ -640,8 +772,7 @@ class _ChatPageState extends State<ChatPage> {
             color: context.dangerBg,
             child: Row(
               children: [
-                const Icon(Icons.block,
-                    size: 14, color: TabangColors.danger),
+                const Icon(Icons.block, size: 14, color: TabangColors.danger),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -697,8 +828,8 @@ class _ChatPageState extends State<ChatPage> {
                     hintText: blocked
                         ? 'Messaging disabled while blocked'
                         : thread.isMuted
-                            ? 'This conversation is muted'
-                            : 'Write a message',
+                        ? 'This conversation is muted'
+                        : 'Write a message',
                     isDense: true,
                   ),
                 ),
@@ -735,19 +866,34 @@ class _ChatPageState extends State<ChatPage> {
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
-        crossAxisAlignment:
-            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: mine
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           if (showAlias) ...[
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 4),
-              child: Text(
-                message.senderAlias,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: context.textMuted,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      message.senderId == TabangRepository.chapterAccountId
+                          ? TabangRepository.chapterName
+                          : message.senderAlias,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.textMuted,
+                      ),
+                    ),
+                  ),
+                  if (message.senderId == TabangRepository.chapterAccountId)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: VerifiedBadge(size: 13),
+                    ),
+                ],
               ),
             ),
           ],
@@ -900,9 +1046,8 @@ class _ChatPageState extends State<ChatPage> {
             onPressed: () {
               _repo.blockUser(widget.user.id, otherId);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('User blocked.')),
-              );
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('User blocked.')));
             },
             child: const Text('Block'),
           ),
@@ -940,7 +1085,9 @@ class _ChatPageState extends State<ChatPage> {
                 Text(
                   'Select a reason. Reports are reviewed by chapter staff.',
                   style: TextStyle(
-                      fontSize: 12, color: dialogContext.textMuted),
+                    fontSize: 12,
+                    color: dialogContext.textMuted,
+                  ),
                 ),
                 const SizedBox(height: TabangSpace.md),
                 RadioGroup<String>(
@@ -948,23 +1095,26 @@ class _ChatPageState extends State<ChatPage> {
                   onChanged: (v) => setDialogState(() => reason = v),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      'Paid blood solicitation',
-                      'Spam or scam',
-                      'Harassment or bullying',
-                      'Fake donor or recipient profile',
-                      'Other',
-                    ]
-                        .map(
-                          (r) => RadioListTile<String>(
-                            value: r,
-                            title:
-                                Text(r, style: const TextStyle(fontSize: 12.5)),
-                            contentPadding: EdgeInsets.zero,
-                            dense: true,
-                          ),
-                        )
-                        .toList(),
+                    children:
+                        const [
+                              'Paid blood solicitation',
+                              'Spam or scam',
+                              'Harassment or bullying',
+                              'Fake donor or recipient profile',
+                              'Other',
+                            ]
+                            .map(
+                              (r) => RadioListTile<String>(
+                                value: r,
+                                title: Text(
+                                  r,
+                                  style: const TextStyle(fontSize: 12.5),
+                                ),
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                              ),
+                            )
+                            .toList(),
                   ),
                 ),
               ],
