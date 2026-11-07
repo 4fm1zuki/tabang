@@ -38,12 +38,23 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   final MapController _mapController = MapController();
 
   String? _selected;
+
+  /// Follows the app's effective theme (system-aware) unless the style button
+  /// on the map has set a per-visit override.
   bool _mapDark = false;
+  bool? _mapDarkOverride;
 
   @override
   void initState() {
     super.initState();
     _repo.addListener(_refresh);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _mapDark =
+        _mapDarkOverride ?? (Theme.of(context).brightness == Brightness.dark);
   }
 
   @override
@@ -168,7 +179,10 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               _mapButton(
                 context,
                 _mapDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                () => setState(() => _mapDark = !_mapDark),
+                () => setState(() {
+                  _mapDarkOverride = !_mapDark;
+                  _mapDark = _mapDarkOverride!;
+                }),
                 tooltip: _mapDark ? 'Use light map' : 'Use dark map',
               ),
             ],

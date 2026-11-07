@@ -125,8 +125,9 @@ were bypassed.
   barangay, never outside the city outline.
   A **metric scale bar** shows distance; one fit-city control (corner-bracket
   icon) re-frames the whole city in the pane; `+`/`−` step the zoom within
-  10.5–18; the light/dark map style is independent of the app theme
-  (and its toggle is desktop-only). The map opens framed to the whole city
+  10.5–18; the map style follows the app theme — and the system theme when the
+  app is set to System — with a desktop-only toggle that overrides it for the
+  visit. The map opens framed to the whole city
   instead of falling back to street level. Map panels fade while the map is
   being touched and return when the gesture ends; a layers button hides them for
   an unobstructed view, and the phone control stack is reduced to 30 px buttons
@@ -361,8 +362,8 @@ map stacks above the donor list; from 1024 px up the sidebar is the default
 navigation, expanded and pinnable, with hover-open still available after
 unpinning, and the classic side-by-side splits. `MaterialApp.builder` wraps the
 navigator in `SafeArea`, so status-bar and gesture insets are never painted
-over. The theme starts in **light** mode; dark and system-follow are explicit
-choices in Settings.
+over. The theme follows the **system** by default; light and dark stay explicit
+choices in Settings, and the map style follows whichever theme is active.
 
 **Accounts can be created at the chapter desk.** Staff register walk-in donors
 and patient representatives from User management. Every field is a fixed choice
@@ -392,10 +393,11 @@ contrasting outline, never the blue that previously meant both "selected" and
 warm template, so streets, water, buildings and land use stay revealed while its
 farmland hatching and baked-in names are muted; TABANG's own
 labels all sit on their barangay's representative point and never disappear as
-the view widens. The base starts light even in
-dark mode (with an independent map toggle) because cartography reads better on a
-light surface, and the compass, zoom buttons and collapsible donor pane are
-explicit controls rather than gestures.
+the view widens. The base now follows the
+active theme — the same `invert + hue-rotate` dark recipe keeps water blue and
+parks green instead of collapsing the raster to black — and the desktop style
+button can still hold a manual override for the visit. The zoom buttons,
+scale bar and collapsible donor pane are explicit controls rather than gestures.
 
 ### Performance and reliability
 
@@ -408,8 +410,9 @@ view, no API key) with the barangay geometry bundled in
 OpenStreetMap, and tile failures are swallowed: the city mask, barangays,
 donor density, labels and drive pins are all local, so an offline device still
 gets a working map on the paper background. It renders identically on phones,
-tablets, web and desktop, and keeps an independent light/dark map style because
-the app theme should not decide how legible the street network is.
+tablets, web and desktop, and its light/dark map style follows the app theme,
+so the map darkens with the system; desktop users can still override it for the
+visit with the style button.
 
 **Shell pages stay alive.** `DonorShell` and `AdminShell` keep each visited page
 in a lazy `IndexedStack`, so switching tabs no longer rebuilds the page or

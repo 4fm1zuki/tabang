@@ -156,6 +156,40 @@ void main() {
     expect(find.textContaining('Available donors'), findsOneWidget);
   });
 
+  testWidgets('find donor map style follows the active theme', (tester) async {
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+
+    // Dark app theme (system dark): the map opens dark, so the style button
+    // offers to switch back to light.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.dark,
+        home: Scaffold(body: FindDonorPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
+
+    // A live theme change re-syncs the map when the user has not overridden.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: FindDonorPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.dark_mode_outlined), findsOneWidget);
+
+    // The style button still pins a per-visit override.
+    await tester.tap(find.byIcon(Icons.dark_mode_outlined));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
+  });
+
   testWidgets('empty states render the vector illustration', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

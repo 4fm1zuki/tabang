@@ -31,10 +31,10 @@ class TabangApp extends StatefulWidget {
 class _TabangAppState extends State<TabangApp> {
   final TabangRepository _repo = TabangRepository.instance;
 
-  /// Light is the product default. System tracking follows the OS, which on a
-  /// desktop with an evening dark schedule made the app flip themes without
-  /// the user ever choosing one.
-  ThemeMode _themeMode = ThemeMode.light;
+  /// Follow the operating system by default, so a desktop or phone that
+  /// switches to dark for the evening darkens the app and its map in one step.
+  /// Light, Dark and System remain explicit choices in Settings.
+  ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void initState() {

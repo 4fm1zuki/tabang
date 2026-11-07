@@ -74,23 +74,29 @@ class DigosMapColors {
     0,
   ];
 
-  /// Inverted, dimmed tiles for the dark map style.
+  /// Inverted, hue-rotated tiles for the dark map style.
+  ///
+  /// This is the classic `invert(1) hue-rotate(180deg)` recipe folded into one
+  /// matrix and dimmed to 80%, so the result lands just above [paperDark]:
+  /// pale OSM land turns near-black, water stays blue, parks stay green and
+  /// roads read as dark lines. OSM place names drop to a muted grey instead of
+  /// glowing white, so TABANG's own halo labels stay the brightest text.
   static const List<double> darkTileFilter = <double>[
-    -0.300,
-    -0.300,
-    -0.300,
+    0.459,
+    -1.144,
+    -0.115,
     0,
-    96,
-    -0.300,
-    -0.300,
-    -0.300,
+    210,
+    -0.341,
+    -0.344,
+    -0.115,
     0,
-    90,
-    -0.300,
-    -0.300,
-    -0.300,
+    209,
+    -0.341,
+    -1.144,
+    0.685,
     0,
-    82,
+    213,
     0.000,
     0.000,
     0.000,

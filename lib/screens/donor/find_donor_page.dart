@@ -67,11 +67,12 @@ class _FindDonorPageState extends State<FindDonorPage> {
   String _query = '';
   bool _donorsCollapsed = false;
 
-  /// The map starts light even when the app is in dark mode. Cartography is
-  /// easier to read on a light base, and the checklist explicitly asks for a
-  /// light default. The toggle lets a dark-mode user dim it without changing
-  /// the whole application theme.
+  /// The map style follows the app's effective theme, so it darkens with the
+  /// system as soon as the theme does. The style button sets a per-visit
+  /// override; without one, [didChangeDependencies] re-syncs on every theme
+  /// change.
   bool _mapDark = false;
+  bool? _mapDarkOverride;
 
   /// Overlay visibility. Panels fade while the map is being touched and can be
   /// hidden entirely with the layers button, so the map can be read without
@@ -140,6 +141,13 @@ class _FindDonorPageState extends State<FindDonorPage> {
     super.initState();
     _repo.addListener(_refresh);
     _refreshCounts();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _mapDark =
+        _mapDarkOverride ?? (Theme.of(context).brightness == Brightness.dark);
   }
 
   @override
@@ -867,7 +875,10 @@ class _FindDonorPageState extends State<FindDonorPage> {
                         _mapDark
                             ? Icons.light_mode_outlined
                             : Icons.dark_mode_outlined,
-                        () => setState(() => _mapDark = !_mapDark),
+                        () => setState(() {
+                          _mapDarkOverride = !_mapDark;
+                          _mapDark = _mapDarkOverride!;
+                        }),
                         tooltip: _mapDark ? 'Use light map' : 'Use dark map',
                       ),
                       const SizedBox(height: 12),
