@@ -11,6 +11,7 @@ enum EligibilityBlocker {
   suspended('Account suspended'),
   unverified('Blood card not verified'),
   unavailable('Marked unavailable'),
+  away('Away — no app activity for 30+ days'),
   noBloodType('Blood type not recorded');
 
   const EligibilityBlocker(this.label);
@@ -82,6 +83,20 @@ class EligibilityEngine {
 
   /// The cooldown applied when the component is not specified.
   static const int defaultCooldownDays = 84;
+
+  /// How long a donor may stay inactive before the directory hides them
+  /// automatically. Any sign-in or directory action refreshes the timer.
+  static const int awayAfterDays = 30;
+
+  /// Whether [donor] has been away past [awayAfterDays]. A null
+  /// [AppUser.lastActiveAt] means the account has never recorded activity and
+  /// is treated as active, so seeded legacy records keep working.
+  static bool isAway(AppUser donor, {DateTime? now}) {
+    final lastActive = donor.lastActiveAt;
+    if (lastActive == null) return false;
+    final today = now ?? DateTime.now();
+    return today.difference(lastActive).inDays >= awayAfterDays;
+  }
 
   static int cooldownFor(BloodComponent? component) {
     if (component == null) return defaultCooldownDays;
@@ -160,6 +175,17 @@ class EligibilityEngine {
       return EligibilityResult(
         isEligible: false,
         blocker: EligibilityBlocker.unavailable,
+        donorType: donor.bloodType,
+      );
+    }
+
+    // Inactivity is an automatic "away": a donor who has not been seen for
+    // over [awayAfterDays] is hidden from the directory even though the manual
+    // switch is still on.
+    if (isAway(donor, now: today)) {
+      return EligibilityResult(
+        isEligible: false,
+        blocker: EligibilityBlocker.away,
         donorType: donor.bloodType,
       );
     }

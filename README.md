@@ -53,6 +53,7 @@ autofill.
 |---|---|---|
 | Donor | `iverson.briones@tabang.app` | `donor1234` |
 | Donor | `tere.santos@tabang.app` | `donor1234` |
+| Donor (away, 47 days inactive) | `rafael.mendoza@tabang.app` | `donor1234` |
 | Recipient | `maria.santos@tabang.app` | `recipient1234` |
 | Community | `community@tabang.app` | `community1234` |
 | Staff | `staff@tabang.app` | `staff1234` |
@@ -105,15 +106,16 @@ were bypassed.
   readable), a deep-crimson selection wash, tappable drop-shaped **drive pins at
   their venue coordinates** (drives in one barangay, and drives that would sit
   under a hospital pin, are nudged apart), dedicated **hospital and PRC chapter
-  pins**, and haloed barangay labels rebuilt on every camera change. Labels sit
-  on their barangay's true representative point, biggest area first, and shrink
-  before they touch a neighbour; all 26 names stay on the map at every zoom, so
-  zooming out never empties the map of names. Drive and hospital pins scale down
-  at wide views so the city does not drown in markers, and every seed pin is a
-  representative point inside its own barangay, never outside the city outline.
-  A **metric scale bar** shows distance;
-  one compass control re-frames the full north-up city; `+`/`−` step the zoom
-  within 10.5–18; the light/dark map style is independent of the app theme
+  pins**, and haloed barangay labels rebuilt on every camera change. Exactly
+  like the standalone map, every one of the 26 names is drawn at its barangay's
+  representative point — no label is ever dropped when the view zooms out — and
+  the font grows as the user zooms in, which separates the crowded Poblacion
+  names. Drive and hospital pins scale down at wide views so the city does not
+  drown in markers, and every seed pin is a representative point inside its own
+  barangay, never outside the city outline.
+  A **metric scale bar** shows distance; one fit-city control (corner-bracket
+  icon) re-frames the whole city in the pane; `+`/`−` step the zoom within
+  10.5–18; the light/dark map style is independent of the app theme
   (and its toggle is desktop-only). The map opens framed to the whole city
   instead of falling back to street level. Map panels fade while the map is
   being touched and return when the gesture ends; a layers button hides them for
@@ -123,10 +125,19 @@ were bypassed.
   jump to the pin) and **Drives** (show on map, details, and for donors a jump
   to Requests). Donors appear only as anonymous **`Donor #<id>`** handles, the
   signed-in donor is excluded from their own results, and blood-type chips keep
-  clear of the control stack. Tapping a barangay filters the donor list. The map
-  credit reads `© OpenStreetMap contributors`.
+  clear of the control stack. Tapping a barangay filters the donor list; tapping
+  a donor card moves the map to the barangay that donor is from (not just a
+  highlight). Over the map the cursor switches to a pointing hand whenever a
+  barangay is under the mouse, so "click a region to select it" is discoverable.
+  The map credit reads `© OpenStreetMap contributors`.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
-  date, donation history and availability controls. Registration is
+  date, donation history and availability controls. Availability is managed two
+  ways: the manual **Directory availability** switch hides a donor on demand,
+  and TABANG also marks any donor **away** automatically after 30 days with no
+  app activity, even while the switch is on. Posting or answering a request,
+  sending a message, flipping the switch, or the one-tap **I'm active** button
+  all refresh the timer; signing in alone does not, so a returning donor sees
+  the away notice and chooses to come back. Registration is
   **face-to-face**, so the app only records intent: the applicant says whether
   they already hold a PRC donor card (with an optional card number), picks an
   optional visit day, and gets the walk-in steps plus what to bring. The
@@ -244,7 +255,7 @@ lib/
 │   ├── eligibility.dart       # component compatibility + cooldown engine
 │   ├── repository.dart        # in-memory store, seed data, lifecycle, analytics
 │   ├── auth.dart              # credential auth, role gating, donor upgrade
-│   ├── digos_geodata.dart     # PSA/NAMRIA 26-barangay rings, city ring, centroids
+│   ├── digos_geodata.dart     # 75 shared arcs → 26 barangays + city ring
 │   └── image_credits.dart     # per-asset provenance registry
 ├── widgets/
 │   ├── common.dart            # shared UI kit, HelpTip, progress bars
@@ -343,8 +354,8 @@ contrasting outline, never the blue that previously meant both "selected" and
 "water". The OpenStreetMap base is pushed through the standalone map project's
 warm template, so streets, water, buildings and land use stay revealed while its
 farmland hatching and baked-in names are muted; TABANG's own
-labels sit on their barangay's representative point, biggest first, and shrink
-rather than disappear as the view widens. The base starts light even in
+labels all sit on their barangay's representative point and never disappear as
+the view widens. The base starts light even in
 dark mode (with an independent map toggle) because cartography reads better on a
 light surface, and the compass, zoom buttons and collapsible donor pane are
 explicit controls rather than gestures.
@@ -483,10 +494,11 @@ connection to the simulated records.
 flutter test
 ```
 
-**76 tests** cover:
+**79 tests** cover:
 
-- **Seed data** — exactly 15 currently eligible donors, 15 recipients, the
-  community demo account, and a unique bundled avatar per seeded user.
+- **Seed data** — exactly 15 currently eligible donors (plus two deliberately
+  away donors), 15 recipients, the community demo account, and a unique bundled
+  avatar per seeded user.
 - **ABO/Rh compatibility matrix** — universal donor/recipient properties,
   per-type donor sets, and the inverse relationship between `donorsFor` and
   `recipientsFor`.
@@ -509,6 +521,10 @@ flutter test
 - **Privacy and safety** — bilateral reveal accept/decline, persisted reports,
   symmetric blocking, and the 48-hour re-block cooldown.
 - **Donation recording** — component capture and component-specific cooldown.
+- **Automatic away availability** — a donor inactive for 30+ days is blocked
+  with the `away` reason and never reaches the directory; `markActive` clears
+  it, and the seed keeps exactly 15 eligible donors alongside the two
+  deliberate away cases.
 - **Donor authoring and anonymity** — a donor can post a request that another
   donor can serve, and both the response alias and the map/directory handle are
   `Donor #<id>` tokens that never expose the nickname or legal name.
@@ -529,8 +545,10 @@ flutter test
   placeholder, a narrow PageHeader stays a single compact line with its
   description in the tooltip, and the Digos vector map mounts all 26 barangays
   with tiles disabled (so no HTTP runs in tests), keeps its overlay controls in
-  the wide desktop layout, shrinks the phone control stack, and selects a
-  barangay on tap.
+  the wide desktop layout including the fit-city button, shrinks the phone
+  control stack, and selects a barangay on tap. The Donor Hub additionally
+  renders the automatic-away notice and clears it through the **I'm active**
+  action.
 - **Narrow-screen layout** — Discover, Blood Bank (including unit selection and
   the appointment dialog) and Statistics render at a 360 × 780 phone viewport
   without overflow; the unit list reflows to one column and the appointment

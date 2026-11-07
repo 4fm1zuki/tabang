@@ -91,6 +91,8 @@ class AuthService {
     // Demo passwords — documented in README.
     _credentials['iverson.briones@tabang.app'] = _hash('donor1234');
     _credentials['tere.santos@tabang.app'] = _hash('donor1234');
+    // Inactive donor: signs in to demonstrate the automatic "away" state.
+    _credentials['rafael.mendoza@tabang.app'] = _hash('donor1234');
     _credentials['maria.santos@tabang.app'] = _hash('recipient1234');
     _credentials['community@tabang.app'] = _hash('community1234');
     _credentials['staff@tabang.app'] = _hash('staff1234');
@@ -181,10 +183,14 @@ class AuthService {
       );
     }
     if (role == UserRole.donor && bloodType == null) {
-      return AuthResult.failure('Select your blood type to register as a donor.');
+      return AuthResult.failure(
+        'Select your blood type to register as a donor.',
+      );
     }
     if (role == UserRole.donor && birthDate == null) {
-      return AuthResult.failure('Enter your birth date to register as a donor.');
+      return AuthResult.failure(
+        'Enter your birth date to register as a donor.',
+      );
     }
     if (role == UserRole.donor && weightKg == null) {
       return AuthResult.failure('Enter your weight to register as a donor.');
@@ -284,7 +290,9 @@ class AuthService {
         return ManagedUserResult.failure('Enter the donor\'s birth date.');
       }
       if (weightKg == null || weightKg < 20 || weightKg > 300) {
-        return ManagedUserResult.failure('Enter a weight between 20 and 300 kg.');
+        return ManagedUserResult.failure(
+          'Enter a weight between 20 and 300 kg.',
+        );
       }
       final age = _ageOn(birthDate, DateTime.now());
       if (age < EligibilityEngine.minimumAge ||

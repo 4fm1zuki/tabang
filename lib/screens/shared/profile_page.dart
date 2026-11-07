@@ -306,7 +306,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             '${formatDate(result.eligibleFrom!)} · '
                             '${result.daysRemaining} '
                             'day${result.daysRemaining == 1 ? '' : 's'} left'
-                      : 'Meets every rule for this donation type.',
+                      : result.isEligible
+                      ? 'Meets every rule for this donation type.'
+                      : 'Not available for matching right now.',
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.4,

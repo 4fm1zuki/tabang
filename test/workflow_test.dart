@@ -521,6 +521,39 @@ void main() {
     });
   });
 
+  group('Automatic away availability', () {
+    test('a donor inactive for 30+ days is hidden until active again', () {
+      final away = repo.userById('USR-039')!;
+      final result = EligibilityEngine.evaluate(away);
+      expect(result.isEligible, isFalse);
+      expect(result.blocker, EligibilityBlocker.away);
+      expect(
+        repo.findDonors().map((u) => u.id),
+        isNot(contains(away.id)),
+        reason: 'an away donor never reaches the directory',
+      );
+
+      repo.markActive(away.id);
+      final refreshed = repo.userById('USR-039')!;
+      expect(EligibilityEngine.evaluate(refreshed).isEligible, isTrue);
+      expect(repo.findDonors().map((u) => u.id), contains(away.id));
+    });
+
+    test('seeded data still has exactly 15 eligible donors', () {
+      final eligibleDonors = repo.users
+          .where(
+            (u) =>
+                u.role == UserRole.donor &&
+                EligibilityEngine.evaluate(u).isEligible,
+          )
+          .toList();
+      expect(eligibleDonors, hasLength(15));
+      // The two deliberate away cases exist but are not among the 15.
+      expect(eligibleDonors.map((u) => u.id), isNot(contains('USR-039')));
+      expect(eligibleDonors.map((u) => u.id), isNot(contains('USR-040')));
+    });
+  });
+
   group('Bilateral identity reveal', () {
     test('reveal requires the other participant to accept', () {
       expect(repo.requestIdentityReveal('ROOM-101', 'USR-009'), isTrue);

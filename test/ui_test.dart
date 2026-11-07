@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/core/image_credits.dart';
 import 'package:tabang/core/repository.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
+import 'package:tabang/screens/donor/donor_hub_page.dart';
 import 'package:tabang/screens/donor/find_donor_page.dart';
 import 'package:tabang/theme.dart';
 import 'package:tabang/widgets/common.dart';
@@ -20,8 +21,9 @@ void main() {
     DigosVectorMap.tilesEnabled = false;
   });
 
-  testWidgets('discover shows quick actions above the full feed',
-      (tester) async {
+  testWidgets('discover shows quick actions above the full feed', (
+    tester,
+  ) async {
     final donor = repo.userById('USR-001')!;
 
     await tester.pumpWidget(
@@ -40,8 +42,9 @@ void main() {
     expect(find.text('Announcements & stories'), findsOneWidget);
   });
 
-  testWidgets('find donor map loads the real boundaries and stays tappable',
-      (tester) async {
+  testWidgets('find donor map loads the real boundaries and stays tappable', (
+    tester,
+  ) async {
     // Phone layout: the map stacks above the collapsible donor list.
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -83,8 +86,9 @@ void main() {
     expect(find.textContaining('Available donors'), findsOneWidget);
   });
 
-  testWidgets('find donor desktop layout keeps its overlays and controls',
-      (tester) async {
+  testWidgets('find donor desktop layout keeps its overlays and controls', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1600, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -102,6 +106,7 @@ void main() {
     expect(find.text('ALL'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsOneWidget);
     expect(find.byIcon(Icons.remove), findsOneWidget);
+    expect(find.byIcon(Icons.fit_screen), findsOneWidget);
     // The legend keeps the donor-density key. The boundary / pin layer rows
     // were removed: the map already shows them, and they made the panel read
     // as a layers menu.
@@ -154,10 +159,7 @@ void main() {
       MaterialApp(
         theme: TabangTheme.light,
         home: const Scaffold(
-          body: EmptyState(
-            art: TabangArt.requests,
-            title: 'Nothing here',
-          ),
+          body: EmptyState(art: TabangArt.requests, title: 'Nothing here'),
         ),
       ),
     );
@@ -166,8 +168,9 @@ void main() {
     expect(find.text('Nothing here'), findsOneWidget);
   });
 
-  testWidgets('page header stacks actions so the title never gets squeezed',
-      (tester) async {
+  testWidgets('page header stacks actions so the title never gets squeezed', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(320, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(() {
@@ -182,9 +185,7 @@ void main() {
           body: PageHeader(
             title: 'Discover',
             subtitle: 'Updates and drives across Digos City.',
-            actions: [
-              SizedBox(width: 240, height: 40, child: Container()),
-            ],
+            actions: [SizedBox(width: 240, height: 40, child: Container())],
           ),
         ),
       ),
@@ -200,8 +201,7 @@ void main() {
     );
   });
 
-  testWidgets('every content item ships a bundled photo asset',
-      (tester) async {
+  testWidgets('every content item ships a bundled photo asset', (tester) async {
     for (final item in repo.content) {
       expect(
         item.imageAsset,
@@ -229,42 +229,45 @@ void main() {
     expect(icon.lengthInBytes, greaterThan(1000));
   });
 
-  testWidgets('discover uses local photos in the hero, feed and article dialog',
-      (tester) async {
-    final donor = repo.userById('USR-001')!;
+  testWidgets(
+    'discover uses local photos in the hero, feed and article dialog',
+    (tester) async {
+      final donor = repo.userById('USR-001')!;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: TabangTheme.light,
-        home: Scaffold(body: DiscoverPage(user: donor)),
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: TabangTheme.light,
+          home: Scaffold(body: DiscoverPage(user: donor)),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    // Hero, content cards and the two drive cards all use TabangPhoto.
-    expect(find.byType(TabangPhoto), findsWidgets);
-    // The feed itself carries no credit text any more — attribution lives in
-    // the details dialog that opens when a card is tapped.
-    expect(find.byType(PhotoCredit), findsNothing);
+      // Hero, content cards and the two drive cards all use TabangPhoto.
+      expect(find.byType(TabangPhoto), findsWidgets);
+      // The feed itself carries no credit text any more — attribution lives in
+      // the details dialog that opens when a card is tapped.
+      expect(find.byType(PhotoCredit), findsNothing);
 
-    await tester.ensureVisible(find.text('Read the story'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Read the story'));
-    await tester.pumpAndSettle();
-    expect(find.byType(TabangPhoto), findsWidgets);
-    expect(find.byType(PhotoCredit), findsOneWidget);
+      await tester.ensureVisible(find.text('Read the story'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Read the story'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TabangPhoto), findsWidgets);
+      expect(find.byType(PhotoCredit), findsOneWidget);
 
-    // Tapping the chip opens the licence and the source link. Asset paths are
-    // deliberately not shown to users.
-    await tester.tap(find.byType(PhotoCredit));
-    await tester.pumpAndSettle();
-    expect(find.text('Photo credit'), findsOneWidget);
-    expect(find.text('Source'), findsOneWidget);
-    expect(find.textContaining('assets/images'), findsNothing);
-  });
+      // Tapping the chip opens the licence and the source link. Asset paths are
+      // deliberately not shown to users.
+      await tester.tap(find.byType(PhotoCredit));
+      await tester.pumpAndSettle();
+      expect(find.text('Photo credit'), findsOneWidget);
+      expect(find.text('Source'), findsOneWidget);
+      expect(find.textContaining('assets/images'), findsNothing);
+    },
+  );
 
-  testWidgets('a missing photo renders the themed fallback, not an error box',
-      (tester) async {
+  testWidgets('a missing photo renders the themed fallback, not an error box', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: TabangTheme.light,
@@ -283,6 +286,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.bloodtype_outlined), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('donor hub shows the away notice and can activate again', (
+    tester,
+  ) async {
+    // A tall viewport keeps every hub card built so the availability notice
+    // is in the tree without scrolling a lazy list.
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final away = repo.userById('USR-039')!;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: DonorHubPage(user: away)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text("I'm active"), findsOneWidget);
+    expect(find.textContaining('marks donors away'), findsOneWidget);
+
+    await tester.tap(find.text("I'm active"));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('marks donors away'), findsNothing);
+    expect(
+      find.text('You are visible to compatible recipients.'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 }

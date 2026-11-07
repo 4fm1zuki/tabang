@@ -360,8 +360,18 @@ class TabangRepository {
   // --------------------------------------------------------------- writes
 
   void signIn(AppUser user) {
-    currentUser = user;
+    currentUser = userById(user.id) ?? user;
     _notify();
+  }
+
+  /// Records app activity for [userId]. Directory actions and the Donor Hub's
+  /// "I'm active" button call this so the automatic "away" rule resets.
+  /// Signing in alone deliberately does not: a returning donor sees the away
+  /// notice and chooses to come back.
+  void markActive(String userId) {
+    final user = userById(userId);
+    if (user == null) return;
+    updateUser(user.copyWith(lastActiveAt: DateTime.now()));
   }
 
   void signOut() {
@@ -392,6 +402,7 @@ class TabangRepository {
       birthDate: birthDate,
       weightKg: weightKg,
       registeredOn: DateTime.now(),
+      lastActiveAt: DateTime.now(),
       // New donors start unverified until staff review their blood card.
       status: role == UserRole.donor
           ? AccountStatus.unverified
@@ -467,7 +478,11 @@ class TabangRepository {
   void setDonorAvailability(String userId, bool isAvailable) {
     final user = userById(userId);
     if (user == null) return;
-    updateUser(user.copyWith(isAvailable: isAvailable));
+    // Touching the switch counts as activity, so turning availability back on
+    // also clears an automatic "away".
+    updateUser(
+      user.copyWith(isAvailable: isAvailable, lastActiveAt: DateTime.now()),
+    );
   }
 
   void recordDonation(
@@ -684,6 +699,7 @@ class TabangRepository {
         note: note,
       ),
     );
+    markActive(requesterId);
     _notify();
   }
 
@@ -730,6 +746,7 @@ class TabangRepository {
           : trimmedMessage,
     );
     _responses.add(response);
+    markActive(donorId);
     _notify();
     return response;
   }
@@ -1135,6 +1152,7 @@ class TabangRepository {
     );
 
     _threads[index] = thread.copyWith(messages: [...thread.messages, message]);
+    markActive(senderId);
     _notify();
   }
 
@@ -2018,6 +2036,45 @@ class TabangRepository {
         registeredOn: daysAgo(9),
         status: AccountStatus.verified,
       ),
+
+      // Two donors who have been away for over a month. Their switch is still
+      // on, but the eligibility engine hides them from the directory until
+      // their next activity — the automatic counterpart to the manual
+      // "Directory availability" toggle.
+      AppUser(
+        id: 'USR-039',
+        fullName: 'Rafael Mendoza',
+        alias: 'Rafael',
+        email: 'rafael.mendoza@tabang.app',
+        phone: '+63 917 202 4455',
+        barangay: 'Matti',
+        role: UserRole.donor,
+        bloodType: BloodType.oPos,
+        birthDate: DateTime(1996, 4, 12),
+        weightKg: 68,
+        registeredOn: daysAgo(320),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(121),
+        totalDonations: 3,
+        lastActiveAt: daysAgo(47),
+      ),
+      AppUser(
+        id: 'USR-040',
+        fullName: 'Joanna Lim',
+        alias: 'Joanna',
+        email: 'joanna.lim@tabang.app',
+        phone: '+63 918 341 2277',
+        barangay: 'Colorado',
+        role: UserRole.donor,
+        bloodType: BloodType.aPos,
+        birthDate: DateTime(1993, 11, 2),
+        weightKg: 57,
+        registeredOn: daysAgo(260),
+        status: AccountStatus.verified,
+        lastDonationDate: daysAgo(96),
+        totalDonations: 2,
+        lastActiveAt: daysAgo(38),
+      ),
     ]);
 
     // Every seeded profile gets its own bundled illustration. The generator in
@@ -2031,6 +2088,9 @@ class TabangRepository {
       _users[i] = _users[i].copyWith(
         onboardingCompleted: true,
         photoAsset: asset,
+        // Seeded accounts are active by default; the two deliberately-away
+        // donors keep their explicit older date. Real sign-ins refresh this.
+        lastActiveAt: _users[i].lastActiveAt ?? daysAgo(1 + (i % 7)),
       );
     }
 

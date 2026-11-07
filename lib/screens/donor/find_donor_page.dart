@@ -125,6 +125,16 @@ class _FindDonorPageState extends State<FindDonorPage> {
     _notifyMapInteraction();
   }
 
+  /// Tapping a donor card takes the map to the barangay that donor is from,
+  /// instead of only filtering/highlighting the list.
+  void _focusDonor(AppUser donor) {
+    setState(() {
+      _selectedBarangay = donor.barangay;
+      _donorsCollapsed = false;
+    });
+    _focusBarangay(donor.barangay);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -467,7 +477,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
   void _resetNorth() {
     DigosVectorMap.fitCity(_mapController);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('North up · showing all 26 barangays')),
+      const SnackBar(content: Text('Fitted to the city · all 26 barangays')),
     );
   }
 
@@ -836,14 +846,15 @@ class _FindDonorPageState extends State<FindDonorPage> {
                       ),
                     ),
                     SizedBox(height: compact ? 4 : 8),
-                    // One reset control, not two. The map is always drawn
-                    // north-up, so a compass is the honest affordance for
-                    // "return to the full, north-up city".
+                    // One fit control, not two. The map is always drawn
+                    // north-up, so "zoom to fill the pane with the whole city"
+                    // is the useful action; the corner-bracket icon says that
+                    // without implying a rotation compass.
                     _mapButton(
                       context,
-                      Icons.explore_outlined,
+                      Icons.fit_screen,
                       _resetNorth,
-                      tooltip: 'Compass · north up, show all 26 barangays',
+                      tooltip: 'Fit city · show all 26 barangays',
                       accent: true,
                       size: compact ? 30 : 36,
                     ),
@@ -1482,9 +1493,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
 
     return SurfaceCard(
       padding: const EdgeInsets.all(TabangSpace.lg),
-      onTap: donor.shareBarangay
-          ? () => setState(() => _selectedBarangay = donor.barangay)
-          : null,
+      onTap: donor.shareBarangay ? () => _focusDonor(donor) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

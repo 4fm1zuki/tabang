@@ -35,6 +35,22 @@ class DonorHubPage extends StatefulWidget {
 class _DonorHubPageState extends State<DonorHubPage> {
   final TabangRepository _repo = TabangRepository.instance;
 
+  @override
+  void initState() {
+    super.initState();
+    _repo.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _repo.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _registerAsDonor() async {
     final submitted = await showDonorRegistrationDialog(context, widget.user);
     if (!mounted || !submitted) return;
@@ -147,10 +163,19 @@ class _DonorHubPageState extends State<DonorHubPage> {
                   spacing: TabangSpace.sm,
                   runSpacing: TabangSpace.sm,
                   children: [
-                    _Benefit(icon: Icons.verified_user_outlined, label: 'Staff-verified'),
+                    _Benefit(
+                      icon: Icons.verified_user_outlined,
+                      label: 'Staff-verified',
+                    ),
                     _Benefit(icon: Icons.lock_outline, label: 'Nickname only'),
-                    _Benefit(icon: Icons.toggle_on_outlined, label: 'You control availability'),
-                    _Benefit(icon: Icons.health_and_safety_outlined, label: 'Clinical screening'),
+                    _Benefit(
+                      icon: Icons.toggle_on_outlined,
+                      label: 'You control availability',
+                    ),
+                    _Benefit(
+                      icon: Icons.health_and_safety_outlined,
+                      label: 'Clinical screening',
+                    ),
                   ],
                 ),
               ],
@@ -300,11 +325,11 @@ class _DonorHubPageState extends State<DonorHubPage> {
           Text(
             application == null
                 ? 'No registration form is on file yet. Fill it up so chapter '
-                    'staff can review your details before your first donation.'
+                      'staff can review your details before your first donation.'
                 : 'Form ${application.id} submitted '
-                    '${formatRelative(application.submittedAt)}. Chapter staff '
-                    'verifies your blood card in person; your profile joins the '
-                    'directory only after that.',
+                      '${formatRelative(application.submittedAt)}. Chapter staff '
+                      'verifies your blood card in person; your profile joins the '
+                      'directory only after that.',
             style: TextStyle(
               fontSize: 12.5,
               height: 1.5,
@@ -467,9 +492,7 @@ class _DonorHubPageState extends State<DonorHubPage> {
             decoration: BoxDecoration(
               gradient: TabangGradients.donorHero,
               borderRadius: BorderRadius.circular(TabangRadius.lg),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.10),
-              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.22),
@@ -495,8 +518,7 @@ class _DonorHubPageState extends State<DonorHubPage> {
                           height: 58,
                           child: TabangPhoto(
                             user.photoAsset,
-                            semanticLabel:
-                                '${user.alias} profile illustration',
+                            semanticLabel: '${user.alias} profile illustration',
                             creditLabel: user.alias,
                             fallbackIcon: Icons.person_outline,
                           ),
@@ -535,8 +557,8 @@ class _DonorHubPageState extends State<DonorHubPage> {
                       tone: !user.bloodCardVerified
                           ? Tone.warning
                           : eligibility.isEligible
-                              ? Tone.success
-                              : Tone.warning,
+                          ? Tone.success
+                          : Tone.warning,
                       onImage: true,
                     ),
                   ],
@@ -631,6 +653,7 @@ class _DonorHubPageState extends State<DonorHubPage> {
   }
 
   Widget _buildAvailability(BuildContext context, AppUser user) {
+    final away = EligibilityEngine.isAway(user);
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -641,16 +664,16 @@ class _DonorHubPageState extends State<DonorHubPage> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: user.isAvailable
+                  color: user.isAvailable && !away
                       ? context.successBg
                       : context.surfaceAlt,
                   borderRadius: BorderRadius.circular(TabangRadius.sm),
                 ),
                 child: Icon(
-                  user.isAvailable
+                  user.isAvailable && !away
                       ? Icons.toggle_on_outlined
                       : Icons.toggle_off_outlined,
-                  color: user.isAvailable
+                  color: user.isAvailable && !away
                       ? TabangColors.success
                       : context.textMuted,
                   size: 24,
@@ -659,7 +682,9 @@ class _DonorHubPageState extends State<DonorHubPage> {
               const SizedBox(width: TabangSpace.md),
               Expanded(
                 child: Text(
-                  user.isAvailable
+                  away
+                      ? 'Away — you are hidden from the donor directory.'
+                      : user.isAvailable
                       ? 'You are visible to compatible recipients.'
                       : 'You are hidden from the donor directory.',
                   style: TextStyle(
@@ -676,6 +701,41 @@ class _DonorHubPageState extends State<DonorHubPage> {
               ),
             ],
           ),
+          if (away) ...[
+            const SizedBox(height: TabangSpace.sm),
+            Container(
+              padding: const EdgeInsets.fromLTRB(TabangSpace.sm, 4, 4, 4),
+              decoration: BoxDecoration(
+                color: context.warningBg,
+                borderRadius: BorderRadius.circular(TabangRadius.xs),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.hourglass_bottom,
+                    size: 16,
+                    color: TabangColors.warning,
+                  ),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'TABANG marks donors away after 30 days without activity, '
+                      'even while the switch above is on.',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        height: 1.45,
+                        color: TabangColors.warning,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => _repo.markActive(user.id),
+                    child: const Text("I'm active"),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: TabangSpace.sm),
           Text(
             'TABANG hides you automatically during cooldown even if this '
@@ -712,7 +772,9 @@ class _DonorHubPageState extends State<DonorHubPage> {
                     Text(
                       eligibility.isEligible
                           ? 'Eligible now'
-                          : 'Eligible from ${formatDate(eligibility.eligibleFrom!)}',
+                          : eligibility.eligibleFrom != null
+                          ? 'Eligible from ${formatDate(eligibility.eligibleFrom!)}'
+                          : eligibility.blocker.label,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -723,8 +785,10 @@ class _DonorHubPageState extends State<DonorHubPage> {
                     Text(
                       eligibility.isEligible
                           ? 'Whole blood · 12-week interval satisfied'
-                          : '${eligibility.daysRemaining} days remaining · '
-                              '${eligibility.blocker.label}',
+                          : eligibility.daysRemaining > 0
+                          ? '${eligibility.daysRemaining} days remaining · '
+                                '${eligibility.blocker.label}'
+                          : eligibility.blocker.label,
                       style: TextStyle(
                         fontSize: 10.5,
                         color: context.textMuted,
@@ -810,10 +874,7 @@ class _DonorHubPageState extends State<DonorHubPage> {
                     ),
                     Text(
                       formatDate(date),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: context.textMuted,
-                      ),
+                      style: TextStyle(fontSize: 11, color: context.textMuted),
                     ),
                   ],
                 ),

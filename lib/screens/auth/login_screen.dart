@@ -130,7 +130,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             onFieldSubmitted: (_) => _submit(),
                             decoration: InputDecoration(
                               labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline, size: 18),
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                size: 18,
+                              ),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscure
@@ -341,7 +344,18 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: TabangSpace.sm),
           _demoRow(context, 'Donor', 'iverson.briones@tabang.app', 'donor1234'),
-          _demoRow(context, 'Recipient', 'maria.santos@tabang.app', 'recipient1234'),
+          _demoRow(
+            context,
+            'Donor (away)',
+            'rafael.mendoza@tabang.app',
+            'donor1234',
+          ),
+          _demoRow(
+            context,
+            'Recipient',
+            'maria.santos@tabang.app',
+            'recipient1234',
+          ),
           _demoRow(context, 'Staff', 'staff@tabang.app', 'staff1234'),
           _demoRow(context, 'Admin', 'admin@tabang.app', 'admin1234'),
         ],

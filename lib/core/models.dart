@@ -221,6 +221,7 @@ class AppUser {
     this.lastDonationComponent,
     this.totalDonations = 0,
     this.isAvailable = true,
+    this.lastActiveAt,
     this.bloodCardVerified = false,
     this.shareBarangay = true,
     this.notifyRequests = true,
@@ -262,6 +263,13 @@ class AppUser {
 
   final int totalDonations;
   final bool isAvailable;
+
+  /// Last time the donor was active in TABANG (sign-in or a directory action).
+  /// The eligibility engine treats a donor who has been away for more than
+  /// [EligibilityEngine.awayAfterDays] as unavailable automatically, even when
+  /// the manual availability switch is still on.
+  final DateTime? lastActiveAt;
+
   final bool bloodCardVerified;
 
   /// Whether the donor's barangay may be shown to other community users.
@@ -315,6 +323,7 @@ class AppUser {
     String? suspensionReason,
     bool clearSuspensionReason = false,
     bool? isAvailable,
+    DateTime? lastActiveAt,
     bool? bloodCardVerified,
     DateTime? lastDonationDate,
     BloodComponent? lastDonationComponent,
@@ -358,6 +367,7 @@ class AppUser {
           lastDonationComponent ?? this.lastDonationComponent,
       totalDonations: totalDonations ?? this.totalDonations,
       isAvailable: isAvailable ?? this.isAvailable,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       bloodCardVerified: bloodCardVerified ?? this.bloodCardVerified,
       shareBarangay: shareBarangay ?? this.shareBarangay,
       notifyRequests: notifyRequests ?? this.notifyRequests,
