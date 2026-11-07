@@ -1,17 +1,598 @@
-# shs_pesearch_project
+# TABANG
 
-A new Flutter project.
+**Transfusion Access, Blood Availability and Network Guidance**
 
-## Getting Started
+A centralized donor management system for Digos City, Davao del Sur. Built as a
+Senior High School research project at Cor Jesu College, Inc.
 
-This project is a starting point for a Flutter application.
+> **This is a simulated-data research prototype.** It runs entirely on synthetic
+> donor records, inventory and request workflows. It is not connected to live
+> blood-service databases, hospital electronic health records, or Philippine Red
+> Cross systems. See [Scope](#scope) below.
 
-A few resources to get you started if this is your first Flutter project:
+> **Title note.** The paper's cover and acknowledgement pages use *Transfusion
+> Access, Blood Availability and Network Guidance*. Two body pages abbreviate
+> the last word as "Analytics"; this build follows the official title.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Quick start
+
+Requirements:
+
+- Flutter **3.47.0 or newer** (tested with Flutter 3.47.5)
+- Dart **3.13.0 or newer** (tested with Dart 3.13.4)
+- No map key: the barangay geometry and all photography are bundled. The
+  OpenStreetMap raster base loads when a network is available, and the complete
+  vector map still renders on the paper background without it
+
+```bash
+flutter pub get
+flutter run -d chrome      # or: -d windows, -d android
+```
+
+Run the checks used for this build:
+
+```bash
+flutter analyze
+flutter test
+flutter build web --release
+```
+
+There is no backend to start. The repository is seeded in memory at launch and
+resets when the process restarts. Supabase is intentionally **not** a
+dependency in this build; an unused client would imply a live connection that
+does not exist.
+
+### Demo accounts
+
+Sign in with any of these. The login screen lists them too; click a row to
+autofill.
+
+| Role | Email | Password |
+|---|---|---|
+| Donor | `iverson.briones@tabang.app` | `donor1234` |
+| Donor | `tere.santos@tabang.app` | `donor1234` |
+| Donor (away, 47 days inactive) | `rafael.mendoza@tabang.app` | `donor1234` |
+| Recipient | `maria.santos@tabang.app` | `recipient1234` |
+| Community | `community@tabang.app` | `community1234` |
+| Staff | `staff@tabang.app` | `staff1234` |
+| Admin | `admin@tabang.app` | `admin1234` |
+
+Administrative roles are seeded only. Self-registration always creates a
+community account: new users can request blood and browse donors immediately,
+then opt in to donating through **Donor Hub → Register as a donor**. The
+upgrade asks for blood type, birth date and weight; the account stays
+unverified until chapter staff check the donor's blood card. `AuthService`
+rejects `UserRole.admin` and `UserRole.staff` self-registration even if the UI
+were bypassed.
+
+---
+
+## What the app does
+
+### Donor / recipient surface
+
+- **Discover** — one compact toolbar, then horizontal rails for upcoming blood
+  drives, announcements and stories, and short learning cards, ending with a
+  visit planner. Quick actions are *Request blood*, *Find donors near you* and
+  *Find a drive* (which scrolls the feed to the drives rail). The urgent
+  shortage callout lives on Blood Bank and the map, not here. Credit text is
+  no longer printed under feed cards — attribution appears in the article and
+  drive details after a card is tapped, and original TABANG artwork is not
+  credited at all. A mouse wheel scrolls a rail only after that rail is
+  clicked; moving the pointer off the rail releases that focus immediately, so
+  the page scrolls vertically again.
+- **Blood Bank** — the chapter banner, a one-line stock note, a public stock
+  grid by component and blood type, then a *card list* of units (product,
+  storage, expiry, status) that reflows one to three columns and highlights on
+  hover. The full record — unit ID, storage, dates and who holds it — opens on
+  selection; the barcode graphic itself belongs to the staff inventory. Community
+  users can place or release a *hold* on a usable unit and book an
+  **appointment with blood** (blood type, patient name, donation type, patient
+  hospital and ward, amount and slot). A hold is not a transfusion order:
+  chapter staff still cross-match and confirm release.
+- **Find Donor** — the Digos City map: `flutter_map` renders OpenStreetMap
+  raster tiles under an inverse mask that hides everything outside the city, and
+  the 26-barangay topology from the standalone `map/` project ships locally in
+  `lib/core/digos_geodata.dart` (75 shared topological arcs that stitch into the
+  barangays plus the city perimeter, so no mapping SDK or API key is involved).
+  The base keeps the standalone map project's warm, low-contrast street
+  template, so roads, water, buildings and land use show through while the
+  Carto style's farmland hatching and baked-in place names are muted. Every
+  TABANG
+  layer is drawn on top locally, so the map still reads when tiles cannot load:
+  a translucent warm-crimson donor-density ramp (4–78% opacity, so streets stay
+  readable), a deep-crimson selection wash, tappable drop-shaped **drive pins at
+  their venue coordinates** (drives in one barangay, and drives that would sit
+  under a hospital pin, are nudged apart), dedicated **hospital and PRC chapter
+  pins**, and haloed barangay labels rebuilt on every camera change. Exactly
+  like the standalone map, every one of the 26 names is drawn at its barangay's
+  representative point — no label is ever dropped when the view zooms out — and
+  the font grows as the user zooms in, which separates the crowded Poblacion
+  names. Drive and hospital pins scale down at wide views so the city does not
+  drown in markers, and every seed pin is a representative point inside its own
+  barangay, never outside the city outline.
+  A **metric scale bar** shows distance; one fit-city control (corner-bracket
+  icon) re-frames the whole city in the pane; `+`/`−` step the zoom within
+  10.5–18; the light/dark map style is independent of the app theme
+  (and its toggle is desktop-only). The map opens framed to the whole city
+  instead of falling back to street level. Map panels fade while the map is
+  being touched and return when the gesture ends; a layers button hides them for
+  an unobstructed view, and the phone control stack is reduced to 30 px buttons
+  with a compact single-line legend to keep the map visible. The side panel has
+  three tabs — **Donors**, **Facilities** (hospitals and the PRC chapter, tap to
+  jump to the pin) and **Drives** (show on map, details, and for donors a jump
+  to Requests). Donors appear only as anonymous **`Donor #<id>`** handles, the
+  signed-in donor is excluded from their own results, and blood-type chips keep
+  clear of the control stack. Tapping a barangay filters the donor list; tapping
+  a donor card moves the map to the barangay that donor is from (not just a
+  highlight). Over the map the cursor switches to a pointing hand whenever a
+  barangay is under the mouse, so "click a region to select it" is discoverable.
+  The map credit reads `© OpenStreetMap contributors`.
+- **Donor Hub** — a dedicated donor tab with eligibility window, next available
+  date, donation history and availability controls. Availability is managed two
+  ways: the manual **Directory availability** switch hides a donor on demand,
+  and TABANG also marks any donor **away** automatically after 30 days with no
+  app activity, even while the switch is on. Posting or answering a request,
+  sending a message, flipping the switch, or the one-tap **I'm active** button
+  all refresh the timer; signing in alone does not, so a returning donor sees
+  the away notice and chooses to come back. Registration is
+  **face-to-face**, so the app only records intent: the applicant says whether
+  they already hold a PRC donor card (with an optional card number), picks an
+  optional visit day, and gets the walk-in steps plus what to bring. The
+  medical interview, examination, blood typing and screening stay on the PRC
+  interview sheet at the chapter; the account becomes a donor immediately but
+  stays *unverified*, and the eligibility engine will not match an unverified
+  donor until staff verifies the card on site. Donors see a verification card
+  with what chapter staff asked for, and keep one-tap access to requests and
+  messages because donating and needing blood are not mutually exclusive.
+- **Requests** — anyone, including a donor, can post a blood request; the
+  dialog first checks participating-facility stock and explains what each
+  urgency level means (critical = now, urgent = 24–48 h, routine = planned). If
+  compatible stock exists, the request can go to the blood bank; otherwise it is
+  posted to the donor network. Donors get three tabs — **Requests** (open
+  donor-network requests their blood type and component can serve, with their own
+  posted request excluded), **Mine** (requests they posted, with donor responses
+  and fulfilment progress) and **Donate** (the drives they can join, their
+  eligibility window and what to bring). Every card has a **⋯ menu with View
+  details** for the full record, and the response dialog shares the donor's
+  anonymous **`Donor #<id>`** handle rather than their nickname. **Chat comes
+  first:** the requester must exchange a real, reciprocal human message with a
+  donor before selection is enabled, and a system notice does not count.
+- **Messages** — double-blind coordination threads, bilateral identity reveal
+  (request then accept), block/unblock with a 48-hour re-block cooldown,
+  persisted reports to staff, and the **chapter support thread** created by the
+  Help page's feedback form.
+- **Profile** — a per-component eligibility view with multi-select chips:
+  checking whole blood, packed red cells, platelets and plasma together shows a
+  separate cooldown row for each component, so one donation type no longer hides
+  the others. The page also carries blood-card verification state, blood type,
+  weight, last donation component and notification preferences. Availability is
+  set once, in Settings and Donor Hub, rather than repeated here.
+- **Settings** — appearance (system/light/dark), notification summaries, donor
+  availability, privacy/data and account sections, each with a contextual `?`
+  help tip.
+- **Guides & Help** — a separate destination with task guides (donating,
+  requesting, messaging, Discover, profile/donor registration and settings),
+  a **chat-style FAQ** (each question is a left-hand bubble, the answer replies
+  on the right, sorted A→Z per category) and **About TABANG**, a platform
+  summary with SDG alignment, safety commitments, known gaps and photo credits.
+  A **Message chapter staff** card sends a question, data correction or
+  feedback into a real support thread with the chapter, which is also where the
+  acknowledgement lands.
+
+### Staff / admin surface
+
+- **Statistics** — a KIN-SCORE-style hierarchy: one weighted readiness score
+  with a gauge and four labelled subscores, primary KPI cards with progress
+  bars, supply/community detail, then supporting exceptions. Every figure is
+  computed from the repository. **User management** opens with the donor
+  registrations awaiting staff — card on file, planned visit, notes — where
+  each one can be verified, returned for documents or not accepted. On phones
+  and small tablets the staff console uses the same bottom-bar shell as the
+  community app; the icon rail is desktop-only.
+- **Inventory** — units are a tappable list; selecting one opens the full
+  record including the barcode graphic and the name of the person holding it.
+- **Inventory** — change unit status, monitor effective expiry pressure, confirm
+  holds and appointments, and work the request queue. Only staff/admin can mark
+  a request fulfilled.
+- **Users** — create walk-in accounts with fixed-choice fields and a one-time
+  temporary password, verify blood cards, issue warnings, suspend and reinstate
+  donor and recipient accounts, and record a completed donation with its
+  component. Staff cannot manage their own account, another staff account, or
+  an admin; only an admin can manage another staff member or add staff.
+- **Moderation** — review flagged messages, clear or escalate flags, mute
+  threads, and resolve or dismiss the persisted user-report queue.
+
+---
+
+## Paper alignment
+
+| Paper requirement | Implementation in this build |
+|---|---|
+| Recipient checks compatible stock before posting to the donor network (p.8/21) | `BloodRequestDialog` calls `TabangRepository.compatibleUnitsFor`. Stock present → blood-bank or donor-network branch; no stock → donor-network branch only. |
+| ABO/Rh compatibility matching (p.9/11) | `Compatibility` implements the red-cell matrix and inverse recipient sets. The request board, donor directory and inventory filters use it. |
+| Component-aware compatibility and cooldowns (p.11) | `EligibilityEngine` uses 84 days for whole blood/packed RBC, 14 days for platelets, and 28 days for plasma. Plasma uses the reverse ABO rule; platelets use the red-cell baseline in this prototype. |
+| Read-only inventory visibility (SEIPS, p.11) | The donation history and public stock are read-only. Community users may place a time-limited hold, but dispatch, quarantine, cross-matching, expiry and final reservation release remain staff actions. |
+| Double-blind messaging and privacy (p.34) | The map and donor directory show only a stable `Donor #<id>` handle; messaging shows the nickname. Real names and contact details appear only after a bilateral reveal request is accepted. Selection requires a reciprocal human chat first. |
+| Reports, blocks and moderation (p.12/24) | Reports persist in the repository and appear in the staff queue. Blocking disables messaging in both directions and enforces a 48-hour re-block cooldown. |
+| Expiry-aware inventory (p.15) | `BloodUnit.effectiveStatus` marks expired stock even if its stored status is still `available`; expired units are excluded from usable stock, compatibility counts and expiring-soon lists. |
+| Donor eligibility: age 18–65, weight, availability, standing (p.17) | `EligibilityEngine` enforces the rules; registration computes exact age, rejects donors outside 18–65, and requires a self-reported weight. Donors below 50 kg or without a recorded weight are blocked from matching. |
+| Registration fields (p.22) | A three-step community-account wizard collects full name, unique nickname, email, contact number, birth date, blood type, weight and barangay. Everything is persisted; the nickname is the only public identity. Donor status is a separate opt-in upgrade in Donor Hub. |
+| Email credential authentication (p.28) | Salted SHA-256 credential store, session routing by role, and no self-service admin/staff registration. |
+| Request lifecycle and staff-only fulfilment | Donor-network: open → matched (after chat-first selection) → fulfilled (staff/admin only). Blood-bank: staff process the request and fulfil it directly. Cancellation is guarded; fulfilled/cancelled requests cannot be re-opened or fulfilled twice. |
+| Appointment with blood | `DonationAppointment` records patient name, blood type, component, hospital, ward, units and slot. Requesters book; staff confirm. A slot does not allocate a specific bag. |
+| Image attribution | Every bundled file has its own entry in `lib/core/image_credits.dart`, a visible caption under the image and a hover/detail credit with title, author, licence and source URL. |
+| SUS / SEIPS evaluation (external) | The app supplies the workflow and criteria; the SUS/SEIPS surveys are conducted externally and are not embedded. |
+| Simulated data only, no live PRC/EHR integration | The repository is in-memory synthetic data. No live integration exists. |
+
+### Known gaps against the paper
+
+| Paper reference | Status |
+|---|---|
+| Google OAuth 2.0 (p.28) | **Not implemented.** Requires a provisioned OAuth client. Email credential auth is fully functional. |
+| Supabase/PostgreSQL backend (p.27) | **Not implemented.** The app uses the in-memory repository; no Supabase client is shipped. |
+| Voice calls (p.24) | **Not implemented.** Messaging works; the call affordance is absent rather than dead. |
+| Profile picture upload (p.26) | **Not implemented.** No image-picker dependency. |
+| Push notifications | **Not implemented.** Discover shows in-app summaries; delivery requires a deployed backend and notification service. |
+| Multi-facility inventory | **Partial.** The app has a participating-facility list and a request-source branch, but no per-facility stock ledger or inter-facility transfer workflow. |
+| Clinical screening | **Not implemented.** Weight is self-reported and there is no pre-donation physical examination, hemoglobin check, or clinician clearance. The app enforces the recorded eligibility rules only. |
+| Production authentication | **Prototype only.** Credentials are salted and SHA-256 hashed in memory; a production system needs a persistent store, a memory-hard password KDF, rate limiting, and TLS. |
+| Production release signing | **Prototype only.** Android release builds use the debug key; replace it before distributing an APK. |
+| Desktop map support | **Supported.** The Digos map is a Flutter canvas, so Find Donor works on Windows, Linux and macOS without a fallback. |
+
+---
+
+## Architecture
+
+```
+lib/
+├── main.dart                  # root; routes on session state, wraps navigator in SafeArea
+├── theme.dart                 # M3 schemes, gradients, component themes
+├── core/
+│   ├── models.dart            # domain models, expiry, holds, appointments
+│   ├── eligibility.dart       # component compatibility + cooldown engine
+│   ├── repository.dart        # in-memory store, seed data, lifecycle, analytics
+│   ├── auth.dart              # credential auth, role gating, donor upgrade
+│   ├── digos_geodata.dart     # 75 shared arcs → 26 barangays + city ring
+│   └── image_credits.dart     # per-asset provenance registry
+├── widgets/
+│   ├── common.dart            # shared UI kit, HelpTip, progress bars
+│   ├── photo.dart             # TabangPhoto + visible PhotoCredit
+│   ├── digos_vector_map.dart  # OSM base, heat fills, pins, labels, controls
+│   └── blood_request_dialog.dart # stock-first request flow
+└── screens/
+    ├── auth/                  # login, community registration
+    ├── donor/                 # DonorShell + Discover, Blood Bank, Map,
+    │                          # Requests, Messages, Donor Hub
+    ├── admin/                 # AdminShell + Statistics, Inventory, Users, Moderation
+    └── shared/                # Settings, Profile, Guides & Help / About
+```
+
+### Key design decisions
+
+**One data layer.** `TabangRepository` is the only place seed data lives. Donor,
+recipient and staff surfaces read the same objects and stay in sync through a
+listener.
+
+**Eligibility is enforced, not displayed.** `EligibilityEngine` computes
+cooldowns from `lastDonationDate` against per-component intervals. Donors in
+cooldown are excluded from the directory and cannot respond to requests.
+Recording a donation stores the component so the profile and audit trail are
+consistent.
+
+**Expiry is effective, not cosmetic.** A bag whose `expiresOn` has passed is
+treated as expired even if its stored status was never changed. It is excluded
+from available stock, compatible-unit counts and shortage calculations.
+
+**The request lifecycle is explicit.** Donor responses are offers. Only the
+requester (or staff) can select a response, and only after both sides have
+exchanged a real human message; opening a thread or a system notice is not
+enough. Selection creates one coordination thread and, once enough donors are
+selected, moves a donor-network request to `matched`. Blood-bank requests are
+processed by staff and can be fulfilled directly. Only staff/admin can mark a
+request `fulfilled`; donor-network requests must be matched first. Cancelled and
+fulfilled requests are terminal.
+
+**Holds are not transfusions.** A community user can place a hold on a usable
+unit so two people cannot claim the same bag, and can release it. Staff still
+cross-match and confirm the release, and holds expire with the unit. The public
+inventory never becomes an ordering system.
+
+**Privacy is bilateral.** Aliases are the default identity. A reveal request
+must be accepted by the other participant; declining or ignoring it leaves both
+parties anonymous. Reports persist and blocking is symmetric for messaging.
+
+**The public identity is a nickname, never the User ID.** A raw ID is
+correlatable and unfriendly, while nicknames alone risk impersonation — so
+TABANG combines both: the nickname is unique, case-insensitively enforced by
+`AuthService._validateAlias`, and is the handle used in messaging and community
+surfaces. The map and donor directory go further and show only a stable
+anonymous `Donor #<id>` token, because browsing a public map should not expose
+even a friendly alias. The immutable `USR-…` ID stays internal for audit trails,
+blocks and lifecycle rules, and real names appear only in staff tools or after a
+bilateral reveal. A nickname may not simply repeat the legal name the anonymity
+rule is protecting.
+
+**Onboarding is progressive, the layout is responsive.** Every account starts
+as a community user, and a role-specific welcome guide (`showWelcomeGuide`)
+explains the three things to do first. Donor status is a separate,
+reversible-by-staff upgrade in Donor Hub, not a signup fork. Layout adapts by
+width — below 1024 px the sidebar becomes an M3 bottom navigation bar and the
+map stacks above the donor list; from 1024 px up the sidebar is the default
+navigation, expanded and pinnable, with hover-open still available after
+unpinning, and the classic side-by-side splits. `MaterialApp.builder` wraps the
+navigator in `SafeArea`, so status-bar and gesture insets are never painted
+over. The theme starts in **light** mode; dark and system-follow are explicit
+choices in Settings.
+
+**Accounts can be created at the chapter desk.** Staff register walk-in donors
+and patient representatives from User management. Every field is a fixed choice
+or an obvious text box; TABANG generates a temporary password, shows it once,
+and stores only its hash. Privilege rules are enforced in `AuthService`: staff
+create community accounts only, an admin may add staff, and nobody can create
+an admin from inside the app.
+
+**Role authorization is server-side-style, not just visual.** Staff cannot
+manage themselves, other staff, or admins. Only an admin can manage another
+staff member. Fulfilment checks the actor's role in the repository.
+
+**Analytics are computed.** `TabangRepository.summary()` derives every figure
+on the admin statistics page from the underlying records, so the readiness
+score, KPI cards and tables beneath them always agree.
+
+**Attribution matches the file.** `lib/core/image_credits.dart` is the single
+per-asset registry. `TabangPhoto` looks up the exact asset for its hover tooltip,
+and `PhotoCredit` prints the same author and licence visibly under the image.
+The About tab renders the full registry with source links. There is no generic
+"public domain" footer that could drift away from the file being shown.
+
+**The map has one visual language.** A sequential warm-crimson ramp encodes
+available donors, with a legend; selection uses deep brand tones plus a
+contrasting outline, never the blue that previously meant both "selected" and
+"water". The OpenStreetMap base is pushed through the standalone map project's
+warm template, so streets, water, buildings and land use stay revealed while its
+farmland hatching and baked-in names are muted; TABANG's own
+labels all sit on their barangay's representative point and never disappear as
+the view widens. The base starts light even in
+dark mode (with an independent map toggle) because cartography reads better on a
+light surface, and the compass, zoom buttons and collapsible donor pane are
+explicit controls rather than gestures.
+
+### Performance and reliability
+
+**No maps SDK, so no platform view.** The original build used
+`google_maps_flutter`; its web platform view threw
+`Maps cannot be retrieved before calling buildView!` while switching tabs and
+froze the page. The map now uses `flutter_map` (pure Flutter — no platform
+view, no API key) with the barangay geometry bundled in
+`lib/core/digos_geodata.dart`. Only the base tile image comes from
+OpenStreetMap, and tile failures are swallowed: the city mask, barangays,
+donor density, labels and drive pins are all local, so an offline device still
+gets a working map on the paper background. It renders identically on phones,
+tablets, web and desktop, and keeps an independent light/dark map style because
+the app theme should not decide how legible the street network is.
+
+**Shell pages stay alive.** `DonorShell` and `AdminShell` keep each visited page
+in a lazy `IndexedStack`, so switching tabs no longer rebuilds the page or
+recreates the map. Filters, scroll positions and form state survive navigation.
+
+**Heavy work is cached.** The stitched barangay rings, internal border arcs and
+city ring are computed once and shared between map page instances, and the
+request board uses a sliver list so only the cards on screen are built.
+
+**Empty states are illustrated with vectors; photography is reserved for
+people-facing content.** `TabangIllustration` draws each empty scene from theme
+colours with a radial wash whose alpha reaches zero at the edges, so the art
+blends into the surrounding card in light and dark mode, stays crisp at any
+density, and adds no download weight. `EmptyState` uses it wherever a full
+illustration helps; dense admin tables keep the compact icon variant. Photos are
+used only where they add context: the login brand panel, the Discover hero,
+article and drive cards, their dialogs, and the identity headers. Every one is
+credited individually; the 48 profile portraits and seven educational
+illustrations are original TABANG artwork.
+
+---
+
+## Scope
+
+Per the study's stated limitations, this build:
+
+- runs exclusively on **simulated data**;
+- does **not** connect to live donor registries, hospital EHR systems, or
+  Philippine Red Cross inventory;
+- is **not** a replacement for authorized blood-service procedures;
+- does not claim clinical validity for its component/cooldown rules. Those
+  rules are simplified for the prototype and must be reviewed by a licensed
+  blood-service professional before any real use.
+
+### Barangay boundaries
+
+The 26 barangays of Digos City come from the standalone `map/` project
+(`map/lib/data/digos_geodata.dart`) and are ported unchanged into
+`lib/core/digos_geodata.dart`. The data is 75 shared topological arcs: each
+barangay is a sequence of arc indices, and the outer city perimeter is the
+documented arc sequence `cityArcs` wound clockwise for the inverse mask.
+Stitching from shared arcs means an internal border is drawn once, two
+neighbouring barangays can never disagree about where the line is, and the city
+outline is exactly the previous map's outline. No mapping SDK, network request
+or API key is needed for the shapes.
+
+The older `assets/maps/digos_barangays.geojson`, the PSA/NAMRIA extract and the
+`tools/` SVG/GADM scripts remain in the repository as provenance, but the app
+no longer loads them.
+
+**Accuracy.** The arcs are a schematic trace of the city suitable for an
+academic, non-commercial prototype with attribution. They are not survey-grade:
+do not use them for navigation, land titles or service boundaries. For a real
+deployment, replace the embedded data with PSA or LGU boundary data.
+
+---
+
+## No map key required
+
+No mapping SDK and no API key are involved. Find Donor's geometry comes from
+`lib/core/digos_geodata.dart`, and the OpenStreetMap raster tiles used as the
+base layer need no key, account or referrer restriction; the required credit
+(`© OpenStreetMap contributors`) is drawn on the map. For a fully offline
+deployment the tile layer can be switched
+off with one flag (`DigosVectorMap.tilesEnabled`), which leaves the complete
+vector map running on the paper background. The only deployment signing caveat
+left is the Android release keystore, which the research team must supply before
+distributing an APK outside the group.
+
+---
+
+## Bundled imagery
+
+Every photograph and illustration is a local Flutter asset. The app makes no
+image request at runtime, so the interface still works with the network switched
+off and there is no third-party image host to configure or pay for.
+
+| Surface | Asset |
+|---|---|
+| Login brand panel, Discover hero | `assets/images/hero_donation.jpg` |
+| Hydration and nutrition articles | `content_hydration.jpg`, `content_nutrition.jpg` |
+| Recovery, screening and drive articles | `content_recovery.jpg`, `content_screening.jpg`, `content_drive.jpg` |
+| Privacy article | `content_privacy.jpg` |
+| Recipient story | `content_story.jpg` |
+| Donor spotlight and drive cards | `drive_community.jpg`, `content_drive.jpg` |
+| Educational illustrations | `assets/images/educational/edu_*.png` (7 originals) |
+| Profile portraits | `assets/images/avatars/avatar_001.png` … `avatar_048.png` |
+| App icon / PWA icons | `assets/branding/app_icon.png` |
+
+`TabangPhoto` (`lib/widgets/photo.dart`) is the single image surface. It loads
+with `Image.asset`, fades in on first paint, and falls back to a themed gradient
+with the relevant icon if an asset is missing — so a stripped-down build never
+shows Flutter's red error box or an unstable layout. Every display is paired
+with a visible `PhotoCredit` line and a hover credit that names the actual file,
+creator and licence. The photo is paired with a scrim in the hero and login
+views to keep white copy legible.
+
+**Licences.** Every source photograph is public domain or CC0; original
+artwork is TABANG's own. Source URLs, authors and licence details are recorded
+in [`tools/image_sources/CREDITS.md`](tools/image_sources/CREDITS.md) and in the
+About tab's per-image credit cards. The source files are kept in
+`tools/image_sources/`; regenerate the cropped, graded assets and all platform
+launcher icons with:
+
+```bash
+python tools/make_media_assets.py
+```
+
+Profile portraits and educational art are regenerated with
+`tools/make_avatars.py` and `tools/make_edu_art.py`. The photographs are illustrative:
+they do not depict TABANG users or patients, and the people shown have no
+connection to the simulated records.
+
+---
+
+## Tests
+
+```bash
+flutter test
+```
+
+**79 tests** cover:
+
+- **Seed data** — exactly 15 currently eligible donors (plus two deliberately
+  away donors), 15 recipients, the community demo account, and a unique bundled
+  avatar per seeded user.
+- **ABO/Rh compatibility matrix** — universal donor/recipient properties,
+  per-type donor sets, and the inverse relationship between `donorsFor` and
+  `recipientsFor`.
+- **Component-aware compatibility** — plasma's reverse ABO rule, platelet
+  baseline, and per-component donor sets.
+- **Cooldown enforcement** — boundary conditions, per-component intervals,
+  suspension, availability, age limits, underweight/missing weight, and missing
+  blood type.
+- **Expiry handling** — effective status, exclusion from available stock, and
+  prevention of reviving an expired bag as available.
+- **Request lifecycle** — compatible/ineligible/duplicate responses, blood-bank
+  requests rejecting donor responses, chat-first selection (one-sided chat is
+  refused until both people send a message), selection authorization,
+  selection-time eligibility rechecks, thread creation, leftover offers being
+  declined, staff-only fulfilment, and cancellation guards.
+- **Inventory holds and appointments** — a unit can be held once, a second
+  person cannot claim it, only its holder can release it, appointments start
+  pending, requesters cannot confirm their own slot, and staff confirmation
+  works.
+- **Privacy and safety** — bilateral reveal accept/decline, persisted reports,
+  symmetric blocking, and the 48-hour re-block cooldown.
+- **Donation recording** — component capture and component-specific cooldown.
+- **Automatic away availability** — a donor inactive for 30+ days is blocked
+  with the `away` reason and never reaches the directory; `markActive` clears
+  it, and the seed keeps exactly 15 eligible donors alongside the two
+  deliberate away cases.
+- **Donor authoring and anonymity** — a donor can post a request that another
+  donor can serve, and both the response alias and the map/directory handle are
+  `Donor #<id>` tokens that never expose the nickname or legal name.
+- **Account creation and privacy** — nickname uniqueness and full-name
+  rejection, community-only self-registration, the donor upgrade path,
+  staff/admin privilege rules for walk-in accounts, generated temporary
+  passwords that authenticate, and the onboarding flag.
+- **Donor registration** — a submitted registration interest (with or without
+  an existing donor card) becomes a *pending* application, an unverified donor
+  is never matched by the eligibility engine, staff can request documents
+  without closing the application, and verifying flips the blood card, the
+  account status and the open queue at once.
+- **Interface widgets** — Discover leads with its section rails, photo credit
+  chips resolve for every bundled photograph and open the licence/source dialog
+  (original artwork is deliberately uncredited), empty states render the vector
+  illustration, every content item resolves to a bundled photo, the
+  hero/feed/dialog mount those photos, a missing asset falls back to the themed
+  placeholder, a narrow PageHeader stays a single compact line with its
+  description in the tooltip, and the Digos vector map mounts all 26 barangays
+  with tiles disabled (so no HTTP runs in tests), keeps its overlay controls in
+  the wide desktop layout including the fit-city button, shrinks the phone
+  control stack, and selects a barangay on tap. The Donor Hub additionally
+  renders the automatic-away notice and clears it through the **I'm active**
+  action.
+- **Narrow-screen layout** — Discover, Blood Bank (including unit selection and
+  the appointment dialog) and Statistics render at a 360 × 780 phone viewport
+  without overflow; the unit list reflows to one column and the appointment
+  dialog stacks its fields.
+- **Sidebar** — unpinning the desktop rail collapses it to the icon-only
+  layout, each rail item's icon stays dead-centre in its pill (the regression
+  that left the selection accent bar pushing icons off-centre), and the compact
+  pin control remains under the logo so an unpinned donor or admin rail can be
+  pinned open again.
+- **Barangay canonicalisation** — parenthetical stripping, case/punctuation
+  normalisation, and round-tripping all 26 names.
+
+`flutter analyze` is clean for this build.
+
+---
+
+## Build targets
+
+| Platform | Status |
+|---|---|
+| Web | ✅ builds and runs (`flutter build web --release`) |
+| Android | ✅ debug APK builds; verified package `ph.edu.cjc.tabang`, `minSdk 24`, target SDK 36, `INTERNET` permission |
+| Windows | ✅ configured; the offline Digos map works natively |
+| Linux | ✅ configured; the offline Digos map works natively |
+| iOS / macOS | ⚠️ requires a Mac to compile; bundle ID `ph.edu.cjc.tabang`; not built by the proponents |
+
+Android release builds currently use the debug signing key. This is documented
+in `android/app/build.gradle.kts` and is not suitable for public distribution.
+
+Android is intentionally pinned to **AGP 8.13.2 / Gradle 8.14.3 / Kotlin
+2.4.0**. Flutter 3.47's Gradle plugin still casts AGP 9's new DSL extension to
+the legacy type, so AGP 9.1.0 fails at configuration time. Revisit this pin when
+Flutter's Gradle plugin completes the AGP 9 migration; the app code itself does
+not depend on AGP 8. Kotlin incremental compilation is disabled in
+`android/gradle.properties` because the Pub cache (`C:`) and this project
+(`D:`) are on different Windows drive roots, which makes Kotlin's incremental
+cache fail while closing its path tables.
+
+---
+
+## Alignment
+
+SDG 3 (Good Health and Well-being) and SDG 9 (Industry, Innovation and
+Infrastructure).
+
+Built with Flutter. The Digos City map's geometry is bundled in-app
+(`lib/core/digos_geodata.dart`) — no mapping SDK and no API key.

@@ -1,14 +1,26 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-// Import your dashboards
-import 'dashboard.dart'; // Donor / Recipient Dashboard
-import 'admin_dashboard.dart'; // System Admin Dashboard
+import 'core/auth.dart';
+import 'core/models.dart';
+import 'core/repository.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/donor/donor_shell.dart';
+import 'screens/admin/admin_shell.dart';
+import 'theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AuthService.instance.bootstrap();
   runApp(const TabangApp());
 }
 
+/// Root widget.
+///
+/// Routing is driven by the repository's session state, not by a dropdown.
+/// When [TabangRepository.currentUser] is null the login screen is shown; when
+/// it is set, the correct dashboard is chosen from the user's role. Signing out
+/// clears the session and the router falls back to login automatically.
 class TabangApp extends StatefulWidget {
   const TabangApp({super.key});
 
@@ -17,154 +29,99 @@ class TabangApp extends StatefulWidget {
 }
 
 class _TabangAppState extends State<TabangApp> {
-  ThemeMode themeMode = ThemeMode.system;
+  final TabangRepository _repo = TabangRepository.instance;
 
-  void _handleThemeChange(ThemeMode mode) {
-    setState(() {
-      themeMode = mode;
-    });
+  /// Light is the product default. System tracking follows the OS, which on a
+  /// desktop with an evening dark schedule made the app flip themes without
+  /// the user ever choosing one.
+  ThemeMode _themeMode = ThemeMode.light;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo.addListener(_onRepoChanged);
+  }
+
+  @override
+  void dispose() {
+    _repo.removeListener(_onRepoChanged);
+    super.dispose();
+  }
+
+  void _onRepoChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _setThemeMode(ThemeMode mode) {
+    setState(() => _themeMode = mode);
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = _repo.currentUser;
+
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'TABANG',
-      theme: ThemeData(
-        brightness: Brightness.light,
-        fontFamily: 'Arial',
-        scaffoldBackgroundColor: const Color(0xFFD3D3D3),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
+      debugShowCheckedModeBanner: false,
+      theme: TabangTheme.light,
+      darkTheme: TabangTheme.dark,
+      themeMode: _themeMode,
+      // Flutter's default web scroll behaviour only accepts touch drags. That
+      // left every horizontal rail impossible to move with a mouse, which is
+      // the "can't scroll" failure users hit on desktop.
+      scrollBehavior: const TabangScrollBehavior(),
+      // Non-edge-to-edge by design: reserve the system status and gesture/nav
+      // insets around the whole navigator. Text never sits under the clock,
+      // and the bottom bar never collides with gesture navigation.
+      builder: (context, child) => ColoredBox(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: SafeArea(
+          child: child ?? const SizedBox.shrink(),
         ),
       ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        fontFamily: 'Arial',
-        scaffoldBackgroundColor: const Color(0xFF181818),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-      ),
-      themeMode: themeMode,
-      home: LoginScreen(
-        themeMode: themeMode,
-        onThemeChanged: _handleThemeChange,
-      ),
+      home: _buildHome(user),
     );
   }
-}
 
-class LoginScreen extends StatefulWidget {
-  final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeChanged;
+  Widget _buildHome(AppUser? user) {
 
-  const LoginScreen({
-    super.key,
-    required this.themeMode,
-    required this.onThemeChanged,
-  });
-
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
-  String _selectedRole = 'admin'; // Defaults to Admin for quick preview
-
-  void _login() {
-    Widget destination;
-
-    if (_selectedRole == 'admin') {
-      destination = AdminDashboard(
-        themeMode: widget.themeMode,
-        onThemeChanged: widget.onThemeChanged,
-      );
-    } else {
-      destination = Dashboard(
-        themeMode: widget.themeMode,
-        onThemeChanged: widget.onThemeChanged,
+    if (user == null) {
+      return LoginScreen(
+        themeMode: _themeMode,
+        onThemeModeChanged: _setThemeMode,
       );
     }
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => destination),
+    // Staff and admins share the administrative shell; donors and recipients
+    // share the community shell. This is the only place role routing happens.
+    if (user.role.isAdminSide) {
+      return AdminShell(
+        user: user,
+        themeMode: _themeMode,
+        onThemeModeChanged: _setThemeMode,
+      );
+    }
+
+    return DonorShell(
+      user: user,
+      themeMode: _themeMode,
+      onThemeModeChanged: _setThemeMode,
     );
   }
+}
+
+/// Allows click-and-drag scrolling with a mouse or trackpad on every
+/// scrollable, including the horizontal Discover rails. Flutter only enables
+/// touch drags by default on web.
+class TabangScrollBehavior extends MaterialScrollBehavior {
+  const TabangScrollBehavior();
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Container(
-          width: 380,
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.water_drop, color: Color(0xFF7A1C1E), size: 48),
-              const SizedBox(height: 12),
-              const Text(
-                'TABANG Access Portal',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-
-              // Role Selector Dropdown
-              DropdownButtonFormField<String>(
-                value: _selectedRole,
-                decoration: const InputDecoration(
-                  labelText: 'Select Portal Access Role',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'admin',
-                    child: Text('System Admin Dashboard'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'donor',
-                    child: Text('Donor / Recipient Dashboard'),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedRole = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                height: 42,
-                child: ElevatedButton(
-                  onPressed: _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7A1C1E),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Open Selected Dashboard'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+      };
 }

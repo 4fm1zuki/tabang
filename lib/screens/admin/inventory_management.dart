@@ -1,0 +1,620 @@
+import 'package:flutter/material.dart';
+
+import '../../core/models.dart';
+import '../../core/repository.dart';
+import '../../theme.dart';
+import '../../widgets/layout.dart';
+import '../../widgets/barcode.dart';
+import '../../widgets/common.dart';
+import '../../widgets/illustrations.dart';
+
+/// Inventory and request management for chapter staff.
+///
+/// Staff can change a unit's status, see expiry pressure, and work the request
+/// queue. The previous build's inventory page was read-only and held a second,
+/// divergent copy of the blood unit list.
+class InventoryManagementPage extends StatefulWidget {
+  const InventoryManagementPage({super.key, required this.currentUser});
+
+  final AppUser currentUser;
+
+  @override
+  State<InventoryManagementPage> createState() =>
+      _InventoryManagementPageState();
+}
+
+class _InventoryManagementPageState extends State<InventoryManagementPage> {
+  final TabangRepository _repo = TabangRepository.instance;
+
+  BloodType? _typeFilter;
+  UnitStatus? _statusFilter;
+  int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _repo.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  List<BloodUnit> get _units {
+    final now = DateTime.now();
+    return _repo.units.where((u) {
+      if (_typeFilter != null && u.bloodType != _typeFilter) return false;
+      if (_statusFilter != null &&
+          u.effectiveStatus(now) != _statusFilter) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const PageHeader(
+            title: 'Inventory & requests',
+            subtitle:
+                'Manage blood units, monitor expiry, and work the request queue.',
+          ),
+          const SizedBox(height: TabangSpace.xl),
+
+          // Tabs
+          Row(
+            children: [
+              _tabButton(context, 0, 'Blood units', _repo.units.length),
+              const SizedBox(width: TabangSpace.sm),
+              _tabButton(context, 1, 'Requests', _repo.requests.length),
+            ],
+          ),
+          const SizedBox(height: TabangSpace.lg),
+
+          if (_tab == 0) _buildUnitsTab(context) else _buildRequestsTab(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabButton(BuildContext context, int index, String label, int count) {
+    final selected = _tab == index;
+    return InkWell(
+      borderRadius: BorderRadius.circular(TabangRadius.sm),
+      onTap: () => setState(() => _tab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TabangSpace.lg,
+          vertical: TabangSpace.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? TabangColors.crimson : context.surface,
+          borderRadius: BorderRadius.circular(TabangRadius.sm),
+          border: Border.all(
+            color: selected ? TabangColors.crimson : context.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : context.textColor,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : context.surfaceAlt,
+                borderRadius: BorderRadius.circular(TabangRadius.pill),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : context.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnitsTab(BuildContext context) {
+    final units = _units;
+    final now = DateTime.now();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: TabangSpace.md,
+          runSpacing: TabangSpace.md,
+          children: [
+            SizedBox(
+              width: 180,
+              child: DropdownButtonFormField<BloodType?>(
+                initialValue: _typeFilter,
+                isExpanded: true,
+                decoration:
+                    const InputDecoration(labelText: 'Blood type', isDense: true),
+                style: TextStyle(fontSize: 12.5, color: context.textColor),
+                items: [
+                  const DropdownMenuItem<BloodType?>(
+                      value: null, child: Text('All types')),
+                  ...BloodType.values.map((t) => DropdownMenuItem<BloodType?>(
+                        value: t,
+                        child: Text(t.label),
+                      )),
+                ],
+                onChanged: (v) => setState(() => _typeFilter = v),
+              ),
+            ),
+            SizedBox(
+              width: 180,
+              child: DropdownButtonFormField<UnitStatus?>(
+                initialValue: _statusFilter,
+                isExpanded: true,
+                decoration:
+                    const InputDecoration(labelText: 'Status', isDense: true),
+                style: TextStyle(fontSize: 12.5, color: context.textColor),
+                items: [
+                  const DropdownMenuItem<UnitStatus?>(
+                      value: null, child: Text('All statuses')),
+                  ...UnitStatus.values.map((s) => DropdownMenuItem<UnitStatus?>(
+                        value: s,
+                        child: Text(s.label),
+                      )),
+                ],
+                onChanged: (v) => setState(() => _statusFilter = v),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: TabangSpace.lg),
+        if (units.isEmpty)
+          const EmptyState(
+            art: TabangArt.inventory,
+            title: 'No units match these filters',
+          )
+        else
+          SurfaceCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (var i = 0; i < units.length; i++)
+                  _buildUnitRow(context, units[i], now, first: i == 0),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// One inventory row. The list shows only what staff scan for — product,
+  /// ID, expiry and status. Selecting the row opens the full record, including
+  /// the barcode graphic and the name of the person holding the unit.
+  Widget _buildUnitRow(
+    BuildContext context,
+    BloodUnit unit,
+    DateTime now, {
+    required bool first,
+  }) {
+    final days = unit.daysUntilExpiry(now);
+    final effective = unit.effectiveStatus(now);
+    final expiring = days >= 0 && days <= 5 && unit.isUsableAt(now);
+    final holder = unit.reservedBy == null
+        ? null
+        : _repo.userById(unit.reservedBy!);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: first
+            ? null
+            : Border(top: BorderSide(color: context.border)),
+      ),
+      child: InkWell(
+        onTap: () => _showUnitDetails(context, unit, now),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: TabangSpace.lg,
+            vertical: TabangSpace.md,
+          ),
+          child: Row(
+            children: [
+              BloodTypeChip(unit.bloodType, size: 32),
+              const SizedBox(width: TabangSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      unit.product,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'ID ${unit.barcode}'
+                      '${holder == null ? '' : ' · held by ${holder.alias}'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: context.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: TabangSpace.sm),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    unit.timeLeft(now),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          expiring ? FontWeight.w700 : FontWeight.w600,
+                      color: expiring
+                          ? TabangColors.danger
+                          : context.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  StatusPill(
+                    effective.label,
+                    tone: toneForUnit(effective),
+                    dense: true,
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<UnitStatus>(
+                tooltip: 'Change status',
+                icon: Icon(Icons.more_horiz,
+                    size: 18, color: context.textMuted),
+                onSelected: (status) =>
+                    _repo.setUnitStatus(unit.barcode, status),
+                itemBuilder: (context) => UnitStatus.values
+                    .where((s) =>
+                        s != effective &&
+                        !(s == UnitStatus.available && unit.isExpiredAt(now)))
+                    .map((s) => PopupMenuItem(
+                          value: s,
+                          child: Text(
+                            'Mark ${s.label.toLowerCase()}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUnitDetails(
+    BuildContext context,
+    BloodUnit unit,
+    DateTime now,
+  ) {
+    final effective = unit.effectiveStatus(now);
+    final holder =
+        unit.reservedBy == null ? null : _repo.userById(unit.reservedBy!);
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            BloodTypeChip(unit.bloodType, size: 32),
+            const SizedBox(width: TabangSpace.md),
+            const Expanded(child: Text('Unit details')),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(TabangSpace.md),
+                  decoration: BoxDecoration(
+                    color: dialogContext.surfaceAlt,
+                    borderRadius: BorderRadius.circular(TabangRadius.sm),
+                  ),
+                  child: UnitBarcode(unit.barcode),
+                ),
+                const SizedBox(height: TabangSpace.lg),
+                _detail(dialogContext, 'Component', unit.product),
+                _detail(dialogContext, 'Status', effective.label),
+                _detail(dialogContext, 'Storage', unit.storageBay),
+                _detail(
+                    dialogContext, 'Collected', formatDate(unit.collectedOn)),
+                _detail(dialogContext, 'Expires', formatDate(unit.expiresOn)),
+                _detail(dialogContext, 'Remaining', unit.timeLeft(now)),
+                _detail(
+                  dialogContext,
+                  'Reserved by',
+                  holder == null
+                      ? 'No one — available for allocation'
+                      : '${holder.alias} (${holder.role.label})',
+                ),
+                if (unit.reservedAt != null)
+                  _detail(
+                    dialogContext,
+                    'Hold placed',
+                    formatDateTime(unit.reservedAt!),
+                  ),
+                if (unit.reservationNote != null &&
+                    unit.reservationNote!.isNotEmpty)
+                  _detail(
+                      dialogContext, 'Hold note', unit.reservationNote!),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detail(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: context.textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequestsTab(BuildContext context) {
+    final requests = _repo.requests;
+
+    if (requests.isEmpty) {
+      return const EmptyState(
+        art: TabangArt.requests,
+        title: 'No requests in the queue',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Fulfilment is staff-only. Donor responses are offers; the '
+          'requester selects a donor in the community app, and staff mark the '
+          'request fulfilled after the donation is recorded.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.5,
+            color: context.textMuted,
+          ),
+        ),
+        const SizedBox(height: TabangSpace.md),
+        ...requests.map((request) {
+          final compatibleDonors = _repo.findDonors(
+            compatibleWith: request.bloodType,
+            component: request.component,
+          ).length;
+          final compatibleUnits = _repo
+              .compatibleUnitsFor(
+                recipientType: request.bloodType,
+                component: request.component,
+              )
+              .length;
+          final responses = _repo.responsesFor(request.id);
+          final selected = responses
+              .where((r) => r.status == ResponseStatus.selected)
+              .length;
+          final requester = _repo.userById(request.requesterId);
+
+          void updateStatus(RequestStatus status) {
+            final ok = switch (status) {
+              RequestStatus.fulfilled => _repo.markRequestFulfilled(
+                  request.id,
+                  actorId: widget.currentUser.id,
+                ),
+              RequestStatus.cancelled => _repo.cancelRequest(
+                  request.id,
+                  actorId: widget.currentUser.id,
+                ),
+              RequestStatus.matched || RequestStatus.open => false,
+            };
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  ok
+                      ? 'Request ${request.id} marked ${status.label.toLowerCase()}.'
+                      : 'Could not update ${request.id}.',
+                ),
+              ),
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: TabangSpace.md),
+            child: SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      BloodTypeChip(request.bloodType, size: 34),
+                      const SizedBox(width: TabangSpace.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // One pill, one title. Three stacked pills beside
+                            // every request made the staff queue read as noise;
+                            // status and source now sit in the sentence below.
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    request.patientAlias,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.2,
+                                      color: context.textColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                StatusPill(
+                                  request.urgency.label,
+                                  tone: toneForUrgency(request.urgency),
+                                  dense: true,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${request.component.label} · '
+                              '${request.unitsOutstanding} of '
+                              '${request.unitsNeeded} units outstanding · '
+                              '${request.hospital}',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: context.textMuted),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${request.status.label} · '
+                              '${request.source == RequestSource.bloodBank ? 'Blood bank' : 'Donor network'}'
+                              ' · posted by ${requester?.alias ?? 'unknown'}'
+                              ' · ${request.barangay}'
+                              ' · ${formatRelative(request.createdAt)}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.textMuted),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              request.source == RequestSource.bloodBank
+                                  ? '$compatibleUnits compatible units in '
+                                      'stock · ${responses.length} donor '
+                                      'responses'
+                                  : '$compatibleDonors eligible compatible '
+                                      'donors · ${responses.length} responses '
+                                      '($selected selected)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.textMuted,
+                              ),
+                            ),
+                            if (responses.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                'Responders: '
+                                '${responses.map((r) => r.donorAlias).join(', ')}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.textMuted,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (request.status == RequestStatus.open ||
+                          request.status == RequestStatus.matched)
+                        PopupMenuButton<RequestStatus>(
+                          tooltip: 'Update request',
+                          icon: Icon(Icons.more_vert,
+                              size: 17, color: context.textMuted),
+                          onSelected: updateStatus,
+                          itemBuilder: (context) => [
+                            if (request.status == RequestStatus.matched ||
+                                request.source == RequestSource.bloodBank)
+                              const PopupMenuItem(
+                                value: RequestStatus.fulfilled,
+                                child: Text('Mark fulfilled (staff only)',
+                                    style: TextStyle(fontSize: 12)),
+                              ),
+                            const PopupMenuItem(
+                              value: RequestStatus.cancelled,
+                              child: Text('Cancel request',
+                                  style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  if (request.unitsNeeded > 1) ...[
+                    const SizedBox(height: TabangSpace.md),
+                    ProportionBar(
+                      value: request.unitsFulfilled.toDouble(),
+                      max: request.unitsNeeded.toDouble(),
+                      color: TabangColors.success,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}

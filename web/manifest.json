@@ -1,12 +1,12 @@
 {
-    "name": "shs_pesearch_project",
-    "short_name": "shs_pesearch_project",
+    "name": "TABANG",
+    "short_name": "TABANG",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#F7F5F4",
+    "theme_color": "#B3261E",
+    "description": "Transfusion Access, Blood Availability and Network Guidance. A centralized donor management system for Digos City.",
+    "orientation": "landscape-primary",
     "prefer_related_applications": false,
     "icons": [
         {
