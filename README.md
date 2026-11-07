@@ -103,7 +103,13 @@ were bypassed.
   barangays plus the city perimeter, so no mapping SDK or API key is involved).
   The base keeps the standalone map project's warm, low-contrast street
   template, so roads, water, buildings and land use show through while the
-  Carto style's farmland hatching and baked-in place names are muted. Every
+  Carto style's farmland hatching and baked-in place names are muted. The
+  raster template alone is nudged down-right (`DigosVectorMap.baseMapOffset`)
+  so its streets sit better under the hand-traced cutouts; the vector layers
+  never move. The nudge is calibrated at `baseMapOffsetZoom` and scales with
+  the camera, so it tracks the streets at every zoom. Whole-tile shifts are
+  fetched directly and only the sub-tile remainder is translated, which keeps
+  the shift correct at street level without an oversized tile canvas. Every
   TABANG
   layer is drawn on top locally, so the map still reads when tiles cannot load:
   a translucent warm-crimson donor-density ramp (4–78% opacity, so streets stay
