@@ -949,6 +949,56 @@ class AnalyticsSummary {
   final int openRequests;
 }
 
+/// What a chapter activity entry records.
+///
+/// Staff use this feed to answer two operational questions after the fact:
+/// which transfusions were recorded and for whom, and who changed their
+/// account information or profile photo.
+enum ActivityKind {
+  donation,
+  donationWindow,
+  profile,
+  avatar,
+  verification,
+  warning,
+  suspension,
+  application,
+  report,
+}
+
+/// One entry in the chapter activity log, newest first.
+class ActivityEvent {
+  const ActivityEvent({
+    required this.id,
+    required this.kind,
+    required this.actorId,
+    required this.actorAlias,
+    required this.summary,
+    required this.at,
+    this.subjectId,
+    this.subjectAlias,
+  });
+
+  final String id;
+  final ActivityKind kind;
+
+  /// The account that performed the action. Falls back to the chapter account
+  /// for seeded entries and background updates.
+  final String actorId;
+  final String actorAlias;
+
+  /// The account the action affected, when there is one.
+  final String? subjectId;
+  final String? subjectAlias;
+
+  /// One line a staff member can scan, e.g.
+  /// `Recorded a whole blood donation for Tere`.
+  final String summary;
+  final DateTime at;
+
+  bool get isDonation => kind == ActivityKind.donation;
+}
+
 /// Donations vs. requests for one blood type.
 class BloodTypeStat {
   const BloodTypeStat({

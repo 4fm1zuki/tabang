@@ -3,11 +3,43 @@ import 'package:flutter/material.dart';
 import '../core/repository.dart';
 import '../theme.dart';
 
-/// Circular chapter mark: a blue ring, white field and red cross. Drawn rather
-/// than bundled as an image so it stays crisp at any size and the app carries
-/// no third-party logo asset.
+/// Circular chapter mark: the Philippine Red Cross emblem.
+///
+/// The bundled PNG carries the official navy ring, arc lettering and red
+/// cross, so the mark stays recognisable at a glance. The previous build drew
+/// a plain blue circle with a plus; the drawn version remains the fallback if
+/// the asset is missing from a stripped-down build.
 class ChapterMark extends StatelessWidget {
   const ChapterMark({super.key, this.size = 40});
+
+  /// Bundled emblem, public domain (PD-ineligible) per Wikimedia Commons.
+  /// Use of the Red Cross symbol is regulated by the Geneva Conventions.
+  static const String asset = 'assets/branding/prc_logo.png';
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipOval(
+        child: Image.asset(
+          asset,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          semanticLabel: 'Philippine Red Cross emblem',
+          errorBuilder: (context, error, stackTrace) =>
+              _DrawnChapterMark(size: size),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fallback mark for builds without the bundled emblem.
+class _DrawnChapterMark extends StatelessWidget {
+  const _DrawnChapterMark({required this.size});
 
   final double size;
 

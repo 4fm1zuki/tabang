@@ -311,6 +311,14 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
               );
             },
           ),
+          const SizedBox(height: TabangSpace.xl),
+          _buildSectionTitle(
+            context,
+            'Recent activity',
+            'Latest transfusions and account changes.',
+          ),
+          const SizedBox(height: TabangSpace.md),
+          _buildActivityCard(context),
           const SizedBox(height: TabangSpace.lg),
         ],
       ),
@@ -458,14 +466,26 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Live score out of 100%, recalculated whenever units, '
-                      'requests, registered users or eligible donors change. '
-                      'Weighted across five measures.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.45,
-                        color: Colors.white.withValues(alpha: 0.78),
+                    // The old paragraph said "out of 100%" but never explained
+                    // what each bar measured. The button opens the targets and
+                    // weights instead of hiding them in prose.
+                    OutlinedButton.icon(
+                      onPressed: () => _showScoreDetails(context, score),
+                      icon: const Icon(Icons.info_outline, size: 15),
+                      label: const Text('Details'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: TabangSpace.md,
+                          vertical: 6,
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(height: TabangSpace.lg),
@@ -573,6 +593,107 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     return 'Supply is constrained';
   }
 
+  /// Explains every bar in plain terms: what is counted, what it is compared
+  /// against, and how much the bar weighs in the final score.
+  void _showScoreDetails(BuildContext context, _ReadinessScore score) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('How the readiness score works'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The score is the weighted average of the five bars, shown '
+                  'out of 100%. Each bar compares the chapter today with an '
+                  'internal planning target for this prototype, not a national '
+                  'or DOH standard. A full bar means the target is met; the '
+                  'value beside each bar shows the actual count against it.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.55,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+                const SizedBox(height: TabangSpace.lg),
+                for (final item in score.components) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: dialogContext.textColor,
+                          ),
+                        ),
+                      ),
+                      StatusPill(
+                        '${(item.weight * 100).round()}% of score',
+                        tone: Tone.neutral,
+                        dense: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.valueLabel,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'monospace',
+                      color: TabangColors.crimson,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.targetSummary,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.45,
+                      color: dialogContext.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.method,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.45,
+                      color: dialogContext.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: TabangSpace.md),
+                  const Divider(height: 1),
+                  const SizedBox(height: TabangSpace.md),
+                ],
+                Text(
+                  'The score recalculates live whenever units, requests, '
+                  'registered users, donors or expiry dates change.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGauge(BuildContext context, _ReadinessScore score) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: score.value / 100),
@@ -624,43 +745,49 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
 
   Widget _buildSubscore(BuildContext context, _ScoreComponent item) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 116,
-            child: Text(
-              item.label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.88),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.88),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: TabangSpace.sm),
+              // The count against the target replaces the bare percentage:
+              // "10 of 32 units" is what staff can act on.
+              Tooltip(
+                message: item.targetSummary,
+                child: Text(
+                  item.valueLabel,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                    color: Colors.white.withValues(alpha: 0.82),
+                  ),
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(TabangRadius.pill),
-              child: LinearProgressIndicator(
-                minHeight: 6,
-                value: item.fraction,
-                backgroundColor: Colors.white.withValues(alpha: 0.16),
-                color: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(width: TabangSpace.sm),
-          SizedBox(
-            width: 32,
-            child: Text(
-              '${(item.fraction * 100).round()}%',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'monospace',
-                color: Colors.white.withValues(alpha: 0.82),
-              ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(TabangRadius.pill),
+            child: LinearProgressIndicator(
+              minHeight: 6,
+              value: item.fraction,
+              backgroundColor: Colors.white.withValues(alpha: 0.16),
+              color: Colors.white,
             ),
           ),
         ],
@@ -721,9 +848,6 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     AnalyticsSummary summary,
     _ReadinessScore score,
   ) {
-    final verified = _repo.users
-        .where((u) => u.status == AccountStatus.verified)
-        .length;
     final totalUsers = summary.registeredUsers;
 
     return LayoutBuilder(
@@ -741,7 +865,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             value: '${summary.unitsAvailable}',
             icon: Icons.inventory_2_outlined,
             tone: Tone.brand,
-            footnote: 'Across all components',
+            footnote:
+                '${summary.unitsAvailable} of ${_ReadinessScore.unitTarget} '
+                'target units',
             progress: score.valueFor('Supply coverage'),
           ),
           _KpiCard(
@@ -749,7 +875,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             value: '${summary.activeDonors}',
             icon: Icons.people_outline,
             tone: Tone.success,
-            footnote: 'Eligible right now',
+            footnote:
+                '${summary.activeDonors} of ${_ReadinessScore.donorTarget} '
+                'target donors',
             progress: score.valueFor('Donor capacity'),
           ),
           _KpiCard(
@@ -757,7 +885,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             value: '${summary.openRequests}',
             icon: Icons.campaign_outlined,
             tone: summary.openRequests > 0 ? Tone.warning : Tone.neutral,
-            footnote: 'Awaiting fulfilment',
+            footnote:
+                '${summary.openRequests} waiting · target '
+                '0',
             progress: score.valueFor('Request pressure'),
           ),
           _KpiCard(
@@ -766,8 +896,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             icon: Icons.badge_outlined,
             tone: Tone.info,
             footnote:
-                '$verified verified · ${summary.donationsThisMonth} donations '
-                'this month',
+                '$totalUsers of ${_ReadinessScore.communityTarget} target '
+                'users · ${summary.donationsThisMonth} donations this month',
             progress: score.valueFor('Community reach'),
           ),
         ];
@@ -779,6 +909,213 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           ],
         );
       },
+    );
+  }
+
+  // ---------------------------------------------------------- activity feed
+
+  /// Read-only audit trail for the chapter: recorded transfusions, donation
+  /// window corrections and profile/avatar edits. Answers "who did what and
+  /// when" without opening every account.
+  Widget _buildActivityCard(BuildContext context) {
+    final events = _repo.recentActivity(limit: 6);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Recent transfusions & account changes',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => _showActivityDialog(context),
+                child: const Text('View all'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Every recorded donation and self-service profile change is kept '
+            'here with the account and the time it happened.',
+            style: TextStyle(fontSize: 12.5, color: context.textMuted),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          if (events.isEmpty)
+            Text(
+              'No activity recorded yet.',
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
+            )
+          else
+            for (final event in events) _activityRow(context, event),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityRow(BuildContext context, ActivityEvent event) {
+    final color = _activityColor(event.kind);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: TabangSpace.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(_activityIcon(event.kind), size: 15, color: color),
+          ),
+          const SizedBox(width: TabangSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.summary,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                    color: context.textColor,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  _activitySubtitle(event),
+                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _activitySubtitle(ActivityEvent event) {
+    final parts = <String>[
+      if (event.actorId != event.subjectId) 'by ${event.actorAlias}',
+      formatRelative(event.at),
+    ];
+    return parts.join(' · ');
+  }
+
+  IconData _activityIcon(ActivityKind kind) => switch (kind) {
+    ActivityKind.donation => Icons.bloodtype_outlined,
+    ActivityKind.donationWindow => Icons.event_repeat_outlined,
+    ActivityKind.profile => Icons.manage_accounts_outlined,
+    ActivityKind.avatar => Icons.photo_camera_outlined,
+    ActivityKind.verification => Icons.verified_outlined,
+    ActivityKind.warning => Icons.flag_outlined,
+    ActivityKind.suspension => Icons.block,
+    ActivityKind.application => Icons.assignment_turned_in_outlined,
+    ActivityKind.report => Icons.gavel_outlined,
+  };
+
+  Color _activityColor(ActivityKind kind) => switch (kind) {
+    ActivityKind.donation => TabangColors.crimson,
+    ActivityKind.donationWindow => TabangColors.info,
+    ActivityKind.profile => TabangColors.info,
+    ActivityKind.avatar => TabangColors.info,
+    ActivityKind.verification => TabangColors.success,
+    ActivityKind.warning => TabangColors.warning,
+    ActivityKind.suspension => TabangColors.danger,
+    ActivityKind.application => TabangColors.crimson,
+    ActivityKind.report => TabangColors.danger,
+  };
+
+  void _showActivityDialog(BuildContext context) {
+    var filter = _ActivityFilter.all;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final events = switch (filter) {
+            _ActivityFilter.all => _repo.activityLog,
+            _ActivityFilter.transfusions =>
+              _repo.activityLog
+                  .where((event) => event.isDonation)
+                  .toList(growable: false),
+            _ActivityFilter.changes =>
+              _repo.activityLog
+                  .where((event) => !event.isDonation)
+                  .toList(growable: false),
+          };
+          return AlertDialog(
+            title: const Text('Chapter activity'),
+            content: SizedBox(
+              width: 520,
+              height: 460,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: TabangSpace.sm,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All'),
+                        selected: filter == _ActivityFilter.all,
+                        onSelected: (_) =>
+                            setDialogState(() => filter = _ActivityFilter.all),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Transfusions'),
+                        selected: filter == _ActivityFilter.transfusions,
+                        onSelected: (_) => setDialogState(
+                          () => filter = _ActivityFilter.transfusions,
+                        ),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Account changes'),
+                        selected: filter == _ActivityFilter.changes,
+                        onSelected: (_) => setDialogState(
+                          () => filter = _ActivityFilter.changes,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: TabangSpace.md),
+                  Expanded(
+                    child: events.isEmpty
+                        ? Center(
+                            child: Text(
+                              'Nothing recorded in this view.',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: dialogContext.textMuted,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: events.length,
+                            itemBuilder: (context, index) =>
+                                _activityRow(dialogContext, events[index]),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -1152,12 +1489,23 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
   }
 }
 
+/// Activity dialog filter: everything, recorded transfusions, or account
+/// changes such as profile edits and avatar updates.
+enum _ActivityFilter { all, transfusions, changes }
+
 /// The headline score and its five weighted components.
 class _ReadinessScore {
   const _ReadinessScore(this.value, this.components);
 
   final int value;
   final List<_ScoreComponent> components;
+
+  /// Internal chapter planning targets for this prototype. They are not
+  /// national standards; they exist so every bar has a visible denominator.
+  static const int unitTarget = 32;
+  static const int donorTarget = 20;
+  static const int requestPressureCap = 16;
+  static const int communityTarget = 60;
 
   double valueFor(String label) {
     for (final component in components) {
@@ -1176,23 +1524,78 @@ class _ReadinessScore {
     required AnalyticsSummary summary,
     required int expiringCount,
   }) {
-    final supply = (summary.unitsAvailable / 32).clamp(0.0, 1.0);
-    final donors = (summary.activeDonors / 20).clamp(0.0, 1.0);
+    final units = summary.unitsAvailable;
+    // expiringSoon() already counts usable units, so it can never exceed the
+    // usable set; the old formula added it to the denominator a second time.
+    final expiring = expiringCount.clamp(0, units);
+    final inDate = units - expiring;
+
+    final supply = (units / unitTarget).clamp(0.0, 1.0);
+    final donors = (summary.activeDonors / donorTarget).clamp(0.0, 1.0);
     final requestPressure = summary.openRequests == 0
         ? 1.0
-        : (1 - summary.openRequests / 16).clamp(0.0, 1.0);
-    final total = summary.unitsAvailable + expiringCount;
-    final shelfLife = total == 0
-        ? 1.0
-        : (1 - expiringCount / total).clamp(0.0, 1.0);
-    final community = (summary.registeredUsers / 60).clamp(0.0, 1.0);
+        : (1 - summary.openRequests / requestPressureCap).clamp(0.0, 1.0);
+    final shelfLife = units == 0 ? 1.0 : inDate / units;
+    final community = (summary.registeredUsers / communityTarget).clamp(
+      0.0,
+      1.0,
+    );
 
     final components = [
-      _ScoreComponent('Supply coverage', supply, 0.30),
-      _ScoreComponent('Donor capacity', donors, 0.20),
-      _ScoreComponent('Request pressure', requestPressure, 0.15),
-      _ScoreComponent('Shelf-life health', shelfLife, 0.15),
-      _ScoreComponent('Community reach', community, 0.20),
+      _ScoreComponent(
+        label: 'Supply coverage',
+        fraction: supply,
+        weight: 0.30,
+        valueLabel: '$units of $unitTarget units',
+        targetSummary: 'Target: $unitTarget usable units on the shelf.',
+        method:
+            'Usable units across all components, counted against the chapter '
+            'planning target.',
+      ),
+      _ScoreComponent(
+        label: 'Donor capacity',
+        fraction: donors,
+        weight: 0.20,
+        valueLabel: '${summary.activeDonors} of $donorTarget donors',
+        targetSummary:
+            'Target: $donorTarget donors eligible and available today.',
+        method: 'Donors the eligibility engine would match right now.',
+      ),
+      _ScoreComponent(
+        label: 'Request pressure',
+        fraction: requestPressure,
+        weight: 0.15,
+        valueLabel: '${summary.openRequests} open',
+        targetSummary:
+            'Target: 0 open requests. At $requestPressureCap or more, this '
+            'bar scores zero.',
+        method:
+            'Lower is better: the bar starts full when nothing is waiting and '
+            'falls as open requests pile up.',
+      ),
+      _ScoreComponent(
+        label: 'Shelf-life health',
+        fraction: shelfLife,
+        weight: 0.15,
+        valueLabel: units == 0
+            ? 'No units on shelf'
+            : '$inDate of $units units in date',
+        targetSummary: expiring == 0
+            ? 'Target: no unit expiring within 7 days.'
+            : 'Target: no unit expiring within 7 days. $expiring unit'
+                  '${expiring == 1 ? '' : 's'} inside that window.',
+        method: 'Share of usable units that are not expiring this week.',
+      ),
+      _ScoreComponent(
+        label: 'Community reach',
+        fraction: community,
+        weight: 0.20,
+        valueLabel: '${summary.registeredUsers} of $communityTarget users',
+        targetSummary: 'Target: $communityTarget registered accounts.',
+        method:
+            'Total registered accounts in this chapter, donors and recipients '
+            'together.',
+      ),
     ];
     final weighted = components.fold<double>(
       0,
@@ -1203,11 +1606,23 @@ class _ReadinessScore {
 }
 
 class _ScoreComponent {
-  const _ScoreComponent(this.label, this.fraction, this.weight);
+  const _ScoreComponent({
+    required this.label,
+    required this.fraction,
+    required this.weight,
+    required this.valueLabel,
+    required this.targetSummary,
+    required this.method,
+  });
 
   final String label;
   final double fraction;
   final double weight;
+
+  /// Actual count against the target, e.g. `10 of 32 units`.
+  final String valueLabel;
+  final String targetSummary;
+  final String method;
 }
 
 class _ScoreGaugePainter extends CustomPainter {

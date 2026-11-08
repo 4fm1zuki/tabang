@@ -13,7 +13,7 @@ import '../../widgets/photo.dart';
 ///
 /// Shows the signed-in user's own record: donation history, eligibility
 /// status with the live cooldown countdown, and editable contact details.
-/// The previous build hardcoded "Iverson D. Briones" for every user.
+/// The previous build hardcoded one demo name for every user.
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, required this.user});
 
@@ -613,6 +613,11 @@ class _ProfilePageState extends State<ProfilePage> {
                         onTap: () {
                           final messenger = ScaffoldMessenger.of(context);
                           _repo.updateUser(user.copyWith(photoAsset: asset));
+                          _repo.logProfileActivity(
+                            userId: user.id,
+                            kind: ActivityKind.avatar,
+                            summary: 'Changed their profile photo',
+                          );
                           Navigator.pop(dialogContext);
                           messenger.showSnackBar(
                             const SnackBar(
@@ -788,21 +793,45 @@ class _ProfilePageState extends State<ProfilePage> {
             ElevatedButton(
               onPressed: () {
                 if (!formKey.currentState!.validate()) return;
+                final newName = nameController.text.trim();
+                final newAlias = aliasController.text.trim();
+                final newPhone = phoneController.text.trim();
+                final newWeight = user.role == UserRole.donor
+                    ? double.tryParse(weightController.text.trim())
+                    : null;
                 final typeChanged =
                     user.role == UserRole.donor && bloodType != user.bloodType;
+
+                // The audit entry names the fields, so the console can show
+                // what changed instead of just "profile updated".
+                final changed = <String>[
+                  if (newName != user.fullName) 'full name',
+                  if (newAlias != user.alias) 'alias',
+                  if (newPhone != user.phone) 'contact number',
+                  if (barangay != user.barangay) 'barangay',
+                  if (bloodType != user.bloodType) 'blood type',
+                  if (user.role == UserRole.donor && newWeight != user.weightKg)
+                    'weight',
+                ];
+
                 _repo.updateUser(
                   user.copyWith(
-                    fullName: nameController.text.trim(),
-                    alias: aliasController.text.trim(),
-                    phone: phoneController.text.trim(),
+                    fullName: newName,
+                    alias: newAlias,
+                    phone: newPhone,
                     barangay: barangay,
                     bloodType: bloodType,
-                    weightKg: user.role == UserRole.donor
-                        ? double.tryParse(weightController.text.trim())
-                        : null,
+                    weightKg: newWeight,
                     status: typeChanged ? AccountStatus.unverified : null,
                     bloodCardVerified: typeChanged ? false : null,
                   ),
+                );
+                _repo.logProfileActivity(
+                  userId: user.id,
+                  kind: ActivityKind.profile,
+                  summary: changed.isEmpty
+                      ? 'Saved profile details'
+                      : 'Updated ${changed.join(', ')}',
                 );
                 Navigator.pop(dialogContext);
                 if (typeChanged) {

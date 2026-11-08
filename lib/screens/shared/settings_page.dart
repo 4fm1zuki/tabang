@@ -48,10 +48,32 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   final TabangRepository _repo = TabangRepository.instance;
 
+  /// Local mirrors of the preference props.
+  ///
+  /// Settings can be pushed as a standalone route (phone header), where the
+  /// route's widget instance is not rebuilt when the root preferences change.
+  /// Mirroring the values here makes every switch respond immediately, and
+  /// [didUpdateWidget] keeps the page in sync when the shell does rebuild it.
+  late ThemeMode _themeMode = widget.themeMode;
+  late bool _compactNav = widget.compactNav;
+  late bool _railPinned = widget.railPinned;
+
   @override
   void initState() {
     super.initState();
     _repo.addListener(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(SettingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.themeMode != widget.themeMode) _themeMode = widget.themeMode;
+    if (oldWidget.compactNav != widget.compactNav) {
+      _compactNav = widget.compactNav;
+    }
+    if (oldWidget.railPinned != widget.railPinned) {
+      _railPinned = widget.railPinned;
+    }
   }
 
   @override
@@ -119,17 +141,33 @@ class _SettingsPageState extends State<SettingsPage> {
                 'Slim navigation rails',
                 'Hide the names under icons on the bottom bar, and keep the '
                     'side rail at icon width',
-                widget.compactNav,
-                (value) => widget.onCompactNavChanged?.call(value),
+                _compactNav,
+                (value) {
+                  setState(() => _compactNav = value);
+                  widget.onCompactNavChanged?.call(value);
+                },
               ),
-              _switchRow(
-                context,
-                'Keep the sidebar pinned open',
-                'Desktop sidebars stay expanded. When off, they open on hover '
-                    'and collapse when the pointer leaves.',
-                widget.railPinned,
-                (value) => widget.onRailPinnedChanged?.call(value),
-              ),
+              // The pin only controls the desktop side rail, so it is hidden
+              // where there is no rail. While slim rails are on, the rail is
+              // icon-width by definition; the switch explains that instead of
+              // silently doing nothing.
+              if (MediaQuery.sizeOf(context).width >=
+                  TabangBreakpoints.navigationRail)
+                _switchRow(
+                  context,
+                  'Keep the sidebar pinned open',
+                  _compactNav
+                      ? 'Turn off slim navigation rails to pin the sidebar open'
+                      : 'Desktop sidebars stay expanded. When off, they open on '
+                            'hover and collapse when the pointer leaves.',
+                  _railPinned,
+                  _compactNav
+                      ? null
+                      : (value) {
+                          setState(() => _railPinned = value);
+                          widget.onRailPinnedChanged?.call(value);
+                        },
+                ),
             ],
           ),
           const SizedBox(height: TabangSpace.lg),
@@ -421,10 +459,13 @@ class _SettingsPageState extends State<SettingsPage> {
     String title,
     String subtitle,
   ) {
-    final selected = widget.themeMode == mode;
+    final selected = _themeMode == mode;
     return InkWell(
       borderRadius: BorderRadius.circular(TabangRadius.sm),
-      onTap: () => widget.onThemeModeChanged(mode),
+      onTap: () {
+        setState(() => _themeMode = mode);
+        widget.onThemeModeChanged(mode);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(
@@ -473,9 +514,11 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             RadioGroup<ThemeMode>(
-              groupValue: widget.themeMode,
+              groupValue: _themeMode,
               onChanged: (v) {
-                if (v != null) widget.onThemeModeChanged(v);
+                if (v == null) return;
+                setState(() => _themeMode = v);
+                widget.onThemeModeChanged(v);
               },
               child: Radio<ThemeMode>(value: mode),
             ),
@@ -490,33 +533,39 @@ class _SettingsPageState extends State<SettingsPage> {
     String title,
     String subtitle,
     bool value,
-    ValueChanged<bool> onChanged,
+    ValueChanged<bool>? onChanged,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: context.textColor,
+    // The whole row is the hit target: users tap the label, not just the
+    // little switch, and a disabled row gives no feedback at all.
+    return InkWell(
+      borderRadius: BorderRadius.circular(TabangRadius.sm),
+      onTap: onChanged == null ? null : () => onChanged(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: context.textColor,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
-                ),
-              ],
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Switch(value: value, onChanged: onChanged),
-        ],
+            Switch(value: value, onChanged: onChanged),
+          ],
+        ),
       ),
     );
   }

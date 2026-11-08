@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
 import 'package:tabang/screens/admin/admin_overview.dart';
 import 'package:tabang/screens/admin/admin_shell.dart';
 import 'package:tabang/screens/donor/blood_bank_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_shell.dart';
+import 'package:tabang/screens/shared/settings_page.dart';
 import 'package:tabang/theme.dart';
 
 /// Narrow-screen smoke tests for the three densest surfaces.
@@ -287,7 +289,96 @@ void main() {
       await tester.drag(feed, const Offset(0, 140));
       await tester.pumpAndSettle();
       expect(barHeight(), 80, reason: 'scrolling back up restores the bar');
+
+      // Fling to the very end. Once the page cannot scroll further down the
+      // bar must pin itself instead of leaving the user without navigation.
+      await tester.fling(feed, const Offset(0, -6000), 6000);
+      await tester.pumpAndSettle();
+      expect(
+        barHeight(),
+        80,
+        reason: 'the bar returns at the bottom of the list',
+      );
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('settings switches update immediately', (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: _SettingsHost(user: repo.userById('USR-001')!)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Switch switchFor(String label) {
+      final row = find
+          .ancestor(of: find.text(label), matching: find.byType(Row))
+          .first;
+      return tester.widget<Switch>(
+        find.descendant(of: row, matching: find.byType(Switch)),
+      );
+    }
+
+    // Slim rails are off in this host; the pin switch is enabled.
+    expect(switchFor('Slim navigation rails').value, isFalse);
+    expect(switchFor('Keep the sidebar pinned open').value, isTrue);
+
+    await tester.tap(find.text('Slim navigation rails'));
+    await tester.pumpAndSettle();
+    expect(switchFor('Slim navigation rails').value, isTrue);
+
+    // While slim rails are on the pin switch is disabled and explains why.
+    final pinWhileSlim = switchFor('Keep the sidebar pinned open');
+    expect(pinWhileSlim.value, isTrue);
+    expect(pinWhileSlim.onChanged, isNull);
+    expect(
+      find.textContaining('Turn off slim navigation rails'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Slim navigation rails'));
+    await tester.pumpAndSettle();
+    expect(switchFor('Slim navigation rails').value, isFalse);
+
+    await tester.tap(find.text('Keep the sidebar pinned open'));
+    await tester.pumpAndSettle();
+    expect(switchFor('Keep the sidebar pinned open').value, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+/// Minimal owner for the settings preference props, mirroring how the root
+/// app and the shells share them.
+class _SettingsHost extends StatefulWidget {
+  const _SettingsHost({required this.user});
+
+  final AppUser user;
+
+  @override
+  State<_SettingsHost> createState() => _SettingsHostState();
+}
+
+class _SettingsHostState extends State<_SettingsHost> {
+  ThemeMode theme = ThemeMode.light;
+  bool compactNav = false;
+  bool railPinned = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsPage(
+      user: widget.user,
+      themeMode: theme,
+      onThemeModeChanged: (value) => setState(() => theme = value),
+      compactNav: compactNav,
+      onCompactNavChanged: (value) => setState(() => compactNav = value),
+      railPinned: railPinned,
+      onRailPinnedChanged: (value) => setState(() => railPinned = value),
+    );
+  }
 }

@@ -119,6 +119,15 @@ const List<ImageCredit> kImageCredits = [
     kind: 'icon',
   ),
   ImageCredit(
+    asset: 'assets/branding/prc_logo.png',
+    title: 'Philippine Red Cross emblem',
+    author: 'Philippine Red Cross',
+    license: 'Public domain (PD-ineligible)',
+    kind: 'icon',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:Logo_Philippine_Red_Cross.svg',
+  ),
+  ImageCredit(
     asset: '${kEducationalDirectory}edu_benefits.png',
     title: 'One donation, three lives',
     author: 'TABANG original artwork (tools/make_edu_art.py)',

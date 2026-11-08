@@ -121,9 +121,12 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             : Padding(
                 padding: padding,
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  // Stretch both columns to the workspace height: the map used
+                  // to stop at a fixed 640 px and left an empty band below it
+                  // on taller desktop windows.
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(flex: 3, child: SizedBox(height: 640, child: map)),
+                    Expanded(flex: 3, child: map),
                     const SizedBox(width: TabangSpace.lg),
                     Expanded(
                       flex: 2,

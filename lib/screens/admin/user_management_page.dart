@@ -1366,6 +1366,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     user.suspensionReason!,
                   ),
                 ],
+                const Divider(height: TabangSpace.xl),
+                Text(
+                  'Recent activity',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: dialogContext.textColor,
+                  ),
+                ),
+                const SizedBox(height: TabangSpace.sm),
+                ..._activityLines(dialogContext, user),
                 const SizedBox(height: TabangSpace.md),
                 Text(
                   'Contact details and this record are visible to chapter '
@@ -1407,6 +1418,54 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ],
       ),
     );
+  }
+
+  List<Widget> _activityLines(BuildContext context, AppUser user) {
+    final events = _repo.activityFor(user.id).take(4).toList(growable: false);
+    if (events.isEmpty) {
+      return [
+        Text(
+          'No recorded activity yet.',
+          style: TextStyle(fontSize: 12, color: context.textMuted),
+        ),
+      ];
+    }
+    return [
+      for (final event in events)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.history, size: 13, color: context.textMuted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: event.summary,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: context.textColor,
+                        ),
+                      ),
+                      TextSpan(
+                        text: ' · ${formatRelative(event.at)}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: context.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+    ];
   }
 
   Widget _detailRow(BuildContext context, String label, String value) {

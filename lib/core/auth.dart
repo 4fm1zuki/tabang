@@ -89,13 +89,13 @@ class AuthService {
     if (_credentials.isNotEmpty) return;
 
     // Demo passwords — documented in README.
-    _credentials['iverson.briones@tabang.app'] = _hash('donor1234');
+    _credentials['juan.delacruz@tabang.app'] = _hash('donor1234');
     _credentials['tere.santos@tabang.app'] = _hash('donor1234');
     // Inactive donor: signs in to demonstrate the automatic "away" state.
     _credentials['rafael.mendoza@tabang.app'] = _hash('donor1234');
     _credentials['maria.santos@tabang.app'] = _hash('recipient1234');
     _credentials['community@tabang.app'] = _hash('community1234');
-    _credentials['staff@tabang.app'] = _hash('staff1234');
+    _credentials['marco.villanueva@tabang.app'] = _hash('staff1234');
     _credentials['admin@tabang.app'] = _hash('admin1234');
   }
 

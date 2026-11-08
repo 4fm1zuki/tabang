@@ -1026,7 +1026,7 @@ void main() {
     test('registration rejects a nickname that is already taken', () {
       final result = AuthService.instance.register(
         fullName: 'New Donor',
-        alias: 'Iver', // seeded demo donor
+        alias: 'JuanDC', // seeded demo donor
         email: 'new.donor@tabang.app',
         password: 'password123',
         phone: '+63 900 111 2222',
@@ -1224,6 +1224,67 @@ void main() {
         repo.openDonorApplications.map((a) => a.userId),
         isNot(contains(result.user!.id)),
       );
+    });
+  });
+
+  group('Chapter activity log', () {
+    test('seeded log covers transfusions and account changes', () {
+      final kinds = repo.activityLog.map((event) => event.kind).toSet();
+      expect(kinds, contains(ActivityKind.donation));
+      expect(kinds, contains(ActivityKind.avatar));
+      expect(kinds, contains(ActivityKind.verification));
+      expect(repo.recentActivity(limit: 3), hasLength(3));
+      // Newest first: the seed starts with a recorded transfusion.
+      expect(repo.activityLog.first.isDonation, isTrue);
+    });
+
+    test('records donations, window corrections and profile changes', () {
+      final before = repo.activityLog.length;
+
+      repo.recordDonation('USR-019', component: BloodComponent.platelets);
+      expect(repo.activityLog.first.kind, ActivityKind.donation);
+      expect(repo.activityLog.first.summary, contains('Jessa'));
+      expect(repo.activityLog.first.summary, contains('platelets'));
+      expect(repo.activityLog.first.isDonation, isTrue);
+
+      repo.updateDonationWindow(
+        'USR-019',
+        lastDonationDate: DateTime.now().subtract(const Duration(days: 3)),
+        component: BloodComponent.platelets,
+      );
+      expect(repo.activityLog.first.kind, ActivityKind.donationWindow);
+      expect(repo.activityLog.first.summary, contains('Corrected'));
+
+      repo.logProfileActivity(
+        userId: 'USR-019',
+        kind: ActivityKind.avatar,
+        summary: 'Changed their profile photo',
+      );
+      expect(repo.activityLog.first.kind, ActivityKind.avatar);
+      expect(repo.activityLog.length, before + 3);
+    });
+
+    test('per-user activity filters by the affected account', () {
+      repo.recordDonation('USR-019', component: BloodComponent.wholeBlood);
+      repo.recordDonation('USR-020', component: BloodComponent.wholeBlood);
+
+      final jessa = repo.activityFor('USR-019');
+      final mark = repo.activityFor('USR-020');
+      expect(jessa, isNotEmpty);
+      expect(mark, isNotEmpty);
+      expect(jessa.every((event) => event.subjectId == 'USR-019'), isTrue);
+      expect(mark.every((event) => event.subjectId == 'USR-020'), isTrue);
+    });
+
+    test('staff actions record the actor when a session is signed in', () {
+      repo.currentUser = repo.userById('USR-010');
+      addTearDown(() => repo.currentUser = null);
+
+      repo.recordDonation('USR-004', component: BloodComponent.packedRbc);
+      final event = repo.activityLog.first;
+      expect(event.actorId, 'USR-010');
+      expect(event.actorAlias, repo.userById('USR-010')!.alias);
+      expect(event.subjectAlias, 'Cardo');
     });
   });
 }

@@ -23,8 +23,9 @@ Requirements:
 - Flutter **3.47.0 or newer** (tested with Flutter 3.47.5)
 - Dart **3.13.0 or newer** (tested with Dart 3.13.4)
 - No map key: the barangay geometry and all photography are bundled. The
-  OpenStreetMap raster base loads when a network is available, and the complete
-  vector map still renders on the paper background without it
+  OpenStreetMap raster base (HOT style, no mountain-peak symbols) loads when a
+  network is available, and the complete vector map still renders on the paper
+  background without it
 
 ```bash
 flutter pub get
@@ -51,12 +52,12 @@ autofill.
 
 | Role | Email | Password |
 |---|---|---|
-| Donor | `iverson.briones@tabang.app` | `donor1234` |
+| Donor | `juan.delacruz@tabang.app` | `donor1234` |
 | Donor | `tere.santos@tabang.app` | `donor1234` |
 | Donor (away, 47 days inactive) | `rafael.mendoza@tabang.app` | `donor1234` |
 | Recipient | `maria.santos@tabang.app` | `recipient1234` |
 | Community | `community@tabang.app` | `community1234` |
-| Staff | `staff@tabang.app` | `staff1234` |
+| Staff | `marco.villanueva@tabang.app` | `staff1234` |
 | Admin | `admin@tabang.app` | `admin1234` |
 
 The staff and admin sign-ins are the people behind the official chapter
@@ -98,13 +99,15 @@ were bypassed.
   hospital and ward, amount and slot). A hold is not a transfusion order:
   chapter staff still cross-match and confirm release.
 - **Find Donor** — the Digos City map: `flutter_map` renders OpenStreetMap
-  raster tiles under an inverse mask that hides everything outside the city, and
+  raster tiles (the HOT humanitarian style, chosen because the standard Carto
+  style scatters brown mountain-peak triangles across the Digos highlands)
+  under an inverse mask that hides everything outside the city, and
   the 26-barangay topology from the standalone `map/` project ships locally in
   `lib/core/digos_geodata.dart` (75 shared topological arcs that stitch into the
   barangays plus the city perimeter, so no mapping SDK or API key is involved).
   The base keeps the standalone map project's warm, low-contrast street
-  template, so roads, water, buildings and land use show through while the
-  Carto style's farmland hatching and baked-in place names are muted. The
+  template, so roads, water, buildings and land use show through while
+  farmland hatching and baked-in place names are muted. The
   raster template alone is nudged down-right (`DigosVectorMap.baseMapOffset`)
   so its streets sit better under the hand-traced cutouts; the vector layers
   never move. The nudge is calibrated at `baseMapOffsetZoom` and scales with
@@ -119,8 +122,10 @@ were bypassed.
   layer is drawn on top locally, so the map still reads when tiles cannot load:
   a translucent warm-crimson donor-density ramp (4–78% opacity, so streets stay
   readable), a deep-crimson selection wash, tappable drop-shaped **drive pins at
-  their venue coordinates** (drives in one barangay, and drives that would sit
-  under a hospital pin, are nudged apart), dedicated **hospital and PRC chapter
+  their venue coordinates** (multiple drives in one barangay are staggered, and
+  a drive sharing a facility's venue gets a fixed geographic offset — never a
+  zoom-dependent screen-space nudge, so pins do not jump while zooming),
+  dedicated **hospital and PRC chapter
   pins**, and haloed barangay labels rebuilt on every camera change. Exactly
   like the standalone map, every one of the 26 names is drawn at its barangay's
   representative point — no label is ever dropped when the view zooms out — and
@@ -147,7 +152,7 @@ were bypassed.
   a donor card moves the map to the barangay that donor is from (not just a
   highlight). Over the map the cursor switches to a pointing hand whenever a
   barangay is under the mouse, so "click a region to select it" is discoverable.
-  The map credit reads `© OpenStreetMap contributors`.
+  The map credit reads `© OpenStreetMap contributors · HOT style`.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Availability is managed two
   ways: the manual **Directory availability** switch hides a donor on demand,
@@ -223,15 +228,20 @@ were bypassed.
   explicitly capped at **100% max**, built from five labelled components
   (supply coverage, shelf-life, donor capacity, community reach and request
   pressure) that recalculate live whenever units, requests, registered users or
-  active donors change. Primary KPI cards with progress bars, supply/community
-  detail and supporting exceptions all read the same repository snapshot, and
-  an explicit **Roles & permissions** card spells out what Clinical Personnel
-  and System Administrators can each do. The open-requests and low-stock cards
-  deep-link into the Operations workspace, and **User management** opens with
-  the donor registrations awaiting staff — card on file, planned visit, notes —
-  where each one can be verified, returned for documents or not accepted. On
-  phones and small tablets the staff console uses the same bottom-bar shell as
-  the community app; the icon rail is desktop-only.
+  active donors change. Every bar names its actual count against a stated
+  planning target (`10 of 32 units`), the KPI cards repeat those targets, and a
+  **Details** button opens the weights, targets and method behind the total.
+  Primary KPI cards with progress bars, supply/community detail and supporting
+  exceptions all read the same repository snapshot, and an explicit **Roles &
+  permissions** card spells out what Clinical Personnel and System
+  Administrators can each do. A **Recent transfusions & account changes** card
+  lists the latest audit entries with date and actor, and **View all** filters
+  them between transfusions and account changes. The open-requests and
+  low-stock cards deep-link into the Operations workspace, and **User
+  management** opens with the donor registrations awaiting staff — card on
+  file, planned visit, notes — where each one can be verified, returned for
+  documents or not accepted. On phones and small tablets the staff console uses
+  the same bottom-bar shell as the community app; the icon rail is desktop-only.
 - **Operations** — one destination for the operational work that used to be
   split between Map and Inventory. A collapsible inner sidebar switches views on
   wide windows, and a segmented control does the same on narrow ones. The map
@@ -258,10 +268,11 @@ were bypassed.
   temporary password, verify blood cards, issue warnings, suspend and reinstate
   donor and recipient accounts, and record a completed donation with its
   component. Clicking a user opens a staff/admin-only record with contact
-  details, standing and history; from there staff can message the user or
-  correct the **donation window** after a transfusion without counting another
-  donation. Staff cannot manage their own account, another staff account, or an
-  admin; only an admin can manage another staff member or add staff.
+  details, standing, history and that account's recent activity; from there
+  staff can message the user or correct the **donation window** after a
+  transfusion without counting another donation. Staff cannot manage their own
+  account, another staff account, or an admin; only an admin can manage another
+  staff member or add staff.
 - **Moderation** — review flagged messages, clear or escalate flags, mute
   threads, resolve or dismiss the persisted user-report queue with the
   reporter's free-text explanation attached, and **reply** from the console:
@@ -389,11 +400,15 @@ map stacks above the donor list; from 1024 px up the sidebar is the default
 navigation, expanded and pinnable, with hover-open still available after
 unpinning, and the classic side-by-side splits. On phones the bottom bar slides
 down out of the way while the page scrolls toward its end and returns on any
-scroll up or tab change; when the destinations do not fit, the bar scrolls
-horizontally instead of overflowing. Settings adds a **slim navigation rails**
-switch and a **keep the sidebar pinned open** switch: the first drops bottom-bar
-labels and keeps the side rail at icon width, the second survives restarts
-through the root app. `MaterialApp.builder` wraps the navigator in `SafeArea`, so
+scroll up or tab change, and it pins itself at the top or the bottom of the page
+so navigation is never stranded at the end of a list; when the destinations do
+not fit, the bar scrolls horizontally instead of overflowing. Settings adds a
+**slim navigation rails** switch and a **keep the sidebar pinned open** switch:
+slim rails are **on by default** (they drop bottom-bar labels and keep the side
+rail at icon width), and the pin switch is only shown on wide windows, where it
+is disabled with an explanation while slim rails are on. Both switches mirror
+their value locally so they respond even when Settings is a pushed phone route.
+`MaterialApp.builder` wraps the navigator in `SafeArea`, so
 status-bar and gesture insets are never painted
 over. **Light is the default theme**; dark is an explicit choice in Settings,
 the system theme option is gone, and the map style follows whichever theme is
@@ -412,7 +427,17 @@ staff member. Fulfilment checks the actor's role in the repository.
 
 **Analytics are computed.** `TabangRepository.summary()` derives every figure
 on the admin Overview page from the underlying records, so the readiness
-score, KPI cards and tables beneath them always agree.
+score, KPI cards and tables beneath them always agree. Every readiness bar
+shows the actual count against a stated chapter planning target (for example
+`10 of 32 units`), not a bare percentage, and the **Details** button opens the
+weights and targets behind the total out of 100%.
+
+**Staff can review what changed.** `TabangRepository.activityLog` records every
+recorded transfusion, donation-window correction, verification, warning,
+suspension and self-service profile/avatar edit with its actor, subject and
+timestamp. The Overview shows the latest entries with **View all** filters
+(All / Transfusions / Account changes), and each user record in User management
+lists that account's own recent activity.
 
 **Attribution matches the file.** `lib/core/image_credits.dart` is the single
 per-asset registry. `TabangPhoto` looks up the exact asset for its hover tooltip,
@@ -423,9 +448,10 @@ The About tab renders the full registry with source links. There is no generic
 **The map has one visual language.** A sequential warm-crimson ramp encodes
 available donors, with a legend; selection uses deep brand tones plus a
 contrasting outline, never the blue that previously meant both "selected" and
-"water". The OpenStreetMap base is pushed through the standalone map project's
-warm template, so streets, water, buildings and land use stay revealed while its
-farmland hatching and baked-in names are muted; TABANG's own
+"water". The OpenStreetMap base (HOT style) is pushed through the standalone map
+project's warm template, so streets, water, buildings and land use stay revealed
+while its baked-in names are muted and the standard style's mountain-peak
+triangles never appear; TABANG's own
 labels all sit on their barangay's representative point and never disappear as
 the view widens. The base now follows the
 active theme — the same `invert + hue-rotate` dark recipe keeps water blue and
@@ -508,8 +534,9 @@ deployment, replace the embedded data with PSA or LGU boundary data.
 
 No mapping SDK and no API key are involved. Find Donor's geometry comes from
 `lib/core/digos_geodata.dart`, and the OpenStreetMap raster tiles used as the
-base layer need no key, account or referrer restriction; the required credit
-(`© OpenStreetMap contributors`) is drawn on the map. For a fully offline
+base layer (served in the HOT humanitarian style, which draws no peak symbols)
+need no key, account or referrer restriction; the required credit
+(`© OpenStreetMap contributors · HOT style`) is drawn on the map. For a fully offline
 deployment the tile layer can be switched
 off with one flag (`DigosVectorMap.tilesEnabled`), which leaves the complete
 vector map running on the paper background. The only deployment signing caveat
@@ -535,6 +562,7 @@ off and there is no third-party image host to configure or pay for.
 | Educational illustrations | `assets/images/educational/edu_*.png` (7 originals) |
 | Profile portraits | `assets/images/avatars/avatar_001.png` … `avatar_048.png` |
 | App icon / PWA icons | `assets/branding/app_icon.png` |
+| Chapter emblem | `assets/branding/prc_logo.png` (Philippine Red Cross; public domain/PD-ineligible, symbol use regulated by the Geneva Conventions) |
 
 `TabangPhoto` (`lib/widgets/photo.dart`) is the single image surface. It loads
 with `Image.asset`, fades in on first paint, and falls back to a themed gradient
@@ -568,7 +596,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**110 tests** cover:
+**119 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -598,6 +626,10 @@ flutter test
   symmetric blocking, and the 48-hour re-block cooldown.
 - **Donation recording** — component capture, component-specific cooldown, and
   a staff donation-window correction that does not increment the donation count.
+- **Chapter activity log** — the seeded feed covers transfusions and account
+  changes; recorded donations, donation-window corrections and profile/avatar
+  changes each append an entry, per-user filtering returns only that account's
+  events, and a signed-in staff session is attributed as the actor.
 - **Automatic away availability** — a donor inactive for 30+ days is blocked
   with the `away` reason and never reaches the directory; `markActive` clears
   it, and the seed keeps exactly 15 eligible donors alongside the two
@@ -635,8 +667,13 @@ flutter test
   between its Map and Inventory views and collapses its inner sidebar, staff
   chat starts a new conversation from search, a user record opens its
   staff-only details and donation-window editor, the readiness score states its
-  100% maximum, and the avatar picker keeps the staff and community sets apart.
-  Inventory exposes Add unit plus the appointment queue.
+  100% maximum with per-bar targets and a **Details** dialog, the Overview lists
+  recent transfusions and account changes with a working filter, the avatar
+  picker keeps the staff and community sets apart, the chapter mark ships the
+  bundled Red Cross emblem, and Settings switches mirror
+  their values immediately (the pin switch disables itself under slim rails).
+  Inventory exposes Add unit plus the appointment queue, and the phone bottom
+  bar pins itself at the end of a scroll instead of staying hidden.
 - **Narrow-screen layout** — Home, Blood Bank (including unit selection and
   the appointment dialog) and Overview render at a 360 × 780 phone viewport
   without overflow; the unit list reflows to one column and the appointment
@@ -652,6 +689,9 @@ flutter test
   normalisation, and round-tripping all 26 names.
 - **Map topology** — all 75 shared arcs stitch 26 complete barangay rings and
   the 60 internal border arcs, so a truncated arc table cannot crash the map.
+- **Map pin stability** — a drive pin resolves to the same coordinate on every
+  call (no zoom-dependent screen-space nudging), and a drive sharing a
+  facility's venue receives a fixed south-east offset.
 
 `flutter analyze` is clean for this build.
 

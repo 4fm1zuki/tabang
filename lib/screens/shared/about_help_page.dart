@@ -1070,13 +1070,12 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(width: 36),
+              // Answers are indented one step past the question so the two
+              // blocks read as a document, not as two stacked left edges.
+              const SizedBox(width: 46),
               Flexible(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
                   decoration: BoxDecoration(
                     color: context.isDark
                         ? TabangColors.crimson.withValues(alpha: 0.18)

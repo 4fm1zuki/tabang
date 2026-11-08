@@ -125,6 +125,7 @@ class TabangRepository {
   final List<RequestResponse> _responses = [];
   final List<ChatThread> _threads = [];
   final List<UserReport> _reports = [];
+  final List<ActivityEvent> _activity = [];
   final List<BloodDrive> _drives = [];
   final List<ContentItem> _content = [];
   final List<DonationAppointment> _appointments = [];
@@ -537,12 +538,22 @@ class TabangRepository {
   }) {
     final user = userById(userId);
     if (user == null) return;
+    final recordedComponent =
+        component ?? user.lastDonationComponent ?? BloodComponent.packedRbc;
     updateUser(
       user.copyWith(
         lastDonationDate: at ?? DateTime.now(),
-        lastDonationComponent: component ?? user.lastDonationComponent,
+        lastDonationComponent: recordedComponent,
         totalDonations: user.totalDonations + 1,
       ),
+    );
+    _logActivity(
+      kind: ActivityKind.donation,
+      actorId: currentUser?.id ?? staffAccountId,
+      subjectId: userId,
+      summary:
+          'Recorded a ${recordedComponent.label.toLowerCase()} donation for '
+          '${user.alias}',
     );
   }
 
@@ -564,6 +575,14 @@ class TabangRepository {
         lastDonationComponent: component ?? user.lastDonationComponent,
       ),
     );
+    _logActivity(
+      kind: ActivityKind.donationWindow,
+      actorId: currentUser?.id ?? staffAccountId,
+      subjectId: userId,
+      summary:
+          'Corrected ${user.alias}\'s donation window to '
+          '${_shortDate(lastDonationDate)}',
+    );
   }
 
   void setUserStatus(String userId, AccountStatus status, {String? reason}) {
@@ -576,6 +595,16 @@ class TabangRepository {
         clearSuspensionReason: reason == null,
       ),
     );
+    _logActivity(
+      kind: status == AccountStatus.suspended
+          ? ActivityKind.suspension
+          : ActivityKind.verification,
+      actorId: currentUser?.id ?? staffAccountId,
+      subjectId: userId,
+      summary:
+          'Set ${user.alias} to ${status.label.toLowerCase()}'
+          '${reason == null || reason.isEmpty ? '' : ' · $reason'}',
+    );
   }
 
   void verifyUser(String userId) {
@@ -583,6 +612,12 @@ class TabangRepository {
     if (user == null) return;
     updateUser(
       user.copyWith(status: AccountStatus.verified, bloodCardVerified: true),
+    );
+    _logActivity(
+      kind: ActivityKind.verification,
+      actorId: currentUser?.id ?? staffAccountId,
+      subjectId: userId,
+      summary: 'Verified the blood card for ${user.alias}',
     );
   }
 
@@ -691,6 +726,12 @@ class TabangRepository {
             ],
     );
     _donorApplications.add(application);
+    _logActivity(
+      kind: ActivityKind.application,
+      actorId: userId,
+      subjectId: userId,
+      summary: 'Submitted a donor registration',
+    );
     ensureChapterThread(
       userId,
       welcome:
@@ -781,7 +822,19 @@ class TabangRepository {
             : null,
       ),
     );
+    _logActivity(
+      kind: ActivityKind.warning,
+      actorId: currentUser?.id ?? staffAccountId,
+      subjectId: userId,
+      summary: 'Issued warning $next to ${user.alias}',
+    );
   }
+
+  /// `YYYY-MM-DD`, used in activity summaries where the widgets layer is not
+  /// available to format a date.
+  String _shortDate(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 
   void addRequest({
     required String requesterId,
@@ -1566,8 +1619,72 @@ class TabangRepository {
       threadId: threadId,
     );
     _reports.insert(0, report);
+    _logActivity(
+      kind: ActivityKind.report,
+      actorId: reporterId,
+      subjectId: reportedUserId,
+      summary:
+          '${reporter?.alias ?? 'A member'} reported '
+          '${reported?.alias ?? 'an account'}: ${reason.trim()}',
+    );
     _notify();
     return report;
+  }
+
+  // ------------------------------------------------------------ activity log
+
+  /// Everything the chapter console should be able to review after the fact,
+  /// newest first: recorded transfusions, donation-window corrections, donor
+  /// registrations and profile or avatar changes.
+  List<ActivityEvent> get activityLog => List.unmodifiable(_activity);
+
+  List<ActivityEvent> recentActivity({int limit = 12}) =>
+      _activity.take(limit).toList(growable: false);
+
+  List<ActivityEvent> activityFor(String userId) => _activity
+      .where((event) => event.subjectId == userId)
+      .toList(growable: false);
+
+  /// [actorId] falls back to the chapter account when an update is triggered
+  /// by seed data or a test rather than a signed-in staff member.
+  void _logActivity({
+    required ActivityKind kind,
+    required String actorId,
+    required String summary,
+    String? subjectId,
+    DateTime? at,
+  }) {
+    final actor = userById(actorId);
+    final subject = subjectId == null ? null : userById(subjectId);
+    _activity.insert(
+      0,
+      ActivityEvent(
+        id: 'ACT-${DateTime.now().microsecondsSinceEpoch}',
+        kind: kind,
+        actorId: actorId,
+        actorAlias: actor?.alias ?? 'Chapter account',
+        subjectId: subjectId,
+        subjectAlias: subject?.alias,
+        summary: summary,
+        at: at ?? DateTime.now(),
+      ),
+    );
+  }
+
+  /// Records a profile edit or photo change from the profile page. The page
+  /// builds the human summary; the repository keeps the audit entry.
+  void logProfileActivity({
+    required String userId,
+    required ActivityKind kind,
+    required String summary,
+  }) {
+    _logActivity(
+      kind: kind,
+      actorId: userId,
+      subjectId: userId,
+      summary: summary,
+    );
+    _notify();
   }
 
   bool resolveReport(String reportId, ReportStatus status) {
@@ -1713,6 +1830,7 @@ class TabangRepository {
     _responses.clear();
     _threads.clear();
     _reports.clear();
+    _activity.clear();
     _drives.clear();
     _content.clear();
     _appointments.clear();
@@ -1774,9 +1892,9 @@ class TabangRepository {
     _users.addAll([
       AppUser(
         id: 'USR-001',
-        fullName: 'Iverson D. Briones',
-        alias: 'Iver',
-        email: 'iverson.briones@tabang.app',
+        fullName: 'Juan Dela Cruz',
+        alias: 'JuanDC',
+        email: 'juan.delacruz@tabang.app',
         phone: '+63 912 345 6789',
         barangay: 'Zone 1',
         role: UserRole.donor,
@@ -1808,9 +1926,9 @@ class TabangRepository {
       ),
       AppUser(
         id: 'USR-003',
-        fullName: 'Juan Miguel Dela Cruz',
-        alias: 'Juan',
-        email: 'juan.delacruz@tabang.app',
+        fullName: 'Rogelio Bautista',
+        alias: 'Rogel',
+        email: 'rogelio.bautista@tabang.app',
         phone: '+63 918 553 9021',
         barangay: 'Matti',
         role: UserRole.donor,
@@ -2322,9 +2440,9 @@ class TabangRepository {
       ),
       AppUser(
         id: 'USR-010',
-        fullName: 'Cleford Jay Bacan',
-        alias: 'Staff Bacan',
-        email: 'staff@tabang.app',
+        fullName: 'Marco Villanueva',
+        alias: 'Staff Marco',
+        email: 'marco.villanueva@tabang.app',
         phone: '+63 918 777 6655',
         barangay: 'Zone 1',
         role: UserRole.staff,
@@ -2709,12 +2827,90 @@ class TabangRepository {
         reporterId: 'USR-009',
         reporterAlias: 'Recipient 209',
         reportedUserId: 'USR-003',
-        reportedAlias: 'Juan',
+        reportedAlias: 'Rogel',
         reason: 'Asked for PHP 5,000 cash in exchange for a donation.',
         createdAt: now.subtract(const Duration(days: 1, hours: 2)),
         threadId: 'ROOM-102',
       ),
     );
+
+    // ---- chapter activity log ------------------------------------------
+    // Newest first. Gives the staff console a realistic starting feed of
+    // transfusions and account changes to review.
+    _activity.addAll([
+      ActivityEvent(
+        id: 'ACT-001',
+        kind: ActivityKind.donation,
+        actorId: 'USR-010',
+        actorAlias: 'Staff Marco',
+        subjectId: 'USR-002',
+        subjectAlias: 'Tere',
+        summary: 'Recorded a packed RBC donation for Tere',
+        at: now.subtract(const Duration(hours: 2)),
+      ),
+      ActivityEvent(
+        id: 'ACT-002',
+        kind: ActivityKind.avatar,
+        actorId: 'USR-001',
+        actorAlias: 'JuanDC',
+        subjectId: 'USR-001',
+        subjectAlias: 'JuanDC',
+        summary: 'Changed their profile photo',
+        at: now.subtract(const Duration(days: 1, hours: 2)),
+      ),
+      ActivityEvent(
+        id: 'ACT-003',
+        kind: ActivityKind.donation,
+        actorId: 'USR-010',
+        actorAlias: 'Staff Marco',
+        subjectId: 'USR-020',
+        subjectAlias: 'Mark',
+        summary: 'Recorded a whole blood donation for Mark',
+        at: now.subtract(const Duration(days: 1, hours: 8)),
+      ),
+      ActivityEvent(
+        id: 'ACT-004',
+        kind: ActivityKind.verification,
+        actorId: 'USR-010',
+        actorAlias: 'Staff Marco',
+        subjectId: 'USR-019',
+        subjectAlias: 'Jessa',
+        summary: 'Verified the blood card for Jessa',
+        at: now.subtract(const Duration(days: 2, hours: 3)),
+      ),
+      ActivityEvent(
+        id: 'ACT-005',
+        kind: ActivityKind.profile,
+        actorId: 'USR-038',
+        actorAlias: 'Kai',
+        subjectId: 'USR-038',
+        subjectAlias: 'Kai',
+        summary: 'Updated contact number, barangay',
+        at: now.subtract(const Duration(days: 3)),
+      ),
+      ActivityEvent(
+        id: 'ACT-006',
+        kind: ActivityKind.donationWindow,
+        actorId: 'USR-010',
+        actorAlias: 'Staff Marco',
+        subjectId: 'USR-007',
+        subjectAlias: 'Bea',
+        summary:
+            'Corrected Bea\'s donation window to '
+            '${_shortDate(daysAgo(84))}',
+        at: now.subtract(const Duration(days: 4)),
+      ),
+      ActivityEvent(
+        id: 'ACT-007',
+        kind: ActivityKind.donation,
+        actorId: 'USR-010',
+        actorAlias: 'Staff Marco',
+        subjectId: 'USR-004',
+        subjectAlias: 'Cardo',
+        summary: 'Recorded a platelets donation for Cardo',
+        at: now.subtract(const Duration(days: 6)),
+      ),
+    ]);
 
     // ---- chat threads --------------------------------------------------
     _threads.addAll([
@@ -2723,7 +2919,7 @@ class TabangRepository {
         participantAId: 'USR-009',
         participantAAlias: 'Recipient 209',
         participantBId: 'USR-001',
-        participantBAlias: 'Iver',
+        participantBAlias: 'JuanDC',
         participantAReadAt: now.subtract(const Duration(hours: 2, minutes: 44)),
         participantBReadAt: now.subtract(const Duration(hours: 3, minutes: 5)),
         messages: [
@@ -2737,7 +2933,7 @@ class TabangRepository {
           ChatMessage(
             id: 'MSG-002',
             senderId: 'USR-001',
-            senderAlias: 'Iver',
+            senderAlias: 'JuanDC',
             text: 'Yes, I am free at 9 AM. I will bring my donor card.',
             sentAt: now.subtract(const Duration(hours: 2, minutes: 50)),
           ),
@@ -2755,7 +2951,7 @@ class TabangRepository {
         participantAId: 'USR-009',
         participantAAlias: 'Recipient 209',
         participantBId: 'USR-003',
-        participantBAlias: 'Juan',
+        participantBAlias: 'Rogel',
         isMuted: true,
         participantAReadAt: now.subtract(const Duration(hours: 1, minutes: 50)),
         participantBReadAt: now.subtract(const Duration(hours: 1, minutes: 50)),
@@ -2770,7 +2966,7 @@ class TabangRepository {
           ChatMessage(
             id: 'MSG-102',
             senderId: 'USR-003',
-            senderAlias: 'Juan',
+            senderAlias: 'Rogel',
             text: 'I will only donate if you pay me 5,000 PHP upfront cash.',
             sentAt: now.subtract(const Duration(days: 1, hours: 3)),
             flag: ModerationFlag.inappropriate,

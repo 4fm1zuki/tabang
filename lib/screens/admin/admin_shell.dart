@@ -158,11 +158,20 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   /// Slides the phone bottom bar away when the page scrolls toward its end
-  /// and brings it back when the user scrolls up (or hits the top). Only the
-  /// vertical page scroll counts: horizontal rails must not hide it.
+  /// and brings it back on scroll up. The bar is also pinned automatically at
+  /// the top or the bottom of the page: once there is nowhere left to scroll,
+  /// hiding the navigation would strand the user.
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    final metrics = notification.metrics;
+    final atTop = metrics.pixels <= metrics.minScrollExtent + 4;
+    final atBottom = metrics.extentAfter <= 4;
+
     if (notification is ScrollUpdateNotification) {
+      if (atTop || atBottom) {
+        if (_navHidden) setState(() => _navHidden = false);
+        return false;
+      }
       final delta = notification.scrollDelta ?? 0;
       if (delta > 2 && !_navHidden) {
         setState(() => _navHidden = true);
@@ -170,8 +179,12 @@ class _AdminShellState extends State<AdminShell> {
         setState(() => _navHidden = false);
       }
     } else if (notification is ScrollEndNotification) {
-      final metrics = notification.metrics;
-      if (_navHidden && metrics.pixels <= metrics.minScrollExtent + 4) {
+      if (_navHidden && (atTop || atBottom)) {
+        setState(() => _navHidden = false);
+      }
+    } else if (notification is OverscrollNotification) {
+      // A pull past the last item means the page cannot scroll further down.
+      if (_navHidden && notification.overscroll > 0) {
         setState(() => _navHidden = false);
       }
     }
@@ -496,7 +509,7 @@ class _AdminPhoneHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Chapter console',
+                'TABANG',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,

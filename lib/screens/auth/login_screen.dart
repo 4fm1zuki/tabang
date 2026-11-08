@@ -343,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
           const SizedBox(height: TabangSpace.sm),
-          _demoRow(context, 'Donor', 'iverson.briones@tabang.app', 'donor1234'),
+          _demoRow(context, 'Donor', 'juan.delacruz@tabang.app', 'donor1234'),
           _demoRow(
             context,
             'Donor (away)',
@@ -356,7 +356,12 @@ class _LoginScreenState extends State<LoginScreen> {
             'maria.santos@tabang.app',
             'recipient1234',
           ),
-          _demoRow(context, 'Staff', 'staff@tabang.app', 'staff1234'),
+          _demoRow(
+            context,
+            'Staff',
+            'marco.villanueva@tabang.app',
+            'staff1234',
+          ),
           _demoRow(context, 'Admin', 'admin@tabang.app', 'admin1234'),
         ],
       ),

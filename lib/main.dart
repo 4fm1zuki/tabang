@@ -37,8 +37,9 @@ class _TabangAppState extends State<TabangApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
   /// Slim rails: hide the bottom-bar labels and keep the side rail at icon
-  /// width. Chosen in Settings; off by default.
-  bool _compactNav = false;
+  /// width. Chosen in Settings; on by default so the denser phone bar and the
+  /// icon-width desktop rail are what a fresh install shows.
+  bool _compactNav = true;
 
   /// Whether desktop sidebars stay pinned open. Chosen in Settings and shared
   /// by both shells so the preference survives role changes.

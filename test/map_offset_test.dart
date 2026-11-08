@@ -82,6 +82,32 @@ void main() {
     });
   });
 
+  group('drive marker stability', () {
+    test('returns the same point regardless of camera zoom', () {
+      // The old collision nudge compared pins in screen space, so a drive
+      // could move between zooms. The helper is pure: one input, one output.
+      const drive = LatLng(6.74378, 125.35629); // Digos City Gymnasium.
+      final first = DigosVectorMap.driveMarkerPoint(drive);
+      final second = DigosVectorMap.driveMarkerPoint(drive);
+      expect(first.latitude, closeTo(second.latitude, 1e-12));
+      expect(first.longitude, closeTo(second.longitude, 1e-12));
+      // The gym is not at a facility venue, so it keeps its exact position.
+      expect(first.latitude, drive.latitude);
+      expect(first.longitude, drive.longitude);
+    });
+
+    test('steps a shared-venue drive off the facility pin', () {
+      final facility = DigosVectorMap.toMapFrame(digosFacilityPins.first.point);
+      final marker = DigosVectorMap.driveMarkerPoint(facility);
+      expect(marker.latitude, lessThan(facility.latitude));
+      expect(marker.longitude, greaterThan(facility.longitude));
+      // Repeating the call is stable as well.
+      final again = DigosVectorMap.driveMarkerPoint(facility);
+      expect(again.latitude, closeTo(marker.latitude, 1e-12));
+      expect(again.longitude, closeTo(marker.longitude, 1e-12));
+    });
+  });
+
   group('map frame rebase', () {
     const metresPerDegree = 111319.49;
 

@@ -14,6 +14,7 @@ import 'package:tabang/screens/donor/donor_hub_page.dart';
 import 'package:tabang/screens/donor/find_donor_page.dart';
 import 'package:tabang/screens/shared/profile_page.dart';
 import 'package:tabang/theme.dart';
+import 'package:tabang/widgets/chapter_identity.dart';
 import 'package:tabang/widgets/common.dart';
 import 'package:tabang/widgets/digos_vector_map.dart';
 import 'package:tabang/widgets/illustrations.dart';
@@ -484,7 +485,7 @@ void main() {
         of: find.byType(AlertDialog),
         matching: find.byType(TextField),
       ),
-      'Iverson',
+      'Juan',
     );
     await tester.pumpAndSettle();
 
@@ -516,17 +517,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'Iverson');
+    // Search on a fragment so the field's own text does not also match the
+    // list row's full name.
+    await tester.enterText(find.byType(TextField).first, 'Dela');
     await tester.pumpAndSettle();
 
-    final name = find.text('Iverson D. Briones');
+    final name = find.text('Juan Dela Cruz');
     expect(name, findsOneWidget);
     await tester.tap(name);
     await tester.pumpAndSettle();
 
     // Contact details stay in the staff/admin-only record dialog.
     expect(find.text('Email'), findsOneWidget);
-    expect(find.text('iverson.briones@tabang.app'), findsOneWidget);
+    expect(find.text('juan.delacruz@tabang.app'), findsOneWidget);
     expect(
       find.textContaining('visible to chapter staff and administrators only'),
       findsOneWidget,
@@ -539,13 +542,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Donation window · Iver'), findsOneWidget);
+    expect(find.text('Donation window · JuanDC'), findsOneWidget);
 
     await tester.tap(find.text('Update window'));
     await tester.pumpAndSettle();
 
     expect(repo.userById('USR-001')!.totalDonations, before);
-    expect(find.text('Donation window updated for Iver.'), findsOneWidget);
+    expect(find.text('Donation window updated for JuanDC.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -598,7 +601,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('overview states the readiness maximum and live updates', (
+  testWidgets('chapter mark ships the bundled Red Cross emblem', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: const Scaffold(body: Center(child: ChapterMark(size: 48))),
+      ),
+    );
+    await tester.pump();
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(image.image, isA<AssetImage>());
+    expect(
+      (image.image as AssetImage).assetName,
+      'assets/branding/prc_logo.png',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('readiness score shows targets and explains them on demand', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 1000);
@@ -616,9 +639,61 @@ void main() {
     expect(find.text('READINESS SCORE'), findsOneWidget);
     expect(find.text('of 100% max'), findsOneWidget);
     expect(find.text('Live'), findsOneWidget);
+
+    // Every bar names the count against its target instead of a bare
+    // percentage, and the KPI footnotes repeat the same denominator.
+    expect(find.textContaining('of 32 units'), findsWidgets);
+    expect(find.textContaining('of 20 donors'), findsWidgets);
+    expect(find.textContaining('of 60 target'), findsWidgets);
+
+    await tester.tap(find.text('Details'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('How the readiness score works'), findsOneWidget);
+    expect(find.textContaining('internal planning target'), findsOneWidget);
+    expect(find.textContaining('30% of score'), findsOneWidget);
+    expect(find.textContaining('Target: 0 open requests'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('overview lists recent transfusions and account changes', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: const Scaffold(body: AdminOverviewPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recent transfusions & account changes'), findsOneWidget);
     expect(
-      find.textContaining('recalculated whenever units, requests'),
+      find.textContaining('Recorded a packed RBC donation'),
       findsOneWidget,
+    );
+    expect(find.textContaining('Changed their profile photo'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('View all'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View all'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chapter activity'), findsOneWidget);
+    await tester.tap(find.text('Transfusions'));
+    await tester.pumpAndSettle();
+    // The Overview card stays behind the dialog, so the filter is checked
+    // inside the dialog itself.
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining('Changed their profile photo'),
+      ),
+      findsNothing,
     );
     expect(tester.takeException(), isNull);
   });

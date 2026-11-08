@@ -102,51 +102,61 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(
+                padding: EdgeInsets.fromLTRB(
+                  _collapsed ? TabangSpace.xs : TabangSpace.md,
                   TabangSpace.md,
-                  TabangSpace.md,
-                  TabangSpace.xs,
+                  _collapsed ? TabangSpace.xs : TabangSpace.xs,
                   TabangSpace.sm,
                 ),
-                child: Row(
-                  children: [
-                    if (!_collapsed) ...[
-                      Icon(
-                        Icons.space_dashboard_outlined,
-                        size: 17,
-                        color: context.textMuted,
-                      ),
-                      const SizedBox(width: TabangSpace.sm),
-                      Expanded(
-                        child: Text(
-                          'OPERATIONS',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
+                child: _collapsed
+                    // The expand control is the only element in the collapsed
+                    // header, so centre it in the rail instead of leaving it
+                    // hugging the right edge.
+                    ? Center(
+                        child: IconButton(
+                          tooltip: 'Expand operations sidebar',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(
+                            Icons.keyboard_double_arrow_right,
+                            size: 17,
+                          ),
+                          onPressed: () =>
+                              setState(() => _collapsed = !_collapsed),
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          Icon(
+                            Icons.space_dashboard_outlined,
+                            size: 17,
                             color: context.textMuted,
                           ),
-                        ),
+                          const SizedBox(width: TabangSpace.sm),
+                          Expanded(
+                            child: Text(
+                              'OPERATIONS',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                                color: context.textMuted,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Collapse operations sidebar',
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(
+                              Icons.keyboard_double_arrow_left,
+                              size: 17,
+                            ),
+                            onPressed: () =>
+                                setState(() => _collapsed = !_collapsed),
+                          ),
+                        ],
                       ),
-                    ] else
-                      const Spacer(),
-                    IconButton(
-                      tooltip: _collapsed
-                          ? 'Expand operations sidebar'
-                          : 'Collapse operations sidebar',
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(
-                        _collapsed
-                            ? Icons.keyboard_double_arrow_right
-                            : Icons.keyboard_double_arrow_left,
-                        size: 17,
-                      ),
-                      onPressed: () => setState(() => _collapsed = !_collapsed),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: TabangSpace.xs),
               _sectionTile(

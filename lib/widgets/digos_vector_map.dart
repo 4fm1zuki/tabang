@@ -365,6 +365,34 @@ class DigosVectorMap extends StatefulWidget {
     );
   }
 
+  /// Distance, in degrees, within which a drive and a facility count as the
+  /// same venue. Roughly 45 m at Digos latitudes.
+  static const double _sameVenueDegrees = 0.0004;
+
+  /// Fixed south-east step for a drive pin sharing a facility's venue.
+  static const LatLng _venueStep = LatLng(-0.0008, 0.0011);
+
+  /// Applies the zoom-independent venue separation used by drive pins.
+  ///
+  /// Pure and deterministic: the same input always returns the same point, so
+  /// a pin does not move while the camera zooms. Facility pins are rebased
+  /// first, matching how the marker layer draws them.
+  static LatLng driveMarkerPoint(LatLng point) {
+    for (final pin in digosFacilityPins) {
+      final facility = toMapFrame(pin.point);
+      final cosLat = math.cos(point.latitude * math.pi / 180);
+      final dLat = point.latitude - facility.latitude;
+      final dLng = (point.longitude - facility.longitude) * cosLat;
+      if (dLat.abs() < _sameVenueDegrees && dLng.abs() < _sameVenueDegrees) {
+        return LatLng(
+          point.latitude + _venueStep.latitude,
+          point.longitude + _venueStep.longitude,
+        );
+      }
+    }
+    return point;
+  }
+
   /// Centroid of a barangay by repository name ("Zone 1"), used by the donor
   /// pane's "show on map" actions.
   static LatLng? centroidOf(String canonical) {
@@ -602,8 +630,13 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                               : DigosMapColors.lightTileFilter,
                         ),
                         child: TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          // HOT (Humanitarian OpenStreetMap Team) tiles are
+                          // still OSM data, but the style draws no mountain
+                          // peak symbols or hill shading. The standard OSM
+                          // Carto style covers the Digos highlands - and the
+                          // screenshot problem was those brown triangles.
+                          urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                          subdomains: const ['a', 'b', 'c'],
                           userAgentPackageName: 'com.digos.barangay_map',
                           maxNativeZoom: 19,
                           // The offset is re-evaluated inside the tile builder so
@@ -822,27 +855,17 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     ];
   }
 
-  /// Venue-accurate drive pins, separated when a barangay hosts several or
-  /// when a hospital/PRC pin already occupies the same spot. The glyph scales
-  /// with the zoom so wide views stay readable.
+  /// Venue-accurate drive pins.
+  ///
+  /// Position is deliberately zoom-independent. The old build compared each
+  /// drive against the facility pins in screen space and nudged it until the
+  /// glyphs no longer overlapped, so a pin could jump to a different spot on
+  /// every zoom level. Separation is now a fixed geographic offset applied
+  /// only when a drive and a facility share the same venue, and drives that
+  /// share a barangay get a fixed stagger instead.
   List<Marker> _driveMarkers(bool dark, double pinScale) {
-    final camera = _cameraOrNull();
     final driveWidth = 30 * pinScale;
     final driveHeight = 38 * pinScale;
-    final driveHitHeight = 42 * pinScale;
-    // Facility pins are drawn in the map frame (see toMapFrame), so the
-    // collision test must use the same rebased points as the marker layer.
-    final facilityRects = camera == null
-        ? const <Rect>[]
-        : [
-            for (final pin in digosFacilityPins)
-              _screenRect(
-                camera,
-                DigosVectorMap.toMapFrame(pin.point),
-                30 * pinScale,
-                30 * pinScale,
-              ),
-          ];
     final seenPerBarangay = <String, int>{};
     return [
       for (final drive in widget.drives)
@@ -858,42 +881,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                   drive.point.latitude + 0.0018 * index,
                   drive.point.longitude + 0.0018 * index,
                 );
-          if (camera != null && facilityRects.isNotEmpty) {
-            final base = _screenCenter(camera, point);
-            final rect = Rect.fromCenter(
-              center: base,
-              width: driveWidth,
-              height: driveHitHeight,
-            );
-            if (facilityRects.any((facility) => facility.overlaps(rect))) {
-              // Step off the facility pin in the first direction that clears
-              // it. The drive stays inside its barangay; only the pin glyph
-              // moves, so both venues remain tappable.
-              for (final nudge in const [
-                Offset(0, -40),
-                Offset(20, -30),
-                Offset(-20, -30),
-                Offset(0, 44),
-                Offset(24, 0),
-                Offset(-24, 0),
-              ]) {
-                final scaled = nudge * pinScale;
-                point = camera.pointToLatLng(
-                  math.Point(base.dx + scaled.dx, base.dy + scaled.dy),
-                );
-                final nudgedRect = Rect.fromCenter(
-                  center: base + scaled,
-                  width: driveWidth,
-                  height: driveHitHeight,
-                );
-                if (!facilityRects.any(
-                  (facility) => facility.overlaps(nudgedRect),
-                )) {
-                  break;
-                }
-              }
-            }
-          }
+          point = DigosVectorMap.driveMarkerPoint(point);
           return Marker(
             point: point,
             width: driveWidth,
@@ -908,26 +896,6 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
           );
         }(),
     ];
-  }
-
-  /// Screen position of [point] in the map's local coordinate space.
-  Offset _screenCenter(MapCamera camera, LatLng point) {
-    final projected = camera.project(point);
-    final origin = camera.pixelOrigin;
-    return Offset(projected.x - origin.x, projected.y - origin.y);
-  }
-
-  Rect _screenRect(
-    MapCamera camera,
-    LatLng point,
-    double width,
-    double height,
-  ) {
-    return Rect.fromCenter(
-      center: _screenCenter(camera, point),
-      width: width,
-      height: height,
-    );
   }
 
   MapCamera? _cameraOrNull() {
@@ -1323,7 +1291,7 @@ class DigosMapAttribution extends StatelessWidget {
         border: Border.all(color: context.border),
       ),
       child: Text(
-        '© OpenStreetMap contributors',
+        '© OpenStreetMap contributors · HOT style',
         style: TextStyle(fontSize: 8.5, height: 1.1, color: context.textMuted),
       ),
     );

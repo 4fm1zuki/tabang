@@ -297,7 +297,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Nickname (shown to other users)',
                         prefixIcon: Icon(Icons.badge_outlined, size: 18),
                         helperText:
-                            'Unique, and never your real name — e.g. "Iver"',
+                            'Unique, and never your real name — e.g. "JuanDC"',
                       ),
                       validator: (v) {
                         final alias = v?.trim() ?? '';
