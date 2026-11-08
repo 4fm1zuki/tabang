@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:tabang/widgets/digos_vector_map.dart';
 
 void main() {
@@ -78,6 +79,34 @@ void main() {
           closeTo(total.dy, 1e-9),
         );
       }
+    });
+  });
+
+  group('map frame rebase', () {
+    const metresPerDegree = 111319.49;
+
+    test('moves an OSM point by the same ground offset as the raster', () {
+      const pin = LatLng(6.757051, 125.352800); // PRC chapter, true OSM.
+      final rebased = DigosVectorMap.toMapFrame(pin);
+
+      final cosLat = math.cos(pin.latitude * math.pi / 180);
+      final metresPerPixel =
+          156543.03392 * cosLat / math.pow(2, DigosVectorMap.baseMapOffsetZoom);
+      final southMetres = (pin.latitude - rebased.latitude) * metresPerDegree;
+      final eastMetres =
+          (rebased.longitude - pin.longitude) * metresPerDegree * cosLat;
+
+      expect(
+        southMetres,
+        closeTo(DigosVectorMap.baseMapOffset.dy * metresPerPixel, 1),
+      );
+      expect(
+        eastMetres,
+        closeTo(DigosVectorMap.baseMapOffset.dx * metresPerPixel, 1),
+      );
+      // Same direction as the raster nudge: south and east.
+      expect(rebased.latitude, lessThan(pin.latitude));
+      expect(rebased.longitude, greaterThan(pin.longitude));
     });
   });
 }

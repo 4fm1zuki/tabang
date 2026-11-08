@@ -92,7 +92,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           'chat. Do not share either with anyone.',
     ),
     _Guide(
-      title: 'Using Discover',
+      title: 'Using Home',
       icon: Icons.explore_outlined,
       summary:
           'Find announcements, donation drives and short educational guides.',
@@ -105,7 +105,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       ],
       tip:
           'The urgent-shortage callout lives on Blood Bank and the map, not '
-          'Discover. Stock alerts belong beside the inventory they describe.',
+          'Home. Stock alerts belong beside the inventory they describe.',
     ),
     _Guide(
       title: 'Profile & donor registration',
@@ -130,7 +130,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       steps: [
         'Open Settings from the account menu or the desktop rail. Appearance follows System, Light or Dark mode immediately.',
         'Dark mode uses raised secondary-text contrast and Material 3 surfaced components, not a simple colour inversion.',
-        'Notification switches control what appears in the Discover summary. This build shows in-app summaries only — no SMS or push.',
+        'Notification switches control what appears in the Home summary. This build shows in-app summaries only — no SMS or push.',
         'Donors can hide from the directory and hide their barangay without changing their account status.',
         'The app reserves system status-bar and gesture insets, so titles and the bottom bar never sit under the clock or home indicator.',
         'The map keeps a light base even in dark mode, with a separate map-style toggle for dimming streets and labels.',
@@ -1012,8 +1012,9 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     );
   }
 
-  /// One FAQ entry as a chat exchange: the question arrives on the left, the
-  /// TABANG answer replies on the right.
+  /// One FAQ entry: the question sits on the left and the TABANG answer below
+  /// it. Both blocks read left-to-right so the FAQ scans like a document
+  /// instead of a chat log.
   Widget _buildFaq(BuildContext context, _Faq faq) {
     return Padding(
       padding: const EdgeInsets.only(top: TabangSpace.md),
@@ -1091,9 +1092,9 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                   ),
                   child: Text(
                     faq.answer,
-                    // Answers sit on the right of the exchange, so their
-                    // copy is right-aligned to the bubble edge.
-                    textAlign: TextAlign.right,
+                    // Document-style copy: answers stay left-aligned even
+                    // though the bubble is offset toward the chapter avatar.
+                    textAlign: TextAlign.left,
                     style: TextStyle(
                       fontSize: 12.5,
                       height: 1.55,

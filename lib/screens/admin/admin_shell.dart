@@ -23,11 +23,18 @@ class AdminShell extends StatefulWidget {
     required this.user,
     required this.themeMode,
     required this.onThemeModeChanged,
+    this.compactNav = false,
+    this.onCompactNavChanged,
   });
 
   final AppUser user;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+
+  /// Slim rails: labels hidden on the phone bottom bar, and the side rail
+  /// stays at icon width instead of expanding on hover or pin.
+  final bool compactNav;
+  final ValueChanged<bool>? onCompactNavChanged;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -37,6 +44,10 @@ class _AdminShellState extends State<AdminShell> {
   int _index = 0;
   bool _hovering = false;
   bool _pinned = true;
+
+  /// The bottom bar slides away while the page scrolls toward its end and
+  /// comes back on the first scroll up or tab change.
+  bool _navHidden = false;
 
   /// Opens a destination that is not in the phone bottom bar.
   void _pushStandalone(int index) {
@@ -80,7 +91,8 @@ class _AdminShellState extends State<AdminShell> {
       _pages
         ..clear()
         ..[_index] = _buildPage(_index);
-    } else if (oldWidget.themeMode != widget.themeMode &&
+    } else if ((oldWidget.themeMode != widget.themeMode ||
+            oldWidget.compactNav != widget.compactNav) &&
         _pages.containsKey(6)) {
       _pages[6] = _buildPage(6);
     }
@@ -89,8 +101,30 @@ class _AdminShellState extends State<AdminShell> {
   void _select(int index) {
     setState(() {
       _index = index;
+      _navHidden = false;
       _pages.putIfAbsent(index, () => _buildPage(index));
     });
+  }
+
+  /// Slides the phone bottom bar away when the page scrolls toward its end
+  /// and brings it back when the user scrolls up (or hits the top). Only the
+  /// vertical page scroll counts: horizontal rails must not hide it.
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0;
+      if (delta > 2 && !_navHidden) {
+        setState(() => _navHidden = true);
+      } else if (delta < -2 && _navHidden) {
+        setState(() => _navHidden = false);
+      }
+    } else if (notification is ScrollEndNotification) {
+      final metrics = notification.metrics;
+      if (_navHidden && metrics.pixels <= metrics.minScrollExtent + 4) {
+        setState(() => _navHidden = false);
+      }
+    }
+    return false;
   }
 
   static const _destinations = <_Destination>[
@@ -113,7 +147,9 @@ class _AdminShellState extends State<AdminShell> {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < TabangBreakpoints.navigationRail;
     final wide = !compact;
-    final railExpanded = wide && (_pinned || _hovering);
+    // Slim rails keep the rail collapsed and ignore hover and pin.
+    final slim = widget.compactNav;
+    final railExpanded = wide && !slim && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
 
     final content = IndexedStack(
@@ -137,21 +173,46 @@ class _AdminShellState extends State<AdminShell> {
                 onOpenSettings: () => _pushStandalone(6),
                 onOpenHelp: () => _pushStandalone(7),
               ),
-              Expanded(child: content),
-              NavigationBar(
-                selectedIndex: _phoneIndices.contains(_index)
-                    ? _phoneIndices.indexOf(_index)
-                    : 0,
-                onDestinationSelected: (slot) => _select(_phoneIndices[slot]),
-                destinations: [
-                  for (final index in _phoneIndices)
-                    NavigationDestination(
-                      icon: Icon(_destinations[index].icon),
-                      selectedIcon: Icon(_destinations[index].activeIcon),
-                      label: _destinations[index].label,
-                      tooltip: _destinations[index].label,
+              Expanded(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: _handleScrollNotification,
+                  child: content,
+                ),
+              ),
+              // The bar slides down while the page scrolls toward its end and
+              // returns on scroll up. Slim rails also hide the labels.
+              ClipRect(
+                child: AnimatedContainer(
+                  key: const ValueKey('phoneNavigationBar'),
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  height: _navHidden ? 0 : 80,
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    minHeight: 80,
+                    maxHeight: 80,
+                    child: NavigationBar(
+                      height: 80,
+                      labelBehavior: widget.compactNav
+                          ? NavigationDestinationLabelBehavior.alwaysHide
+                          : NavigationDestinationLabelBehavior.alwaysShow,
+                      selectedIndex: _phoneIndices.contains(_index)
+                          ? _phoneIndices.indexOf(_index)
+                          : 0,
+                      onDestinationSelected: (slot) =>
+                          _select(_phoneIndices[slot]),
+                      destinations: [
+                        for (final index in _phoneIndices)
+                          NavigationDestination(
+                            icon: Icon(_destinations[index].icon),
+                            selectedIcon: Icon(_destinations[index].activeIcon),
+                            label: _destinations[index].label,
+                            tooltip: _destinations[index].label,
+                          ),
+                      ],
                     ),
-                ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -163,8 +224,10 @@ class _AdminShellState extends State<AdminShell> {
       body: Row(
         children: [
           MouseRegion(
-            onEnter: wide ? (_) => setState(() => _hovering = true) : null,
-            onExit: wide
+            onEnter: wide && !slim
+                ? (_) => setState(() => _hovering = true)
+                : null,
+            onExit: wide && !slim
                 ? (_) => setState(() {
                     _hovering = false;
                     if (!_pinned) _railSettled = false;
@@ -176,6 +239,7 @@ class _AdminShellState extends State<AdminShell> {
               selectedIndex: _index,
               railExpanded: railExpanded,
               expanded: showLabels,
+              showPinControl: !slim,
               pinned: _pinned,
               onSlideEnd: () {
                 if (!mounted) return;
@@ -226,6 +290,8 @@ class _AdminShellState extends State<AdminShell> {
           user: widget.user,
           themeMode: widget.themeMode,
           onThemeModeChanged: widget.onThemeModeChanged,
+          compactNav: widget.compactNav,
+          onCompactNavChanged: widget.onCompactNavChanged,
         );
       case 7:
         return AboutHelpPage(onOpenMessages: () => _select(4));
@@ -356,6 +422,7 @@ class _AdminSidebar extends StatelessWidget {
     required this.selectedIndex,
     required this.railExpanded,
     required this.expanded,
+    required this.showPinControl,
     required this.pinned,
     required this.onSlideEnd,
     required this.onSelect,
@@ -371,6 +438,9 @@ class _AdminSidebar extends StatelessWidget {
 
   /// Labels are laid out only once the slide has finished.
   final bool expanded;
+
+  /// Slim rails hide the pin: the setting, not hover, controls the width.
+  final bool showPinControl;
   final bool pinned;
   final VoidCallback onSlideEnd;
   final ValueChanged<int> onSelect;
@@ -441,15 +511,16 @@ class _AdminSidebar extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: pinned ? 'Unpin sidebar' : 'Pin sidebar',
-                    icon: Icon(
-                      pinned ? Icons.push_pin : Icons.push_pin_outlined,
-                      size: 15,
-                      color: Colors.white70,
+                  if (showPinControl)
+                    IconButton(
+                      tooltip: pinned ? 'Unpin sidebar' : 'Pin sidebar',
+                      icon: Icon(
+                        pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                        size: 15,
+                        color: Colors.white70,
+                      ),
+                      onPressed: onTogglePin,
                     ),
-                    onPressed: onTogglePin,
-                  ),
                 ],
               ],
             ),
@@ -457,7 +528,7 @@ class _AdminSidebar extends StatelessWidget {
           // Keep the pin reachable after the rail collapses. Previously the
           // control only existed in the expanded brand row, so an unpinned
           // rail could not be pinned open again without hovering.
-          if (!expanded)
+          if (!expanded && showPinControl)
             IconButton(
               tooltip: pinned ? 'Unpin sidebar' : 'Pin sidebar',
               visualDensity: VisualDensity.compact,

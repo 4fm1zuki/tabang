@@ -117,7 +117,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PageHeader(
-            title: 'Discover',
+            title: 'Home',
             subtitle: 'Updates, donation guidance and upcoming drives across Digos City.',
             actions: [
               SizedBox(

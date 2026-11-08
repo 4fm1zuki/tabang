@@ -23,11 +23,17 @@ class SettingsPage extends StatefulWidget {
     required this.user,
     required this.themeMode,
     required this.onThemeModeChanged,
+    this.compactNav = false,
+    this.onCompactNavChanged,
   });
 
   final AppUser user;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+
+  /// Slim rails preference, owned by the root app so both shells share it.
+  final bool compactNav;
+  final ValueChanged<bool>? onCompactNavChanged;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -83,17 +89,16 @@ class _SettingsPageState extends State<SettingsPage> {
             'Appearance',
             'Choose how TABANG displays on this device.',
             help:
-                'Light is the default so the app looks the same for everyone. '
-                'System follows your device; the map keeps a light base even '
-                'in dark mode, with its own map-style toggle, because '
-                'cartography reads better on a light surface.',
+                'System follows your device; Light and Dark pin the theme on '
+                'this session. The map follows the active theme too, with a '
+                'per-visit override from the map style button on desktop.',
             children: [
               _themeOption(
                 context,
                 ThemeMode.light,
                 Icons.light_mode_outlined,
                 'Light',
-                'Default · always use the light theme',
+                'Always use the light theme',
               ),
               _themeOption(
                 context,
@@ -107,7 +112,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ThemeMode.system,
                 Icons.brightness_auto,
                 'System',
-                'Follow your device setting',
+                'Follow your device setting · default',
               ),
               const SizedBox(height: TabangSpace.sm),
               _note(
@@ -115,6 +120,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 Icons.contrast,
                 'TABANG uses Material 3 typography and surfaces. Dark mode '
                 'raises secondary-text contrast instead of dimming it.',
+              ),
+              const SizedBox(height: TabangSpace.md),
+              _switchRow(
+                context,
+                'Slim navigation rails',
+                'Hide the names under icons on the bottom bar, and keep the '
+                    'side rail at icon width',
+                widget.compactNav,
+                (value) => widget.onCompactNavChanged?.call(value),
               ),
             ],
           ),
@@ -128,7 +142,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 'This prototype shows in-app summaries only. Push '
                 'notifications need a deployed backend and are listed as a '
                 'known gap in the README. Turning a category off hides it from '
-                'the Discover summary immediately.',
+                'the Home summary immediately.',
             children: [
               _switchRow(
                 context,

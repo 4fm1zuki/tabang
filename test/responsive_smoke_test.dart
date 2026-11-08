@@ -32,14 +32,14 @@ void main() {
     );
   }
 
-  testWidgets('discover rails and cards fit a 360 px phone', (tester) async {
+  testWidgets('home rails and cards fit a 360 px phone', (tester) async {
     await usePhone(tester);
     final user = repo.userById('USR-038')!;
 
     await tester.pumpWidget(host(DiscoverPage(user: user)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Discover'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -171,4 +171,87 @@ void main() {
     expect(find.text('Chapter console'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('slim rails setting hides the bottom-bar labels', (tester) async {
+    await usePhone(tester);
+    await tester.pumpWidget(
+      host(
+        DonorShell(
+          user: repo.userById('USR-001')!,
+          themeMode: ThemeMode.light,
+          onThemeModeChanged: (_) {},
+          compactNav: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(bar.labelBehavior, NavigationDestinationLabelBehavior.alwaysHide);
+    // Icons stay; the names under them disappear.
+    expect(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byIcon(Icons.home),
+      ),
+      findsOneWidget,
+    );
+    // The label widget stays in the tree (Material keeps it for semantics)
+    // but is faded to zero, so the name is not visible under the icon.
+    final labelFade = tester.widget<FadeTransition>(
+      find
+          .ancestor(
+            of: find.descendant(
+              of: find.byType(NavigationBar),
+              matching: find.text('Home'),
+            ),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    );
+    expect(labelFade.opacity.value, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'phone bottom bar hides while scrolling and returns on scroll up',
+    (tester) async {
+      await usePhone(tester);
+      await tester.pumpWidget(
+        host(
+          DonorShell(
+            user: repo.userById('USR-001')!,
+            themeMode: ThemeMode.light,
+            onThemeModeChanged: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      double barHeight() => tester
+          .getSize(find.byKey(const ValueKey('phoneNavigationBar')))
+          .height;
+      expect(barHeight(), 80);
+
+      final feed = find
+          .descendant(
+            of: find.byType(DiscoverPage),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            ),
+          )
+          .first;
+
+      await tester.drag(feed, const Offset(0, -420));
+      await tester.pumpAndSettle();
+      expect(barHeight(), 0, reason: 'scrolling toward the end hides the bar');
+
+      await tester.drag(feed, const Offset(0, 140));
+      await tester.pumpAndSettle();
+      expect(barHeight(), 80, reason: 'scrolling back up restores the bar');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

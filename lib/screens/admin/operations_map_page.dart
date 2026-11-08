@@ -44,6 +44,11 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   bool _mapDark = false;
   bool? _mapDarkOverride;
 
+  /// The operations map can shade either open workload (requests) or donor
+  /// availability. Staff asked for the donor-density view they already know
+  /// from Find Donor.
+  bool _showDonorDensity = false;
+
   @override
   void initState() {
     super.initState();
@@ -74,8 +79,11 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
       if (drive.status == 'Completed') continue;
       final barangay =
           DigosBarangays.canonical(drive.barangay) ?? drive.barangay;
+      // Venue seeds are true OSM coordinates; centroids are already in the
+      // hand-traced map frame. Rebase only the former so the marker sits on
+      // its venue under the nudged raster.
       final point = (drive.lat != null && drive.lng != null)
-          ? LatLng(drive.lat!, drive.lng!)
+          ? DigosVectorMap.toMapFrame(LatLng(drive.lat!, drive.lng!))
           : DigosVectorMap.centroidOf(barangay);
       if (point == null) continue;
       markers.add(
@@ -121,7 +129,11 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             child: DigosVectorMap(
               controller: _mapController,
               donorCounts: _repo.donorCountsByBarangay(),
-              requestCounts: _repo.openRequestsByBarangay(),
+              // Switches the heat ramp between workload and donor density;
+              // the legend below tracks the same flag.
+              requestCounts: _showDonorDensity
+                  ? null
+                  : _repo.openRequestsByBarangay(),
               drives: _driveMarkers,
               selectedBarangay: _selected,
               mapDark: _mapDark,
@@ -196,8 +208,19 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Staff get both ramps: workload for triage and the same
+                // donor-density view used by Find Donor. The switch drives
+                // both the shading and this legend.
+                Row(
+                  children: [
+                    _layerToggle(context, donor: false),
+                    const SizedBox(width: 4),
+                    _layerToggle(context, donor: true),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
-                  'OPEN REQUESTS',
+                  _showDonorDensity ? 'DONOR DENSITY' : 'OPEN REQUESTS',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -206,10 +229,49 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                _legendRow(context, 0, 'None open'),
-                _legendRow(context, 1, '1 request'),
-                _legendRow(context, 3, '2–3 requests'),
-                _legendRow(context, 6, '4+ requests'),
+                if (_showDonorDensity) ...[
+                  _legendRow(
+                    context,
+                    digosHeatColor(0, dark: _mapDark),
+                    'No available donors',
+                  ),
+                  _legendRow(
+                    context,
+                    digosHeatColor(1, dark: _mapDark),
+                    '1–2 donors',
+                  ),
+                  _legendRow(
+                    context,
+                    digosHeatColor(4, dark: _mapDark),
+                    '3–5 donors',
+                  ),
+                  _legendRow(
+                    context,
+                    digosHeatColor(7, dark: _mapDark),
+                    '6+ donors',
+                  ),
+                ] else ...[
+                  _legendRow(
+                    context,
+                    digosRequestColor(0, dark: _mapDark),
+                    'None open',
+                  ),
+                  _legendRow(
+                    context,
+                    digosRequestColor(1, dark: _mapDark),
+                    '1 request',
+                  ),
+                  _legendRow(
+                    context,
+                    digosRequestColor(3, dark: _mapDark),
+                    '2–3 requests',
+                  ),
+                  _legendRow(
+                    context,
+                    digosRequestColor(6, dark: _mapDark),
+                    '4+ requests',
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Row(
                   children: [
@@ -241,7 +303,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
-  Widget _legendRow(BuildContext context, int count, String label) {
+  Widget _legendRow(BuildContext context, Color color, String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
@@ -250,7 +312,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             width: 12,
             height: 12,
             decoration: BoxDecoration(
-              color: digosRequestColor(count, dark: _mapDark),
+              color: color,
               borderRadius: BorderRadius.circular(3),
               border: Border.all(color: context.border),
             ),
@@ -261,6 +323,39 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             style: TextStyle(fontSize: 10.5, color: context.textMuted),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Small two-state switch inside the map legend card.
+  Widget _layerToggle(BuildContext context, {required bool donor}) {
+    final selected = _showDonorDensity == donor;
+    return InkWell(
+      borderRadius: BorderRadius.circular(TabangRadius.xs),
+      onTap: () => setState(() => _showDonorDensity = donor),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: selected
+              ? (context.isDark
+                    ? TabangColors.crimson.withValues(alpha: 0.22)
+                    : TabangColors.crimsonSoft)
+              : null,
+          borderRadius: BorderRadius.circular(TabangRadius.xs),
+          border: Border.all(
+            color: selected
+                ? TabangColors.crimson.withValues(alpha: 0.45)
+                : context.border,
+          ),
+        ),
+        child: Text(
+          donor ? 'Donor density' : 'Requests',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: selected ? TabangColors.crimson : context.textMuted,
+          ),
+        ),
       ),
     );
   }

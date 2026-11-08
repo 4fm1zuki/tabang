@@ -77,10 +77,11 @@ were bypassed.
 
 ### Donor / recipient surface
 
-- **Discover** — one compact toolbar, then horizontal rails for upcoming blood
-  drives, announcements and stories, and short learning cards, ending with a
-  visit planner. Quick actions are *Request blood*, *Find donors near you* and
-  *Find a drive* (which scrolls the feed to the drives rail). The urgent
+- **Home** (the first navigation destination, home icon) — one compact toolbar,
+  then horizontal rails for upcoming blood drives, announcements and stories,
+  and short learning cards, ending with a visit planner. Quick actions are
+  *Request blood*, *Find donors near you* and *Find a drive* (which scrolls the
+  feed to the drives rail). The urgent
   shortage callout lives on Blood Bank and the map, not here. Credit text is
   no longer printed under feed cards — attribution appears in the article and
   drive details after a card is tapped, and original TABANG artwork is not
@@ -109,7 +110,11 @@ were bypassed.
   never move. The nudge is calibrated at `baseMapOffsetZoom` and scales with
   the camera, so it tracks the streets at every zoom. Whole-tile shifts are
   fetched directly and only the sub-tile remainder is translated, which keeps
-  the shift correct at street level without an oversized tile canvas. Every
+  the shift correct at street level without an oversized tile canvas. The
+  pins follow the same displacement: facility and venue seeds hold their real
+  OpenStreetMap coordinates, and `DigosVectorMap.toMapFrame` rebases them into
+  the nudged map frame so a hospital pin lands on the hospital building and a
+  drive pin on its barangay hall — not half a kilometre away. Every
   TABANG
   layer is drawn on top locally, so the map still reads when tiles cannot load:
   a translucent warm-crimson donor-density ramp (4–78% opacity, so streets stay
@@ -195,9 +200,10 @@ were bypassed.
   availability, privacy/data and account sections, each with a contextual `?`
   help tip.
 - **Guides & Help** — a separate destination with task guides (donating,
-  requesting, messaging, Discover, profile/donor registration and settings),
-  a **chat-style FAQ** (each question is a left-hand bubble, the answer replies
-  on the right, sorted A→Z per category) and **About TABANG**, a platform
+  requesting, messaging, Home, profile/donor registration and settings),
+  a **left-aligned FAQ** (each question is a bubble above its answer, both
+  reading left-to-right and sorted A→Z per category) and **About TABANG**, a
+  platform
   summary with SDG alignment, safety commitments, known gaps and photo credits.
   A **Message chapter staff** card sends a question, data correction or
   feedback into a real support thread with the chapter, which is also where the
@@ -215,8 +221,9 @@ were bypassed.
   file, planned visit, notes — where each one can be verified, returned for
   documents or not accepted. On phones and small tablets the staff console uses
   the same bottom-bar shell as the community app; the icon rail is desktop-only.
-- **Operations** — a staff/admin map of the same Digos template, switched to the
-  amber **open-request heat layer** instead of donor density. Tapping a
+- **Operations** — a staff/admin map of the same Digos template with a legend
+  switch between the amber **open-request heat layer** and the same
+  **donor-density heatmap** the community map uses. Tapping a
   barangay scopes the side panel to that barangay: eligible donors, pending
   registrations, open requests with responders, and donor applications waiting
   for review. Staff can open a request's details, select a donor response
@@ -273,7 +280,7 @@ were bypassed.
 | Supabase/PostgreSQL backend (p.27) | **Not implemented.** The app uses the in-memory repository; no Supabase client is shipped. |
 | Voice calls (p.24) | **Not implemented.** Messaging works; the call affordance is absent rather than dead. |
 | Profile picture upload (p.26) | **Not implemented.** No image-picker dependency. |
-| Push notifications | **Not implemented.** Discover shows in-app summaries; delivery requires a deployed backend and notification service. |
+| Push notifications | **Not implemented.** Home shows in-app summaries; delivery requires a deployed backend and notification service. |
 | Multi-facility inventory | **Partial.** The app has a participating-facility list and a request-source branch, but no per-facility stock ledger or inter-facility transfer workflow. |
 | Clinical screening | **Not implemented.** Weight is self-reported and there is no pre-donation physical examination, hemoglobin check, or clinician clearance. The app enforces the recorded eligibility rules only. |
 | Production authentication | **Prototype only.** Credentials are salted and SHA-256 hashed in memory; a production system needs a persistent store, a memory-hard password KDF, rate limiting, and TLS. |
@@ -302,7 +309,7 @@ lib/
 │   └── blood_request_dialog.dart # stock-first request flow
 └── screens/
     ├── auth/                  # login, community registration
-    ├── donor/                 # DonorShell + Discover, Blood Bank, Map,
+    ├── donor/                 # DonorShell + Home, Blood Bank, Map,
     │                          # Requests, Messages, Donor Hub
     ├── admin/                 # AdminShell + Statistics, Inventory, Users, Moderation
     └── shared/                # Settings, Profile, Guides & Help / About
@@ -360,8 +367,12 @@ reversible-by-staff upgrade in Donor Hub, not a signup fork. Layout adapts by
 width — below 1024 px the sidebar becomes an M3 bottom navigation bar and the
 map stacks above the donor list; from 1024 px up the sidebar is the default
 navigation, expanded and pinnable, with hover-open still available after
-unpinning, and the classic side-by-side splits. `MaterialApp.builder` wraps the
-navigator in `SafeArea`, so status-bar and gesture insets are never painted
+unpinning, and the classic side-by-side splits. On phones the bottom bar slides
+down out of the way while the page scrolls toward its end and returns on any
+scroll up or tab change. Settings adds a **slim navigation rails** switch: the
+bottom bar drops its labels and the side rail stays at icon width, ignoring
+hover and pin. `MaterialApp.builder` wraps the navigator in `SafeArea`, so
+status-bar and gesture insets are never painted
 over. The theme follows the **system** by default; light and dark stay explicit
 choices in Settings, and the map style follows whichever theme is active.
 
@@ -428,7 +439,7 @@ colours with a radial wash whose alpha reaches zero at the edges, so the art
 blends into the surrounding card in light and dark mode, stays crisp at any
 density, and adds no download weight. `EmptyState` uses it wherever a full
 illustration helps; dense admin tables keep the compact icon variant. Photos are
-used only where they add context: the login brand panel, the Discover hero,
+used only where they add context: the login brand panel, the Home hero,
 article and drive cards, their dialogs, and the identity headers. Every one is
 credited individually; the 48 profile portraits and seven educational
 illustrations are original TABANG artwork.
@@ -492,7 +503,7 @@ off and there is no third-party image host to configure or pay for.
 
 | Surface | Asset |
 |---|---|
-| Login brand panel, Discover hero | `assets/images/hero_donation.jpg` |
+| Login brand panel, Home hero | `assets/images/hero_donation.jpg` |
 | Hydration and nutrition articles | `content_hydration.jpg`, `content_nutrition.jpg` |
 | Recovery, screening and drive articles | `content_recovery.jpg`, `content_screening.jpg`, `content_drive.jpg` |
 | Privacy article | `content_privacy.jpg` |
@@ -582,7 +593,7 @@ flutter test
   is never matched by the eligibility engine, staff can request documents
   without closing the application, and verifying flips the blood card, the
   account status and the open queue at once.
-- **Interface widgets** — Discover leads with its section rails, photo credit
+- **Interface widgets** — Home leads with its section rails, photo credit
   chips resolve for every bundled photograph and open the licence/source dialog
   (original artwork is deliberately uncredited), empty states render the vector
   illustration, every content item resolves to a bundled photo, the
@@ -593,9 +604,10 @@ flutter test
   the wide desktop layout including the fit-city button, shrinks the phone
   control stack, and selects a barangay on tap. The Donor Hub additionally
   renders the automatic-away notice and clears it through the **I'm active**
-  action, the staff Operations map renders its request layer, and Inventory
+  action, the staff Operations map renders its request layer and switches to
+  the donor-density heatmap from the legend, and Inventory
   exposes Add unit plus the appointment queue.
-- **Narrow-screen layout** — Discover, Blood Bank (including unit selection and
+- **Narrow-screen layout** — Home, Blood Bank (including unit selection and
   the appointment dialog) and Statistics render at a 360 × 780 phone viewport
   without overflow; the unit list reflows to one column and the appointment
   dialog stacks its fields.
@@ -603,7 +615,8 @@ flutter test
   layout, each rail item's icon stays dead-centre in its pill (the regression
   that left the selection accent bar pushing icons off-centre), and the compact
   pin control remains under the logo so an unpinned donor or admin rail can be
-  pinned open again.
+  pinned open again. The map style also follows the active theme, and the
+  rebased pins stay on their OSM buildings under the nudged raster.
 - **Barangay canonicalisation** — parenthetical stripping, case/punctuation
   normalisation, and round-tripping all 26 names.
 - **Map topology** — all 75 shared arcs stitch 26 complete barangay rings and

@@ -36,6 +36,10 @@ class _TabangAppState extends State<TabangApp> {
   /// Light, Dark and System remain explicit choices in Settings.
   ThemeMode _themeMode = ThemeMode.system;
 
+  /// Slim rails: hide the bottom-bar labels and keep the side rail at icon
+  /// width. Chosen in Settings; off by default.
+  bool _compactNav = false;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +58,10 @@ class _TabangAppState extends State<TabangApp> {
 
   void _setThemeMode(ThemeMode mode) {
     setState(() => _themeMode = mode);
+  }
+
+  void _setCompactNav(bool value) {
+    setState(() => _compactNav = value);
   }
 
   @override
@@ -96,6 +104,8 @@ class _TabangAppState extends State<TabangApp> {
         user: user,
         themeMode: _themeMode,
         onThemeModeChanged: _setThemeMode,
+        compactNav: _compactNav,
+        onCompactNavChanged: _setCompactNav,
       );
     }
 
@@ -103,6 +113,8 @@ class _TabangAppState extends State<TabangApp> {
       user: user,
       themeMode: _themeMode,
       onThemeModeChanged: _setThemeMode,
+      compactNav: _compactNav,
+      onCompactNavChanged: _setCompactNav,
     );
   }
 }

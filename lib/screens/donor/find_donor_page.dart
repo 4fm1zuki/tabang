@@ -115,7 +115,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
   }
 
   void _focusFacility(DigosFacilityPin pin) {
-    _mapController.move(pin.point, 15);
+    // The pin is drawn in the map frame, so the camera must target the same
+    // rebased point or "show on map" would centre half a kilometre away.
+    _mapController.move(DigosVectorMap.toMapFrame(pin.point), 15);
     _notifyMapInteraction();
   }
 
@@ -506,8 +508,11 @@ class _FindDonorPageState extends State<FindDonorPage> {
       if (drive.status == 'Completed') continue;
       final barangay =
           DigosBarangays.canonical(drive.barangay) ?? drive.barangay;
+      // Venue seeds are true OSM coordinates; centroids are already in the
+      // hand-traced map frame. Rebase only the former so the marker sits on
+      // its venue under the nudged raster.
       final point = (drive.lat != null && drive.lng != null)
-          ? LatLng(drive.lat!, drive.lng!)
+          ? DigosVectorMap.toMapFrame(LatLng(drive.lat!, drive.lng!))
           : DigosVectorMap.centroidOf(barangay);
       if (point == null) continue;
       markers.add(

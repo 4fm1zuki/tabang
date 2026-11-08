@@ -343,6 +343,19 @@ void main() {
     expect(find.text('OPEN REQUESTS'), findsOneWidget);
     expect(find.text('Inventory queue'), findsOneWidget);
     expect(find.byType(DigosVectorMap), findsOneWidget);
+
+    // The legend switch gives staff the same donor-density heatmap that the
+    // community map uses, and swaps the legend with it.
+    await tester.tap(find.text('Donor density'));
+    await tester.pumpAndSettle();
+    expect(find.text('DONOR DENSITY'), findsOneWidget);
+    expect(find.text('No available donors'), findsOneWidget);
+    expect(find.text('OPEN REQUESTS'), findsNothing);
+
+    await tester.tap(find.text('Requests'));
+    await tester.pumpAndSettle();
+    expect(find.text('OPEN REQUESTS'), findsOneWidget);
+    expect(find.text('DONOR DENSITY'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

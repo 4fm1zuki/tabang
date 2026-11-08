@@ -342,6 +342,29 @@ class DigosVectorMap extends StatefulWidget {
     const LatLng(6.9874, 125.3930),
   );
 
+  /// Moves a true OpenStreetMap coordinate into the hand-traced map frame.
+  ///
+  /// Facility pins and drive venues are stored at their real coordinates, but
+  /// the raster base — and therefore the whole bundled map — is nudged
+  /// [baseMapOffset] down-right of real geography: a fixed ground
+  /// displacement of roughly 89 m east and 551 m south at
+  /// [baseMapOffsetZoom]. This applies that same displacement to a point, so
+  /// OSM-derived pins sit on their buildings under the nudged raster instead
+  /// of roughly half a kilometre away. Hand-traced coordinates
+  /// ([centroidOf], barangay rings) are already in this frame and must not be
+  /// passed through it.
+  static LatLng toMapFrame(LatLng point) {
+    const metresPerDegree = 111319.49;
+    final cosLat = math.cos(point.latitude * math.pi / 180);
+    final metresPerPixel =
+        156543.03392 * cosLat / math.pow(2, baseMapOffsetZoom);
+    return LatLng(
+      point.latitude - baseMapOffset.dy * metresPerPixel / metresPerDegree,
+      point.longitude +
+          baseMapOffset.dx * metresPerPixel / (metresPerDegree * cosLat),
+    );
+  }
+
   /// Centroid of a barangay by repository name ("Zone 1"), used by the donor
   /// pane's "show on map" actions.
   static LatLng? centroidOf(String canonical) {
@@ -686,12 +709,14 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                     if (widget.drives.isNotEmpty)
                       MarkerLayer(markers: _driveMarkers(dark, pinScale)),
 
-                    // Hospitals and the PRC chapter, above the fills.
+                    // Hospitals and the PRC chapter, above the fills. The
+                    // stored points are true OSM coordinates, so they are
+                    // rebased into the nudged map frame first.
                     MarkerLayer(
                       markers: [
                         for (final pin in digosFacilityPins)
                           Marker(
-                            point: pin.point,
+                            point: DigosVectorMap.toMapFrame(pin.point),
                             width: 30 * pinScale,
                             height: 30 * pinScale,
                             child: _FacilityPin(
@@ -805,11 +830,18 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     final driveWidth = 30 * pinScale;
     final driveHeight = 38 * pinScale;
     final driveHitHeight = 42 * pinScale;
+    // Facility pins are drawn in the map frame (see toMapFrame), so the
+    // collision test must use the same rebased points as the marker layer.
     final facilityRects = camera == null
         ? const <Rect>[]
         : [
             for (final pin in digosFacilityPins)
-              _screenRect(camera, pin.point, 30 * pinScale, 30 * pinScale),
+              _screenRect(
+                camera,
+                DigosVectorMap.toMapFrame(pin.point),
+                30 * pinScale,
+                30 * pinScale,
+              ),
           ];
     final seenPerBarangay = <String, int>{};
     return [

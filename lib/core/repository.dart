@@ -2734,9 +2734,10 @@ class TabangRepository {
     ]);
 
     // ---- drives --------------------------------------------------------
-    // Pin coordinates are representative points inside each drive's own
-    // barangay on the bundled Digos map, so a marker never drifts outside the
-    // city outline or into a neighbouring barangay.
+    // Venue coordinates are the real OpenStreetMap points for each site.
+    // DigosVectorMap.toMapFrame rebases them into the hand-traced map frame
+    // when drawing, so a marker sits on its venue under the nudged raster and
+    // stays inside the drive's own barangay.
     _drives.addAll([
       BloodDrive(
         id: 'DRV-001',
@@ -2754,8 +2755,9 @@ class TabangRepository {
         title: 'Barangay Matti Health Drive',
         venue: 'Matti Covered Court',
         barangay: 'Matti',
-        lat: 6.78678,
-        lng: 125.32991,
+        // Matti Barangay Hall compound; the covered court is not mapped.
+        lat: 6.7683092,
+        lng: 125.3078194,
         startsAt: _atHour(now, 8, 9),
         endsAt: _atHour(now, 8, 14),
         expectedDonors: 75,
@@ -2776,8 +2778,8 @@ class TabangRepository {
         title: 'Aplaya Coastal Community Drive',
         venue: 'Aplaya Barangay Hall',
         barangay: 'Aplaya',
-        lat: 6.72470,
-        lng: 125.36879,
+        lat: 6.7365659,
+        lng: 125.3775360,
         startsAt: _atHour(now, 5, 8),
         endsAt: _atHour(now, 5, 13),
         expectedDonors: 60,
@@ -2787,8 +2789,8 @@ class TabangRepository {
         title: 'San Jose Community Bloodletting',
         venue: 'San Jose Barangay Hall',
         barangay: 'San Jose',
-        lat: 6.73230,
-        lng: 125.34217,
+        lat: 6.7331466,
+        lng: 125.3549049,
         startsAt: _atHour(now, 11, 9),
         endsAt: _atHour(now, 11, 17),
         expectedDonors: 95,
