@@ -583,6 +583,7 @@ class UserReport {
     required this.reportedAlias,
     required this.reason,
     required this.createdAt,
+    this.details,
     this.threadId,
     this.status = ReportStatus.open,
   });
@@ -592,7 +593,13 @@ class UserReport {
   final String reporterAlias;
   final String reportedUserId;
   final String reportedAlias;
+
+  /// Short category chosen from the report dialog.
   final String reason;
+
+  /// The reporter's own explanation of what happened. Kept separate from
+  /// [reason] so staff can see both the category and the full context.
+  final String? details;
   final DateTime createdAt;
   final String? threadId;
   final ReportStatus status;
@@ -604,6 +611,7 @@ class UserReport {
     reportedUserId: reportedUserId,
     reportedAlias: reportedAlias,
     reason: reason,
+    details: details,
     createdAt: createdAt,
     threadId: threadId,
     status: status ?? this.status,
@@ -665,6 +673,8 @@ class ChatThread {
     this.identityRevealRequestedBy,
     this.isMuted = false,
     this.unblockedAt,
+    this.participantAReadAt,
+    this.participantBReadAt,
   });
 
   final String id;
@@ -682,6 +692,31 @@ class ChatThread {
   final bool isMuted;
   final DateTime? unblockedAt;
 
+  /// When each participant last opened the conversation. A reply that arrives
+  /// after this instant is new activity for that person.
+  final DateTime? participantAReadAt;
+  final DateTime? participantBReadAt;
+
+  DateTime? readAtFor(String userId) {
+    if (userId == participantAId) return participantAReadAt;
+    if (userId == participantBId) return participantBReadAt;
+    return null;
+  }
+
+  /// Messages from the other participant that have not been read yet. System
+  /// notices and the reader's own messages are never counted.
+  int unreadCountFor(String userId) {
+    final readAt = readAtFor(userId);
+    return messages.where((message) {
+      if (message.senderId == userId || message.senderId == 'system') {
+        return false;
+      }
+      return readAt == null || message.sentAt.isAfter(readAt);
+    }).length;
+  }
+
+  bool hasUnreadFor(String userId) => unreadCountFor(userId) > 0;
+
   bool get hasFlaggedMessages =>
       messages.any((m) => m.flag != ModerationFlag.clean);
 
@@ -698,6 +733,8 @@ class ChatThread {
     bool? isMuted,
     DateTime? unblockedAt,
     bool clearUnblockedAt = false,
+    DateTime? participantAReadAt,
+    DateTime? participantBReadAt,
   }) {
     return ChatThread(
       id: id,
@@ -712,6 +749,8 @@ class ChatThread {
           : (identityRevealRequestedBy ?? this.identityRevealRequestedBy),
       isMuted: isMuted ?? this.isMuted,
       unblockedAt: clearUnblockedAt ? null : (unblockedAt ?? this.unblockedAt),
+      participantAReadAt: participantAReadAt ?? this.participantAReadAt,
+      participantBReadAt: participantBReadAt ?? this.participantBReadAt,
     );
   }
 }

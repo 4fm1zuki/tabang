@@ -213,6 +213,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('message badge clears when the conversation is read', (
+    tester,
+  ) async {
+    await usePhone(tester);
+    await tester.pumpWidget(
+      host(
+        DonorShell(
+          user: repo.userById('USR-001')!,
+          themeMode: ThemeMode.light,
+          onThemeModeChanged: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Badge messageBadge() => tester.widget<Badge>(
+      find
+          .descendant(
+            of: find.byType(NavigationBar),
+            matching: find.byType(Badge),
+          )
+          .first,
+    );
+
+    expect(repo.unreadMessageCountFor('USR-001'), 2);
+    expect(messageBadge().isLabelVisible, isTrue);
+
+    // Reading a conversation notifies the repository; the shell listens so the
+    // rail and bottom-bar badge clear without a tab switch.
+    repo.markThreadRead('ROOM-101', 'USR-001');
+    await tester.pumpAndSettle();
+
+    expect(messageBadge().isLabelVisible, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'phone bottom bar hides while scrolling and returns on scroll up',
     (tester) async {

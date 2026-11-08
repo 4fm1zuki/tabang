@@ -7,6 +7,7 @@ import '../../theme.dart';
 import '../../widgets/chapter_identity.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
+import '../../widgets/photo.dart';
 
 /// Donor / recipient profile.
 ///
@@ -64,6 +65,11 @@ class _ProfilePageState extends State<ProfilePage> {
             subtitle: 'Your account, donation history and eligibility.',
             actions: [
               OutlinedButton.icon(
+                onPressed: () => _showAvatarPicker(context, user),
+                icon: const Icon(Icons.face_outlined, size: 15),
+                label: const Text('Change avatar'),
+              ),
+              OutlinedButton.icon(
                 onPressed: () => _showEditDialog(context),
                 icon: const Icon(Icons.edit_outlined, size: 15),
                 label: const Text('Edit profile'),
@@ -76,15 +82,47 @@ class _ProfilePageState extends State<ProfilePage> {
           SurfaceCard(
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: TabangColors.crimson,
-                  child: Text(
-                    user.initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
+                Tooltip(
+                  message: 'Change profile photo',
+                  child: InkWell(
+                    onTap: () => _showAvatarPicker(context, user),
+                    borderRadius: BorderRadius.circular(34),
+                    child: Stack(
+                      children: [
+                        ClipOval(
+                          child: SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: TabangPhoto(
+                              user.photoAsset,
+                              semanticLabel: '${user.alias} profile photo',
+                              creditLabel: user.alias,
+                              fallbackIcon: Icons.person_outline,
+                              fallbackIconSize: 26,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: TabangColors.crimson,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: context.surface,
+                                width: 2,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -505,6 +543,119 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: context.textColor,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Separate avatar sets keep chapter staff visually distinct from community
+  /// accounts. The current photo is always included so an older choice remains
+  /// visible and selectable.
+  List<String> _avatarOptions(AppUser user) {
+    final assets = <String>[
+      for (
+        var i = user.role.isAdminSide ? 37 : 1;
+        i <= (user.role.isAdminSide ? 48 : 36);
+        i++
+      )
+        'assets/images/avatars/avatar_${i.toString().padLeft(3, '0')}.png',
+    ];
+    final current = user.photoAsset;
+    if (current != null && !assets.contains(current)) {
+      assets.insert(0, current);
+    }
+    return assets;
+  }
+
+  void _showAvatarPicker(BuildContext context, AppUser user) {
+    final assets = _avatarOptions(user);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Choose your profile photo'),
+        // A fixed box keeps AlertDialog's intrinsic-width pass away from the
+        // scrollable grid, which does not support intrinsic dimensions.
+        content: SizedBox(
+          width: 430,
+          height: 330,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user.role.isAdminSide
+                    ? 'Chapter staff and administrators pick from a separate '
+                          'set so internal accounts are easy to recognise.'
+                    : 'Pick the illustration other members see beside your '
+                          'alias. Your real photo is never required.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: dialogContext.textMuted,
+                ),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 66,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                  ),
+                  itemCount: assets.length,
+                  itemBuilder: (context, i) {
+                    final asset = assets[i];
+                    final selected = asset == user.photoAsset;
+                    return Tooltip(
+                      message: selected ? 'Current photo' : 'Use this photo',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(40),
+                        onTap: () {
+                          final messenger = ScaffoldMessenger.of(context);
+                          _repo.updateUser(user.copyWith(photoAsset: asset));
+                          Navigator.pop(dialogContext);
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Profile photo updated.'),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: selected
+                                ? TabangColors.crimsonSoft
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: selected
+                                  ? TabangColors.crimson
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: TabangPhoto(
+                              asset,
+                              semanticLabel: 'Profile photo option ${i + 1}',
+                              creditLabel: 'TABANG bundled avatar',
+                              fallbackIcon: Icons.person_outline,
+                              fallbackIconSize: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
           ),
         ],
       ),

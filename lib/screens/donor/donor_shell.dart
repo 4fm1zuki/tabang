@@ -36,6 +36,8 @@ class DonorShell extends StatefulWidget {
     required this.onThemeModeChanged,
     this.compactNav = false,
     this.onCompactNavChanged,
+    this.railPinned = true,
+    this.onRailPinnedChanged,
   });
 
   final AppUser user;
@@ -47,14 +49,24 @@ class DonorShell extends StatefulWidget {
   final bool compactNav;
   final ValueChanged<bool>? onCompactNavChanged;
 
+  /// Whether the desktop rail stays pinned open. Owned by the root app so the
+  /// preference is shared with Settings and survives role changes.
+  final bool railPinned;
+  final ValueChanged<bool>? onRailPinnedChanged;
+
   @override
   State<DonorShell> createState() => _DonorShellState();
 }
 
 class _DonorShellState extends State<DonorShell> {
+  final TabangRepository _repo = TabangRepository.instance;
+
   int _index = 0;
   bool _hovering = false;
-  bool _pinned = true;
+
+  /// Mirrors [DonorShell.railPinned] so the control still works when the shell
+  /// is embedded without a preference owner (widget tests, previews).
+  late bool _pinned = widget.railPinned;
 
   /// The bottom bar slides away while the page scrolls toward its end and
   /// comes back on the first scroll up or tab change.
@@ -90,13 +102,24 @@ class _DonorShellState extends State<DonorShell> {
   @override
   void initState() {
     super.initState();
+    _repo.addListener(_refresh);
     _pages[0] = _buildPage(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final user =
-          TabangRepository.instance.userById(widget.user.id) ?? widget.user;
+      final user = _repo.userById(widget.user.id) ?? widget.user;
       if (!user.onboardingCompleted) showWelcomeGuide(context, user);
     });
+  }
+
+  @override
+  void dispose() {
+    _repo.removeListener(_refresh);
+    super.dispose();
+  }
+
+  /// Keeps the unread badges current while the user stays on another page.
+  void _refresh() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -107,7 +130,11 @@ class _DonorShellState extends State<DonorShell> {
         ..clear()
         ..[_index] = _buildPage(_index);
     } else if (oldWidget.themeMode != widget.themeMode ||
-        oldWidget.compactNav != widget.compactNav) {
+        oldWidget.compactNav != widget.compactNav ||
+        oldWidget.railPinned != widget.railPinned) {
+      if (oldWidget.railPinned != widget.railPinned) {
+        _pinned = widget.railPinned;
+      }
       if (_pages.containsKey(7)) _pages[7] = _buildPage(7);
     }
   }
@@ -157,7 +184,10 @@ class _DonorShellState extends State<DonorShell> {
             title: Text(_destinations[index].label),
             leading: const BackButton(),
           ),
-          body: page,
+          body: DecoratedBox(
+            decoration: BoxDecoration(gradient: TabangGradients.page(context)),
+            child: page,
+          ),
         ),
       ),
     );
@@ -203,6 +233,14 @@ class _DonorShellState extends State<DonorShell> {
           onThemeModeChanged: widget.onThemeModeChanged,
           compactNav: widget.compactNav,
           onCompactNavChanged: widget.onCompactNavChanged,
+          railPinned: _pinned,
+          onRailPinnedChanged: (value) {
+            setState(() {
+              _pinned = value;
+              if (_pages.containsKey(7)) _pages[7] = _buildPage(7);
+            });
+            widget.onRailPinnedChanged?.call(value);
+          },
         );
       case 8:
         return AboutHelpPage(onOpenMessages: () => _select(4));
@@ -225,6 +263,7 @@ class _DonorShellState extends State<DonorShell> {
     final slim = widget.compactNav;
     final railExpanded = wide && !slim && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
+    final unreadMessages = _repoUnreadCount;
 
     final content = IndexedStack(
       index: _index,
@@ -236,114 +275,163 @@ class _DonorShellState extends State<DonorShell> {
 
     if (compact) {
       return Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              _PhoneHeader(
-                user: widget.user,
-                onOpenProfile: () => _pushStandalone(6),
-                onOpenSettings: () => _pushStandalone(7),
-                onOpenHelp: () => _pushStandalone(8),
-                onOpenChat: () => _select(4),
-              ),
-              Expanded(
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: _handleScrollNotification,
-                  child: content,
+        body: DecoratedBox(
+          decoration: BoxDecoration(gradient: TabangGradients.page(context)),
+          child: SafeArea(
+            child: Column(
+              children: [
+                _PhoneHeader(
+                  user: widget.user,
+                  unreadMessages: unreadMessages,
+                  onOpenProfile: () => _pushStandalone(6),
+                  onOpenSettings: () => _pushStandalone(7),
+                  onOpenHelp: () => _pushStandalone(8),
+                  onOpenChat: () => _select(4),
                 ),
-              ),
-              // The bar slides down while the page scrolls toward its end and
-              // returns on scroll up. Slim rails also hide the labels.
-              ClipRect(
-                child: AnimatedContainer(
-                  key: const ValueKey('phoneNavigationBar'),
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  height: _navHidden ? 0 : 80,
-                  child: OverflowBox(
-                    alignment: Alignment.topCenter,
-                    minHeight: 80,
-                    maxHeight: 80,
-                    child: NavigationBar(
-                      height: 80,
-                      labelBehavior: widget.compactNav
-                          ? NavigationDestinationLabelBehavior.alwaysHide
-                          : NavigationDestinationLabelBehavior.alwaysShow,
-                      selectedIndex: _phoneIndices.contains(_index)
-                          ? _phoneIndices.indexOf(_index)
-                          : 0,
-                      onDestinationSelected: (slot) =>
-                          _select(_phoneIndices[slot]),
-                      destinations: [
-                        for (final index in _phoneIndices)
-                          NavigationDestination(
-                            icon: Icon(_destinations[index].icon),
-                            selectedIcon: Icon(_destinations[index].activeIcon),
-                            label: _destinations[index].label,
-                            tooltip: _destinations[index].label,
-                          ),
-                      ],
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: content,
+                  ),
+                ),
+                // The bar slides down while the page scrolls toward its end
+                // and returns on scroll up. It scrolls horizontally when the
+                // labels need more room than the phone has.
+                ClipRect(
+                  child: AnimatedContainer(
+                    key: const ValueKey('phoneNavigationBar'),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    height: _navHidden ? 0 : 80,
+                    child: OverflowBox(
+                      alignment: Alignment.topCenter,
+                      minHeight: 80,
+                      maxHeight: 80,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          // 84 px keeps a full label readable; a narrow phone
+                          // scrolls the bar instead of squeezing every name.
+                          final minBarWidth = _phoneIndices.length * 84.0;
+                          final barWidth = constraints.maxWidth < minBarWidth
+                              ? minBarWidth
+                              : constraints.maxWidth;
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: barWidth,
+                              height: 80,
+                              child: NavigationBar(
+                                height: 80,
+                                labelBehavior: widget.compactNav
+                                    ? NavigationDestinationLabelBehavior
+                                          .alwaysHide
+                                    : NavigationDestinationLabelBehavior
+                                          .alwaysShow,
+                                selectedIndex: _phoneIndices.contains(_index)
+                                    ? _phoneIndices.indexOf(_index)
+                                    : 0,
+                                onDestinationSelected: (slot) =>
+                                    _select(_phoneIndices[slot]),
+                                destinations: [
+                                  for (final index in _phoneIndices)
+                                    NavigationDestination(
+                                      icon: index == 4
+                                          ? _UnreadBadge(
+                                              count: unreadMessages,
+                                              child: Icon(
+                                                _destinations[index].icon,
+                                              ),
+                                            )
+                                          : Icon(_destinations[index].icon),
+                                      selectedIcon: index == 4
+                                          ? _UnreadBadge(
+                                              count: unreadMessages,
+                                              child: Icon(
+                                                _destinations[index].activeIcon,
+                                              ),
+                                            )
+                                          : Icon(
+                                              _destinations[index].activeIcon,
+                                            ),
+                                      label: _destinations[index].label,
+                                      tooltip: _destinations[index].label,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
     }
 
     return Scaffold(
-      body: SafeArea(
-        child: Row(
-          children: [
-            MouseRegion(
-              onEnter: wide && !slim
-                  ? (_) => setState(() => _hovering = true)
-                  : null,
-              onExit: wide && !slim
-                  ? (_) => setState(() {
-                      _hovering = false;
-                      // Collapse: drop the labels first, then slide in.
-                      if (!_pinned) _railSettled = false;
-                    })
-                  : null,
-              child: _Sidebar(
-                user: widget.user,
-                destinations: _destinations,
-                selectedIndex: _index,
-                railExpanded: railExpanded,
-                expanded: showLabels,
-                wide: wide,
-                showPinControl: !slim,
-                pinned: _pinned,
-                onSlideEnd: () {
-                  if (!mounted) return;
-                  if (_railSettled != railExpanded) {
-                    setState(() => _railSettled = railExpanded);
-                  }
-                },
-                onSelect: _select,
-                onTogglePin: () => setState(() {
-                  // If pinning does not change the rail's width (for example
-                  // while it is already open because of hover), no slide
-                  // animation runs and onSlideEnd never fires — so the labels
-                  // must not be hidden in that case. Resetting the flag
-                  // unconditionally is what made pinning "break" the rail.
-                  final wasExpanded = wide && (_pinned || _hovering);
-                  _pinned = !_pinned;
-                  final willExpand = wide && (_pinned || _hovering);
-                  _railSettled = willExpand == wasExpanded;
-                }),
-                onToggleExpand: null,
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: TabangGradients.page(context)),
+        child: SafeArea(
+          child: Row(
+            children: [
+              MouseRegion(
+                onEnter: wide && !slim
+                    ? (_) => setState(() => _hovering = true)
+                    : null,
+                onExit: wide && !slim
+                    ? (_) => setState(() {
+                        _hovering = false;
+                        // Collapse: drop the labels first, then slide in.
+                        if (!_pinned) _railSettled = false;
+                      })
+                    : null,
+                child: _Sidebar(
+                  user: widget.user,
+                  unreadMessages: unreadMessages,
+                  destinations: _destinations,
+                  selectedIndex: _index,
+                  railExpanded: railExpanded,
+                  expanded: showLabels,
+                  wide: wide,
+                  showPinControl: !slim,
+                  pinned: _pinned,
+                  onSlideEnd: () {
+                    if (!mounted) return;
+                    if (_railSettled != railExpanded) {
+                      setState(() => _railSettled = railExpanded);
+                    }
+                  },
+                  onSelect: _select,
+                  onTogglePin: () {
+                    setState(() {
+                      // If pinning does not change the rail's width (for
+                      // example while it is already open because of hover),
+                      // no slide animation runs and onSlideEnd never fires —
+                      // so the labels must not be hidden in that case.
+                      final wasExpanded = wide && (_pinned || _hovering);
+                      _pinned = !_pinned;
+                      final willExpand = wide && (_pinned || _hovering);
+                      _railSettled = willExpand == wasExpanded;
+                    });
+                    widget.onRailPinnedChanged?.call(_pinned);
+                  },
+                  onToggleExpand: null,
+                ),
               ),
-            ),
-            Expanded(child: content),
-          ],
+              Expanded(child: content),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  int get _repoUnreadCount =>
+      TabangRepository.instance.unreadMessageCountFor(widget.user.id);
 }
 
 class _Destination {
@@ -354,12 +442,38 @@ class _Destination {
   final IconData activeIcon;
 }
 
+/// Small unread counter used by the rail, phone header and bottom bar.
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count, required this.child});
+
+  final int count;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      isLabelVisible: count > 0,
+      backgroundColor: TabangColors.crimson,
+      label: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 /// Compact identity bar shown above the phone layout. It is deliberately not a
 /// second page header: pages already own their titles, so this only carries
 /// brand, help and account actions.
 class _PhoneHeader extends StatelessWidget {
   const _PhoneHeader({
     required this.user,
+    required this.unreadMessages,
     required this.onOpenProfile,
     required this.onOpenSettings,
     required this.onOpenHelp,
@@ -367,6 +481,7 @@ class _PhoneHeader extends StatelessWidget {
   });
 
   final AppUser user;
+  final int unreadMessages;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenHelp;
@@ -421,7 +536,10 @@ class _PhoneHeader extends StatelessWidget {
           IconButton(
             tooltip: 'Messages',
             onPressed: onOpenChat,
-            icon: const Icon(Icons.forum_outlined, size: 20),
+            icon: _UnreadBadge(
+              count: unreadMessages,
+              child: const Icon(Icons.forum_outlined, size: 20),
+            ),
           ),
           IconButton(
             tooltip: 'Guides & help',
@@ -470,6 +588,7 @@ class _PhoneHeader extends StatelessWidget {
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.user,
+    required this.unreadMessages,
     required this.destinations,
     required this.selectedIndex,
     required this.railExpanded,
@@ -484,6 +603,7 @@ class _Sidebar extends StatelessWidget {
   });
 
   final AppUser user;
+  final int unreadMessages;
   final List<_Destination> destinations;
   final int selectedIndex;
 
@@ -692,11 +812,24 @@ class _Sidebar extends StatelessWidget {
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      Icon(
-                        selected ? destination.activeIcon : destination.icon,
-                        size: 19,
-                        color: foreground,
-                      ),
+                      index == 4
+                          ? _UnreadBadge(
+                              count: unreadMessages,
+                              child: Icon(
+                                selected
+                                    ? destination.activeIcon
+                                    : destination.icon,
+                                size: 19,
+                                color: foreground,
+                              ),
+                            )
+                          : Icon(
+                              selected
+                                  ? destination.activeIcon
+                                  : destination.icon,
+                              size: 19,
+                              color: foreground,
+                            ),
                       const SizedBox(width: TabangSpace.sm),
                       Expanded(
                         child: Text(
@@ -714,11 +847,24 @@ class _Sidebar extends StatelessWidget {
                     ],
                   )
                 : Center(
-                    child: Icon(
-                      selected ? destination.activeIcon : destination.icon,
-                      size: 21,
-                      color: foreground,
-                    ),
+                    child: index == 4
+                        ? _UnreadBadge(
+                            count: unreadMessages,
+                            child: Icon(
+                              selected
+                                  ? destination.activeIcon
+                                  : destination.icon,
+                              size: 21,
+                              color: foreground,
+                            ),
+                          )
+                        : Icon(
+                            selected
+                                ? destination.activeIcon
+                                : destination.icon,
+                            size: 21,
+                            color: foreground,
+                          ),
                   ),
           ),
         ),

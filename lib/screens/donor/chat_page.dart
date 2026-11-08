@@ -22,9 +22,22 @@ enum _ThreadSort { recent, alpha }
 /// in the staff moderation queue, and a 48-hour re-block cooldown matches the
 /// Help FAQ.
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, required this.user});
+  const ChatPage({
+    super.key,
+    required this.user,
+    this.allowNewConversation = false,
+    this.initialThreadId,
+  });
 
   final AppUser user;
+
+  /// Staff and admins can open a new conversation with any community account.
+  /// Donor/recipient messaging stays tied to coordination threads.
+  final bool allowNewConversation;
+
+  /// Deep-link straight into a conversation (for example from a staff user
+  /// record).
+  final String? initialThreadId;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -40,10 +53,24 @@ class _ChatPageState extends State<ChatPage> {
   String _query = '';
   _ThreadSort _sort = _ThreadSort.recent;
 
+  /// Guards against stacking post-frame read receipts while a rebuild is
+  /// already on its way.
+  String? _pendingReadThreadId;
+
   @override
   void initState() {
     super.initState();
+    _selectedThreadId = widget.initialThreadId;
     _repo.addListener(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(ChatPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialThreadId != oldWidget.initialThreadId &&
+        widget.initialThreadId != null) {
+      _selectedThreadId = widget.initialThreadId;
+    }
   }
 
   @override
@@ -57,6 +84,20 @@ class _ChatPageState extends State<ChatPage> {
 
   void _refresh() {
     if (mounted) setState(() {});
+  }
+
+  /// Marks the conversation currently on screen as read without notifying the
+  /// repository during build. The guard prevents a loop when several rebuilds
+  /// happen before the frame callback runs.
+  void _scheduleMarkRead(ChatThread thread) {
+    if (!thread.hasUnreadFor(widget.user.id)) return;
+    if (_pendingReadThreadId == thread.id) return;
+    _pendingReadThreadId = thread.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pendingReadThreadId = null;
+      if (!mounted) return;
+      _repo.markThreadRead(thread.id, widget.user.id);
+    });
   }
 
   List<ChatThread> get _threads {
@@ -173,6 +214,12 @@ class _ChatPageState extends State<ChatPage> {
         // a back button. Tablets and desktops keep the two-pane layout.
         final compact = constraints.maxWidth < 820;
 
+        // A conversation is "seen" when it is the one drawn on screen. Mark it
+        // read after the frame so the navigation badges clear immediately.
+        if (active != null && (!compact || _selectedThreadId != null)) {
+          _scheduleMarkRead(active);
+        }
+
         if (!compact) {
           return Row(
             children: [
@@ -232,16 +279,22 @@ class _ChatPageState extends State<ChatPage> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      'Conversations',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                        color: context.textColor,
+                    // The two-pane layout gives this list a fixed 300 px, so
+                    // the title has to flex instead of pushing the sort and
+                    // compose controls past the edge.
+                    Expanded(
+                      child: Text(
+                        'Conversations',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                          color: context.textColor,
+                        ),
                       ),
                     ),
-                    const Spacer(),
                     if (threads.isNotEmpty)
                       StatusPill(
                         '${threads.length}',
@@ -284,6 +337,20 @@ class _ChatPageState extends State<ChatPage> {
                         ],
                       ),
                     ),
+                    if (widget.allowNewConversation) ...[
+                      const SizedBox(width: 2),
+                      IconButton(
+                        tooltip: 'New conversation',
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 32,
+                        ),
+                        icon: const Icon(Icons.add_comment_outlined, size: 18),
+                        onPressed: () => _showNewConversationDialog(context),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: TabangSpace.md),
@@ -313,9 +380,24 @@ class _ChatPageState extends State<ChatPage> {
           Divider(height: 1, color: context.border),
           Expanded(
             child: threads.isEmpty
-                ? const EmptyState(
+                ? EmptyState(
                     art: TabangArt.search,
                     title: 'No conversations',
+                    message: widget.allowNewConversation
+                        ? 'Start a conversation with a community member, donor '
+                              'or another staff account.'
+                        : null,
+                    action: widget.allowNewConversation
+                        ? OutlinedButton.icon(
+                            onPressed: () =>
+                                _showNewConversationDialog(context),
+                            icon: const Icon(
+                              Icons.add_comment_outlined,
+                              size: 15,
+                            ),
+                            label: const Text('New conversation'),
+                          )
+                        : null,
                   )
                 : ListView.builder(
                     itemCount: threads.length,
@@ -333,6 +415,7 @@ class _ChatPageState extends State<ChatPage> {
     final last = thread.lastMessage;
     final other = _otherUser(thread);
     final type = other?.bloodType;
+    final unread = thread.unreadCountFor(widget.user.id);
 
     // A left accent bar marks the open thread. The old full-row pink fill made
     // every conversation look selected once the page had focus.
@@ -431,12 +514,40 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                         ],
                         const Spacer(),
+                        if (unread > 0) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: TabangColors.crimson,
+                              borderRadius: BorderRadius.circular(
+                                TabangRadius.pill,
+                              ),
+                            ),
+                            child: Text(
+                              unread > 99 ? '99+' : '$unread',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
                         if (last != null)
                           Text(
                             formatRelative(last.sentAt),
                             style: TextStyle(
                               fontSize: 11,
-                              color: context.textMuted,
+                              color: unread > 0
+                                  ? TabangColors.crimson
+                                  : context.textMuted,
+                              fontWeight: unread > 0
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
                             ),
                           ),
                       ],
@@ -449,7 +560,12 @@ class _ChatPageState extends State<ChatPage> {
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.35,
-                        color: context.textMuted,
+                        fontWeight: unread > 0
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: unread > 0
+                            ? context.textColor
+                            : context.textMuted,
                       ),
                     ),
                     const SizedBox(height: 7),
@@ -956,6 +1072,149 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  /// Staff compose flow: search every active account and open (or reuse) a
+  /// private thread. Community members reach people through coordination
+  /// threads or the chapter account instead.
+  void _showNewConversationDialog(BuildContext context) {
+    String query = '';
+
+    int roleRank(UserRole role) => role.isAdminSide ? 0 : 1;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final q = query.trim().toLowerCase();
+          final candidates =
+              _repo.users.where((u) {
+                if (u.id == widget.user.id) return false;
+                if (u.status == AccountStatus.suspended) return false;
+                if (_repo.isBlockedBetween(widget.user.id, u.id)) {
+                  return false;
+                }
+                if (q.isEmpty) return true;
+                return u.fullName.toLowerCase().contains(q) ||
+                    u.alias.toLowerCase().contains(q) ||
+                    u.email.toLowerCase().contains(q) ||
+                    u.role.label.toLowerCase().contains(q) ||
+                    u.barangay.toLowerCase().contains(q);
+              }).toList()..sort((a, b) {
+                final byRole = roleRank(a.role).compareTo(roleRank(b.role));
+                if (byRole != 0) return byRole;
+                return a.alias.toLowerCase().compareTo(b.alias.toLowerCase());
+              });
+
+          return AlertDialog(
+            title: const Text('New conversation'),
+            content: SizedBox(
+              width: 430,
+              height: 430,
+              child: Column(
+                children: [
+                  TextField(
+                    autofocus: true,
+                    onChanged: (value) => setDialogState(() => query = value),
+                    style: const TextStyle(fontSize: 13),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      hintText: 'Search staff, donors or community members',
+                      prefixIcon: Icon(Icons.search, size: 17),
+                    ),
+                  ),
+                  const SizedBox(height: TabangSpace.md),
+                  Expanded(
+                    child: candidates.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No accounts match that search.',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: dialogContext.textMuted,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: candidates.length,
+                            itemBuilder: (context, i) {
+                              final candidate = candidates[i];
+                              return ListTile(
+                                key: ValueKey(
+                                  'newConversation-${candidate.id}',
+                                ),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                leading: ClipOval(
+                                  child: SizedBox(
+                                    width: 34,
+                                    height: 34,
+                                    child: TabangPhoto(
+                                      candidate.photoAsset,
+                                      semanticLabel:
+                                          '${candidate.alias} profile photo',
+                                      creditLabel: candidate.alias,
+                                      fallbackIcon: Icons.person_outline,
+                                      fallbackIconSize: 17,
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  candidate.fullName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${candidate.alias} · ${candidate.role.label}'
+                                  ' · ${candidate.barangay}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                trailing: const Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 16,
+                                ),
+                                onTap: () {
+                                  final thread = _repo.startConversation(
+                                    initiatorId: widget.user.id,
+                                    otherId: candidate.id,
+                                  );
+                                  if (thread == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'That conversation cannot be '
+                                          'opened right now.',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  Navigator.pop(dialogContext);
+                                  setState(() => _selectedThreadId = thread.id);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _requestReveal(BuildContext context, ChatThread thread) {
     showDialog<void>(
       context: context,
@@ -1069,23 +1328,27 @@ class _ChatPageState extends State<ChatPage> {
 
   void _showReportDialog(BuildContext context, ChatThread thread) {
     String? reason;
+    String details = '';
     final other = _otherAlias(thread);
 
     showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
           title: Text('Report $other'),
-          content: SizedBox(
-            width: 380,
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Select a reason. Reports are reviewed by chapter staff.',
+                  'Select a reason and explain what happened. Reports are '
+                  'reviewed by chapter staff.',
                   style: TextStyle(
                     fontSize: 12,
+                    height: 1.45,
                     color: dialogContext.textMuted,
                   ),
                 ),
@@ -1117,6 +1380,20 @@ class _ChatPageState extends State<ChatPage> {
                             .toList(),
                   ),
                 ),
+                const SizedBox(height: TabangSpace.md),
+                TextField(
+                  onChanged: (value) => details = value,
+                  maxLines: 3,
+                  minLines: 2,
+                  style: const TextStyle(fontSize: 12.5),
+                  decoration: const InputDecoration(
+                    labelText: 'Explain what happened',
+                    hintText:
+                        'Add the context staff need — what was said, when it '
+                        'happened, or anything else relevant.',
+                    alignLabelWithHint: true,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1133,6 +1410,7 @@ class _ChatPageState extends State<ChatPage> {
                         reporterId: widget.user.id,
                         reportedUserId: _otherId(thread),
                         reason: reason!,
+                        details: details,
                         threadId: thread.id,
                       );
                       Navigator.pop(dialogContext);

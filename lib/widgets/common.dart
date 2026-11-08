@@ -457,8 +457,17 @@ class EmptyState extends StatelessWidget {
               minHeight: boundedHeight ? constraints.maxHeight : 0,
             ),
             child: Center(
-              child: Padding(
+              child: Container(
+                margin: EdgeInsets.all(compact ? 0 : TabangSpace.md),
                 padding: EdgeInsets.all(padding),
+                constraints: const BoxConstraints(maxWidth: 560),
+                decoration: BoxDecoration(
+                  gradient: TabangGradients.empty(context),
+                  borderRadius: BorderRadius.circular(TabangRadius.lg),
+                  border: Border.all(
+                    color: context.border.withValues(alpha: 0.55),
+                  ),
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

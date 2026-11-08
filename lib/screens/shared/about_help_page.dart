@@ -128,16 +128,16 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       icon: Icons.settings_outlined,
       summary: 'Theme, notification summaries, privacy and safe-area layout.',
       steps: [
-        'Open Settings from the account menu or the desktop rail. Appearance follows System, Light or Dark mode immediately.',
-        'Dark mode uses raised secondary-text contrast and Material 3 surfaced components, not a simple colour inversion.',
-        'Notification switches control what appears in the Home summary. This build shows in-app summaries only — no SMS or push.',
+        'Open Settings from the account menu or the desktop rail. Light is the default; Dark applies immediately.',
+        'Dark mode keeps secondary text readable instead of simply inverting the palette.',
+        'Notification switches choose which updates appear in your Home summary.',
         'Donors can hide from the directory and hide their barangay without changing their account status.',
         'The app reserves system status-bar and gesture insets, so titles and the bottom bar never sit under the clock or home indicator.',
         'The map keeps a light base even in dark mode, with a separate map-style toggle for dimming streets and labels.',
       ],
       tip:
-          'If text looks too small, raise the device text size. TABANG uses '
-          'Material 3 typography and wraps controls instead of clipping them.',
+          'If text looks too small, raise the device text size. TABANG layouts '
+          'wrap controls instead of clipping them.',
     ),
   ];
 
@@ -217,8 +217,8 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           'Donor-network requests appear on the Requests board of donors whose '
               'blood type and component are compatible and who are currently '
               'eligible. Requests are ranked critical, urgent, then routine. '
-              'This build shows in-app summaries; push delivery is a documented '
-              'gap that requires a deployed backend.',
+              'Turn request alerts off in Settings if you only want to check '
+              'the board yourself.',
         ),
         _Faq(
           'What details are required when creating a request?',
@@ -258,10 +258,11 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
         ),
         _Faq(
           'How do I report a user?',
-          'Open the conversation, tap the flag icon, and choose a reason. The '
-              'report is stored and appears in the chapter staff reports queue, '
-              'where staff can resolve or dismiss it. Paid blood solicitation '
-              'is the most serious category and is reviewed first.',
+          'Open the conversation, tap the flag icon, choose a reason and add '
+              'an explanation of what happened. The report appears in the '
+              'chapter staff queue, where staff can resolve or dismiss it. Paid '
+              'blood solicitation is the most serious category and is reviewed '
+              'first.',
         ),
         _Faq(
           'Is paid blood donation allowed?',

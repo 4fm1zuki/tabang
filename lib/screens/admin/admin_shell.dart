@@ -10,10 +10,10 @@ import '../donor/donor_shell.dart' show accountMenuItems;
 import '../shared/about_help_page.dart';
 import '../shared/profile_page.dart';
 import '../shared/settings_page.dart';
+import '../donor/chat_page.dart';
 import 'admin_overview.dart';
 import 'chat_moderation_page.dart';
-import 'inventory_management.dart';
-import 'operations_map_page.dart';
+import 'operations_workspace_page.dart';
 import 'user_management_page.dart';
 
 /// Navigation shell for clinical staff and administrators.
@@ -25,6 +25,8 @@ class AdminShell extends StatefulWidget {
     required this.onThemeModeChanged,
     this.compactNav = false,
     this.onCompactNavChanged,
+    this.railPinned = true,
+    this.onRailPinnedChanged,
   });
 
   final AppUser user;
@@ -36,14 +38,27 @@ class AdminShell extends StatefulWidget {
   final bool compactNav;
   final ValueChanged<bool>? onCompactNavChanged;
 
+  /// Whether the desktop rail stays pinned open. Owned by the root app.
+  final bool railPinned;
+  final ValueChanged<bool>? onRailPinnedChanged;
+
   @override
   State<AdminShell> createState() => _AdminShellState();
 }
 
 class _AdminShellState extends State<AdminShell> {
+  final TabangRepository _repo = TabangRepository.instance;
+
   int _index = 0;
   bool _hovering = false;
-  bool _pinned = true;
+
+  /// Mirrors [AdminShell.railPinned] when the shell is embedded without a
+  /// preference owner.
+  late bool _pinned = widget.railPinned;
+
+  /// Which inner Operations section the next visit should show. Reset when the
+  /// user picks Operations directly; set to 1 for the Overview drill-through.
+  int _operationsSection = 0;
 
   /// The bottom bar slides away while the page scrolls toward its end and
   /// comes back on the first scroll up or tab change.
@@ -58,7 +73,10 @@ class _AdminShellState extends State<AdminShell> {
             title: Text(_destinations[index].label),
             leading: const BackButton(),
           ),
-          body: _pages.putIfAbsent(index, () => _buildPage(index)),
+          body: DecoratedBox(
+            decoration: BoxDecoration(gradient: TabangGradients.page(context)),
+            child: _pages.putIfAbsent(index, () => _buildPage(index)),
+          ),
         ),
       ),
     );
@@ -75,13 +93,24 @@ class _AdminShellState extends State<AdminShell> {
   @override
   void initState() {
     super.initState();
+    _repo.addListener(_refresh);
     _pages[0] = _buildPage(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final user =
-          TabangRepository.instance.userById(widget.user.id) ?? widget.user;
+      final user = _repo.userById(widget.user.id) ?? widget.user;
       if (!user.onboardingCompleted) showWelcomeGuide(context, user);
     });
+  }
+
+  @override
+  void dispose() {
+    _repo.removeListener(_refresh);
+    super.dispose();
+  }
+
+  /// Keeps the unread badges current while the user stays on another page.
+  void _refresh() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -91,10 +120,16 @@ class _AdminShellState extends State<AdminShell> {
       _pages
         ..clear()
         ..[_index] = _buildPage(_index);
-    } else if ((oldWidget.themeMode != widget.themeMode ||
-            oldWidget.compactNav != widget.compactNav) &&
-        _pages.containsKey(6)) {
-      _pages[6] = _buildPage(6);
+    } else {
+      if (oldWidget.railPinned != widget.railPinned) {
+        _pinned = widget.railPinned;
+      }
+      if ((oldWidget.themeMode != widget.themeMode ||
+              oldWidget.compactNav != widget.compactNav ||
+              oldWidget.railPinned != widget.railPinned) &&
+          _pages.containsKey(6)) {
+        _pages[6] = _buildPage(6);
+      }
     }
   }
 
@@ -102,7 +137,23 @@ class _AdminShellState extends State<AdminShell> {
     setState(() {
       _index = index;
       _navHidden = false;
+      if (index == 1 && _operationsSection != 0) {
+        _operationsSection = 0;
+        _pages.remove(1);
+      }
       _pages.putIfAbsent(index, () => _buildPage(index));
+    });
+  }
+
+  /// Opens Operations directly on the inventory section, without adding a
+  /// second top-level Inventory destination to the staff sidebar.
+  void _openOperationsInventory() {
+    setState(() {
+      _operationsSection = 1;
+      _pages.remove(1);
+      _index = 1;
+      _navHidden = false;
+      _pages[1] = _buildPage(1);
     });
   }
 
@@ -130,7 +181,7 @@ class _AdminShellState extends State<AdminShell> {
   static const _destinations = <_Destination>[
     _Destination('Overview', Icons.dashboard_outlined, Icons.dashboard),
     _Destination('Operations', Icons.map_outlined, Icons.map),
-    _Destination('Inventory', Icons.inventory_2_outlined, Icons.inventory_2),
+    _Destination('Messages', Icons.forum_outlined, Icons.forum),
     _Destination('Users', Icons.people_outline, Icons.people),
     _Destination('Moderation', Icons.gavel_outlined, Icons.gavel),
     _Destination('Profile', Icons.person_outline, Icons.person),
@@ -151,6 +202,7 @@ class _AdminShellState extends State<AdminShell> {
     final slim = widget.compactNav;
     final railExpanded = wide && !slim && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
+    final unreadMessages = _repoUnreadCount;
 
     final content = IndexedStack(
       index: _index,
@@ -164,121 +216,168 @@ class _AdminShellState extends State<AdminShell> {
     // users; the 68 px icon rail was unusable on a 390 px screen.
     if (compact) {
       return Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              _AdminPhoneHeader(
-                user: widget.user,
-                onOpenProfile: () => _pushStandalone(5),
-                onOpenSettings: () => _pushStandalone(6),
-                onOpenHelp: () => _pushStandalone(7),
-              ),
-              Expanded(
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: _handleScrollNotification,
-                  child: content,
+        body: DecoratedBox(
+          decoration: BoxDecoration(gradient: TabangGradients.page(context)),
+          child: SafeArea(
+            child: Column(
+              children: [
+                _AdminPhoneHeader(
+                  user: widget.user,
+                  onOpenProfile: () => _pushStandalone(5),
+                  onOpenSettings: () => _pushStandalone(6),
+                  onOpenHelp: () => _pushStandalone(7),
                 ),
-              ),
-              // The bar slides down while the page scrolls toward its end and
-              // returns on scroll up. Slim rails also hide the labels.
-              ClipRect(
-                child: AnimatedContainer(
-                  key: const ValueKey('phoneNavigationBar'),
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  height: _navHidden ? 0 : 80,
-                  child: OverflowBox(
-                    alignment: Alignment.topCenter,
-                    minHeight: 80,
-                    maxHeight: 80,
-                    child: NavigationBar(
-                      height: 80,
-                      labelBehavior: widget.compactNav
-                          ? NavigationDestinationLabelBehavior.alwaysHide
-                          : NavigationDestinationLabelBehavior.alwaysShow,
-                      selectedIndex: _phoneIndices.contains(_index)
-                          ? _phoneIndices.indexOf(_index)
-                          : 0,
-                      onDestinationSelected: (slot) =>
-                          _select(_phoneIndices[slot]),
-                      destinations: [
-                        for (final index in _phoneIndices)
-                          NavigationDestination(
-                            icon: Icon(_destinations[index].icon),
-                            selectedIcon: Icon(_destinations[index].activeIcon),
-                            label: _destinations[index].label,
-                            tooltip: _destinations[index].label,
-                          ),
-                      ],
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScrollNotification,
+                    child: content,
+                  ),
+                ),
+                // The bar slides down while the page scrolls toward its end
+                // and returns on scroll up. It scrolls horizontally when the
+                // labels need more room than the phone has.
+                ClipRect(
+                  child: AnimatedContainer(
+                    key: const ValueKey('phoneNavigationBar'),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    height: _navHidden ? 0 : 80,
+                    child: OverflowBox(
+                      alignment: Alignment.topCenter,
+                      minHeight: 80,
+                      maxHeight: 80,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final minBarWidth = _phoneIndices.length * 84.0;
+                          final barWidth = constraints.maxWidth < minBarWidth
+                              ? minBarWidth
+                              : constraints.maxWidth;
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: barWidth,
+                              height: 80,
+                              child: NavigationBar(
+                                height: 80,
+                                labelBehavior: widget.compactNav
+                                    ? NavigationDestinationLabelBehavior
+                                          .alwaysHide
+                                    : NavigationDestinationLabelBehavior
+                                          .alwaysShow,
+                                selectedIndex: _phoneIndices.contains(_index)
+                                    ? _phoneIndices.indexOf(_index)
+                                    : 0,
+                                onDestinationSelected: (slot) =>
+                                    _select(_phoneIndices[slot]),
+                                destinations: [
+                                  for (final index in _phoneIndices)
+                                    NavigationDestination(
+                                      icon: index == 2
+                                          ? _UnreadBadge(
+                                              count: unreadMessages,
+                                              child: Icon(
+                                                _destinations[index].icon,
+                                              ),
+                                            )
+                                          : Icon(_destinations[index].icon),
+                                      selectedIcon: index == 2
+                                          ? _UnreadBadge(
+                                              count: unreadMessages,
+                                              child: Icon(
+                                                _destinations[index].activeIcon,
+                                              ),
+                                            )
+                                          : Icon(
+                                              _destinations[index].activeIcon,
+                                            ),
+                                      label: _destinations[index].label,
+                                      tooltip: _destinations[index].label,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
     }
 
     return Scaffold(
-      body: Row(
-        children: [
-          MouseRegion(
-            onEnter: wide && !slim
-                ? (_) => setState(() => _hovering = true)
-                : null,
-            onExit: wide && !slim
-                ? (_) => setState(() {
-                    _hovering = false;
-                    if (!_pinned) _railSettled = false;
-                  })
-                : null,
-            child: _AdminSidebar(
-              user: widget.user,
-              destinations: _destinations,
-              selectedIndex: _index,
-              railExpanded: railExpanded,
-              expanded: showLabels,
-              showPinControl: !slim,
-              pinned: _pinned,
-              onSlideEnd: () {
-                if (!mounted) return;
-                if (_railSettled != railExpanded) {
-                  setState(() => _railSettled = railExpanded);
-                }
-              },
-              onSelect: _select,
-              onTogglePin: () => setState(() {
-                // Only drop the labels when the width actually animates;
-                // otherwise onSlideEnd never fires and they stay hidden.
-                final wasExpanded = wide && (_pinned || _hovering);
-                _pinned = !_pinned;
-                final willExpand = wide && (_pinned || _hovering);
-                _railSettled = willExpand == wasExpanded;
-              }),
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: TabangGradients.page(context)),
+        child: Row(
+          children: [
+            MouseRegion(
+              onEnter: wide && !slim
+                  ? (_) => setState(() => _hovering = true)
+                  : null,
+              onExit: wide && !slim
+                  ? (_) => setState(() {
+                      _hovering = false;
+                      if (!_pinned) _railSettled = false;
+                    })
+                  : null,
+              child: _AdminSidebar(
+                user: widget.user,
+                unreadMessages: unreadMessages,
+                destinations: _destinations,
+                selectedIndex: _index,
+                railExpanded: railExpanded,
+                expanded: showLabels,
+                showPinControl: !slim,
+                pinned: _pinned,
+                onSlideEnd: () {
+                  if (!mounted) return;
+                  if (_railSettled != railExpanded) {
+                    setState(() => _railSettled = railExpanded);
+                  }
+                },
+                onSelect: _select,
+                onTogglePin: () {
+                  setState(() {
+                    // Only drop the labels when the width actually animates;
+                    // otherwise onSlideEnd never fires and they stay hidden.
+                    final wasExpanded = wide && (_pinned || _hovering);
+                    _pinned = !_pinned;
+                    final willExpand = wide && (_pinned || _hovering);
+                    _railSettled = willExpand == wasExpanded;
+                  });
+                  widget.onRailPinnedChanged?.call(_pinned);
+                },
+              ),
             ),
-          ),
-          Expanded(child: content),
-        ],
+            Expanded(child: content),
+          ],
+        ),
       ),
     );
   }
+
+  int get _repoUnreadCount =>
+      TabangRepository.instance.unreadMessageCountFor(widget.user.id);
 
   Widget _buildPage(int index) {
     switch (index) {
       case 0:
         return AdminOverviewPage(
           user: widget.user,
-          onOpenInventory: () => _select(2),
+          onOpenInventory: _openOperationsInventory,
         );
       case 1:
-        return OperationsMapPage(
+        return OperationsWorkspacePage(
           user: widget.user,
-          onOpenInventory: () => _select(2),
+          initialSection: _operationsSection,
           onOpenUsers: () => _select(3),
         );
       case 2:
-        return InventoryManagementPage(currentUser: widget.user);
+        return ChatPage(user: widget.user, allowNewConversation: true);
       case 3:
         return UserManagementPage(currentUser: widget.user);
       case 4:
@@ -292,13 +391,21 @@ class _AdminShellState extends State<AdminShell> {
           onThemeModeChanged: widget.onThemeModeChanged,
           compactNav: widget.compactNav,
           onCompactNavChanged: widget.onCompactNavChanged,
+          railPinned: _pinned,
+          onRailPinnedChanged: (value) {
+            setState(() {
+              _pinned = value;
+              if (_pages.containsKey(6)) _pages[6] = _buildPage(6);
+            });
+            widget.onRailPinnedChanged?.call(value);
+          },
         );
       case 7:
-        return AboutHelpPage(onOpenMessages: () => _select(4));
+        return AboutHelpPage(onOpenMessages: () => _select(2));
       default:
         return AdminOverviewPage(
           user: widget.user,
-          onOpenInventory: () => _select(2),
+          onOpenInventory: _openOperationsInventory,
         );
     }
   }
@@ -309,6 +416,31 @@ class _Destination {
   final String label;
   final IconData icon;
   final IconData activeIcon;
+}
+
+/// Small unread counter shared by the staff rail and bottom bar.
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count, required this.child});
+
+  final int count;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      isLabelVisible: count > 0,
+      backgroundColor: TabangColors.crimson,
+      label: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      child: child,
+    );
+  }
 }
 
 /// Compact identity bar for staff on phones: brand, identity and the account
@@ -418,6 +550,7 @@ class _AdminPhoneHeader extends StatelessWidget {
 class _AdminSidebar extends StatelessWidget {
   const _AdminSidebar({
     required this.user,
+    required this.unreadMessages,
     required this.destinations,
     required this.selectedIndex,
     required this.railExpanded,
@@ -430,6 +563,7 @@ class _AdminSidebar extends StatelessWidget {
   });
 
   final AppUser user;
+  final int unreadMessages;
   final List<_Destination> destinations;
   final int selectedIndex;
 
@@ -571,13 +705,28 @@ class _AdminSidebar extends StatelessWidget {
                               ? MainAxisAlignment.start
                               : MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              selected
-                                  ? destination.activeIcon
-                                  : destination.icon,
-                              size: 19,
-                              color: selected ? Colors.white : Colors.white70,
-                            ),
+                            i == 2
+                                ? _UnreadBadge(
+                                    count: unreadMessages,
+                                    child: Icon(
+                                      selected
+                                          ? destination.activeIcon
+                                          : destination.icon,
+                                      size: 19,
+                                      color: selected
+                                          ? Colors.white
+                                          : Colors.white70,
+                                    ),
+                                  )
+                                : Icon(
+                                    selected
+                                        ? destination.activeIcon
+                                        : destination.icon,
+                                    size: 19,
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.white70,
+                                  ),
                             if (expanded) ...[
                               const SizedBox(width: TabangSpace.md),
                               Expanded(
@@ -620,15 +769,16 @@ class _AdminSidebar extends StatelessWidget {
                         ? MainAxisAlignment.start
                         : MainAxisAlignment.center,
                     children: [
-                      CircleAvatar(
-                        radius: 15,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        child: Text(
-                          user.initials,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                      ClipOval(
+                        child: SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: TabangPhoto(
+                            user.photoAsset,
+                            semanticLabel: '${user.alias} profile photo',
+                            creditLabel: user.alias,
+                            fallbackIcon: Icons.person_outline,
+                            fallbackIconSize: 15,
                           ),
                         ),
                       ),

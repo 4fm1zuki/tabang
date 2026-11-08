@@ -722,6 +722,43 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                   height: 1.5,
                                 ),
                               ),
+                              if (report.details != null &&
+                                  report.details!.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(TabangSpace.sm),
+                                  decoration: BoxDecoration(
+                                    color: context.surfaceAlt,
+                                    borderRadius: BorderRadius.circular(
+                                      TabangRadius.sm,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Reporter explanation',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                          color: context.textMuted,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        report.details!,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 4),
                               Text(
                                 '${report.id} · '

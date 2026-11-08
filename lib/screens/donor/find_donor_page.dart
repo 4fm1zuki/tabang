@@ -1193,6 +1193,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
 
   Widget _buildDonorPane(BuildContext context, {required bool compact}) {
     final donors = _visibleDonors;
+    final unreadMessages = _repo.unreadMessageCountFor(widget.user.id);
 
     return Column(
       children: [
@@ -1243,6 +1244,37 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     ),
                   ),
                   const SizedBox(width: 4),
+                  if (unreadMessages > 0 && widget.onOpenChat != null) ...[
+                    Tooltip(
+                      message:
+                          '$unreadMessages new message'
+                          '${unreadMessages == 1 ? '' : 's'}',
+                      child: InkWell(
+                        onTap: widget.onOpenChat,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Badge(
+                            backgroundColor: TabangColors.crimson,
+                            label: Text(
+                              unreadMessages > 99 ? '99+' : '$unreadMessages',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.forum_outlined,
+                              size: 18,
+                              color: TabangColors.crimson,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                  ],
                   Tooltip(
                     message: 'Hide this panel',
                     child: InkWell(
@@ -1277,6 +1309,18 @@ class _FindDonorPageState extends State<FindDonorPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const Tooltip(
+                      message:
+                          'Updates automatically as donors, requests and '
+                          'messages change.',
+                      child: StatusPill(
+                        'Live',
+                        tone: Tone.success,
+                        icon: Icons.bolt,
+                        dense: true,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     StatusPill(
                       '${donors.length}',
                       tone: Tone.brand,
@@ -1506,6 +1550,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
 
   Widget _buildDonorCard(BuildContext context, AppUser donor) {
     final eligibility = EligibilityEngine.evaluate(donor);
+    final commitment = _repo.activeCommitmentFor(donor.id);
 
     return SurfaceCard(
       padding: const EdgeInsets.all(TabangSpace.lg),
@@ -1585,7 +1630,20 @@ class _FindDonorPageState extends State<FindDonorPage> {
           Wrap(
             spacing: 6,
             runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              if (commitment != null)
+                Tooltip(
+                  message:
+                      'This donor is already selected for another active '
+                      'request. They stay visible, but cannot be reserved for '
+                      'two requests at once.',
+                  child: StatusPill(
+                    'Coordinating · ${commitment.id}',
+                    tone: Tone.info,
+                    dense: true,
+                  ),
+                ),
               if (widget.onOpenRequests != null)
                 TextButton.icon(
                   onPressed: widget.onOpenRequests,

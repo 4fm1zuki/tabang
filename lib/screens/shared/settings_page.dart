@@ -12,8 +12,8 @@ import '../../widgets/common.dart';
 /// record, so they survive page changes and are visible to the rest of the app.
 /// The donor-directory switch is the same `isAvailable` flag used by
 /// eligibility and request matching; the barangay switch controls whether the
-/// donor's barangay is shown in the directory. Push delivery is outside this
-/// simulated build, so the notification switches drive in-app summaries.
+/// donor's barangay is shown in the directory. The notification switches drive
+/// the in-app summaries shown on the Home dashboard.
 ///
 /// Guides and About live in their own destination (About & Help). They are not
 /// buried here as a single "Show the welcome guide" tile.
@@ -25,6 +25,8 @@ class SettingsPage extends StatefulWidget {
     required this.onThemeModeChanged,
     this.compactNav = false,
     this.onCompactNavChanged,
+    this.railPinned = true,
+    this.onRailPinnedChanged,
   });
 
   final AppUser user;
@@ -34,6 +36,10 @@ class SettingsPage extends StatefulWidget {
   /// Slim rails preference, owned by the root app so both shells share it.
   final bool compactNav;
   final ValueChanged<bool>? onCompactNavChanged;
+
+  /// Whether desktop sidebars stay expanded instead of opening on hover.
+  final bool railPinned;
+  final ValueChanged<bool>? onRailPinnedChanged;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -89,8 +95,8 @@ class _SettingsPageState extends State<SettingsPage> {
             'Appearance',
             'Choose how TABANG displays on this device.',
             help:
-                'System follows your device; Light and Dark pin the theme on '
-                'this session. The map follows the active theme too, with a '
+                'Light is the default. Dark pins the darker theme on this '
+                'session. The map follows the active theme too, with a '
                 'per-visit override from the map style button on desktop.',
             children: [
               _themeOption(
@@ -98,7 +104,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ThemeMode.light,
                 Icons.light_mode_outlined,
                 'Light',
-                'Always use the light theme',
+                'Default · warm surfaces and dark text',
               ),
               _themeOption(
                 context,
@@ -106,20 +112,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 Icons.dark_mode_outlined,
                 'Dark',
                 'Always use the dark theme',
-              ),
-              _themeOption(
-                context,
-                ThemeMode.system,
-                Icons.brightness_auto,
-                'System',
-                'Follow your device setting · default',
-              ),
-              const SizedBox(height: TabangSpace.sm),
-              _note(
-                context,
-                Icons.contrast,
-                'TABANG uses Material 3 typography and surfaces. Dark mode '
-                'raises secondary-text contrast instead of dimming it.',
               ),
               const SizedBox(height: TabangSpace.md),
               _switchRow(
@@ -130,6 +122,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 widget.compactNav,
                 (value) => widget.onCompactNavChanged?.call(value),
               ),
+              _switchRow(
+                context,
+                'Keep the sidebar pinned open',
+                'Desktop sidebars stay expanded. When off, they open on hover '
+                    'and collapse when the pointer leaves.',
+                widget.railPinned,
+                (value) => widget.onRailPinnedChanged?.call(value),
+              ),
             ],
           ),
           const SizedBox(height: TabangSpace.lg),
@@ -139,10 +139,8 @@ class _SettingsPageState extends State<SettingsPage> {
             'Notifications',
             'What TABANG should summarise for you.',
             help:
-                'This prototype shows in-app summaries only. Push '
-                'notifications need a deployed backend and are listed as a '
-                'known gap in the README. Turning a category off hides it from '
-                'the Home summary immediately.',
+                'Choose which updates appear in your Home summary. Turning a '
+                'category off hides it immediately.',
             children: [
               _switchRow(
                 context,
@@ -164,13 +162,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 'Show upcoming blood drives and campaigns in my summary',
                 user.notifyNews,
                 (v) => _repo.updateUser(user.copyWith(notifyNews: v)),
-              ),
-              const SizedBox(height: TabangSpace.sm),
-              _note(
-                context,
-                Icons.notifications_none,
-                'Notifications are in-app only. TABANG never sends SMS or '
-                'email in this build.',
               ),
             ],
           ),

@@ -8,6 +8,8 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
+import '../../widgets/photo.dart';
+import '../donor/chat_page.dart';
 
 /// User management for chapter staff.
 ///
@@ -943,21 +945,23 @@ class _UserManagementPageState extends State<UserManagementPage> {
     final isDonor = user.role == UserRole.donor;
 
     return SurfaceCard(
+      onTap: () => _showUserDetails(context, user),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 19,
-                backgroundColor: TabangColors.crimson,
-                child: Text(
-                  user.initials,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+              ClipOval(
+                child: SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: TabangPhoto(
+                    user.photoAsset,
+                    semanticLabel: '${user.alias} profile photo',
+                    creditLabel: user.alias,
+                    fallbackIcon: Icons.person_outline,
+                    fallbackIconSize: 18,
                   ),
                 ),
               ),
@@ -1072,25 +1076,39 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   Widget _buildActions(BuildContext context, AppUser user) {
-    final protected = _protectedLabel(user);
-    if (protected != null) {
-      return StatusPill(protected, tone: Tone.neutral, dense: true);
+    if (user.id == widget.currentUser.id) {
+      return const StatusPill('This is you', tone: Tone.neutral, dense: true);
     }
 
+    final protected = _protectedLabel(user);
     final isDonor = user.role == UserRole.donor;
     final canRecord =
         isDonor &&
         user.status != AccountStatus.suspended &&
         user.status != AccountStatus.unverified;
 
-    return Wrap(
-      spacing: TabangSpace.sm,
-      children: [
+    final actions = <Widget>[
+      _messageButton(context, user),
+      if (protected != null)
+        StatusPill(protected, tone: Tone.neutral, dense: true)
+      else ...[
         if (canRecord)
           OutlinedButton.icon(
             onPressed: () => _recordDonation(context, user),
             icon: const Icon(Icons.bloodtype_outlined, size: 14),
             label: const Text('Record donation'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: TabangSpace.md,
+                vertical: TabangSpace.sm,
+              ),
+            ),
+          ),
+        if (isDonor)
+          OutlinedButton.icon(
+            onPressed: () => _editDonationWindow(context, user),
+            icon: const Icon(Icons.event_repeat_outlined, size: 14),
+            label: const Text('Donation window'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(
                 horizontal: TabangSpace.md,
@@ -1150,6 +1168,362 @@ class _UserManagementPageState extends State<UserManagementPage> {
             ),
           ),
       ],
+    ];
+
+    return Wrap(
+      spacing: TabangSpace.sm,
+      runSpacing: TabangSpace.sm,
+      children: actions,
+    );
+  }
+
+  Widget _messageButton(BuildContext context, AppUser user) {
+    return OutlinedButton.icon(
+      onPressed: () => _openConversation(context, user),
+      icon: const Icon(Icons.chat_bubble_outline, size: 14),
+      label: const Text('Message'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TabangSpace.md,
+          vertical: TabangSpace.sm,
+        ),
+      ),
+    );
+  }
+
+  void _openConversation(BuildContext context, AppUser user) {
+    final thread = _repo.startConversation(
+      initiatorId: widget.currentUser.id,
+      otherId: user.id,
+    );
+    if (thread == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'That conversation cannot be opened. The account may be blocked.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text('Message ${user.alias}'),
+            leading: const BackButton(),
+          ),
+          body: DecoratedBox(
+            decoration: BoxDecoration(gradient: TabangGradients.page(context)),
+            child: ChatPage(
+              user: widget.currentUser,
+              allowNewConversation: true,
+              initialThreadId: thread.id,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Staff-only detail sheet. Shows the full account record, including contact
+  /// details and the live donation window, without exposing it to the directory.
+  void _showUserDetails(BuildContext context, AppUser user) {
+    final eligibility = EligibilityEngine.evaluate(user);
+    final isDonor = user.role == UserRole.donor;
+    final other = user.id == widget.currentUser.id;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            ClipOval(
+              child: SizedBox(
+                width: 38,
+                height: 38,
+                child: TabangPhoto(
+                  user.photoAsset,
+                  semanticLabel: '${user.alias} profile photo',
+                  creditLabel: user.alias,
+                  fallbackIcon: Icons.person_outline,
+                  fallbackIconSize: 18,
+                ),
+              ),
+            ),
+            const SizedBox(width: TabangSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(user.fullName, style: const TextStyle(fontSize: 15)),
+                  Text(
+                    '${user.alias} · ${user.role.label}',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w400,
+                      color: dialogContext.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460, maxHeight: 460),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    StatusPill(
+                      user.status.label,
+                      tone: toneForAccount(user.status),
+                      dense: true,
+                    ),
+                    StatusPill(
+                      user.role.label,
+                      tone: Tone.neutral,
+                      dense: true,
+                    ),
+                    if (user.warningCount > 0)
+                      StatusPill(
+                        '${user.warningCount} warning'
+                        '${user.warningCount == 1 ? '' : 's'}',
+                        tone: Tone.warning,
+                        dense: true,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: TabangSpace.md),
+                _detailRow(dialogContext, 'Email', user.email),
+                _detailRow(dialogContext, 'Phone', user.phone),
+                _detailRow(dialogContext, 'Barangay', user.barangay),
+                _detailRow(
+                  dialogContext,
+                  'Registered',
+                  formatDate(user.registeredOn),
+                ),
+                if (isDonor) ...[
+                  const Divider(height: TabangSpace.xl),
+                  _detailRow(
+                    dialogContext,
+                    'Blood type',
+                    user.bloodType?.label ?? 'Not recorded',
+                  ),
+                  _detailRow(
+                    dialogContext,
+                    'Birth date',
+                    user.birthDate == null
+                        ? 'Not recorded'
+                        : formatDate(user.birthDate!),
+                  ),
+                  _detailRow(
+                    dialogContext,
+                    'Weight',
+                    user.weightKg == null
+                        ? 'Not recorded'
+                        : '${user.weightKg!.toStringAsFixed(0)} kg',
+                  ),
+                  _detailRow(
+                    dialogContext,
+                    'Donations',
+                    '${user.totalDonations}',
+                  ),
+                  _detailRow(
+                    dialogContext,
+                    'Last donation',
+                    user.lastDonationDate == null
+                        ? 'None recorded'
+                        : formatDate(user.lastDonationDate!),
+                  ),
+                  _detailRow(
+                    dialogContext,
+                    'Component',
+                    user.lastDonationComponent?.label ?? 'Not recorded',
+                  ),
+                  _detailRow(
+                    dialogContext,
+                    'Blood card',
+                    user.bloodCardVerified ? 'Verified' : 'Not verified',
+                  ),
+                  _detailRow(
+                    dialogContext,
+                    'Directory',
+                    user.isAvailable ? 'Visible' : 'Hidden by donor',
+                  ),
+                  _detailRow(dialogContext, 'Eligibility', eligibility.summary),
+                ],
+                if (user.suspensionReason != null) ...[
+                  const Divider(height: TabangSpace.xl),
+                  _detailRow(
+                    dialogContext,
+                    'Suspension reason',
+                    user.suspensionReason!,
+                  ),
+                ],
+                const SizedBox(height: TabangSpace.md),
+                Text(
+                  'Contact details and this record are visible to chapter '
+                  'staff and administrators only.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.45,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          if (!other) ...[
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _openConversation(context, user);
+              },
+              icon: const Icon(Icons.chat_bubble_outline, size: 15),
+              label: const Text('Message'),
+            ),
+            if (isDonor)
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _editDonationWindow(context, user);
+                },
+                icon: const Icon(Icons.event_repeat_outlined, size: 15),
+                label: const Text('Donation window'),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(BuildContext context, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 128,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 11.5, color: context.textMuted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: context.textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editDonationWindow(BuildContext context, AppUser user) {
+    var date = user.lastDonationDate ?? DateTime.now();
+    var component = user.lastDonationComponent ?? BloodComponent.packedRbc;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Donation window · ${user.alias}'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Use this after a transfusion or late data entry. It moves '
+                  'the cooldown anchor without counting another donation.',
+                  style: TextStyle(fontSize: 12.5, height: 1.5),
+                ),
+                const SizedBox(height: TabangSpace.md),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: dialogContext,
+                      initialDate: date,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => date = picked);
+                    }
+                  },
+                  icon: const Icon(Icons.calendar_today_outlined, size: 15),
+                  label: Text('Last donation: ${formatDate(date)}'),
+                ),
+                const SizedBox(height: TabangSpace.sm),
+                DropdownButtonFormField<BloodComponent>(
+                  initialValue: component,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Component donated',
+                  ),
+                  items: BloodComponent.values
+                      .map(
+                        (c) => DropdownMenuItem(value: c, child: Text(c.label)),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => component = value ?? component),
+                ),
+                const SizedBox(height: TabangSpace.sm),
+                Text(
+                  '${EligibilityEngine.cooldownFor(component)}-day cooldown '
+                  'applies to ${component.label.toLowerCase()}.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _repo.updateDonationWindow(
+                  user.id,
+                  lastDonationDate: date,
+                  component: component,
+                );
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Donation window updated for ${user.alias}.'),
+                  ),
+                );
+              },
+              child: const Text('Update window'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

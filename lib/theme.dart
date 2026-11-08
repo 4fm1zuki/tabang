@@ -88,6 +88,38 @@ class TabangGradients {
     colors: [Color(0xFFF8E9C8), Color(0xFFFFF7E7)],
   );
 
+  /// Nearly invisible page wash. Large empty areas get a warm corner instead
+  /// of a single flat fill; cards and maps stay the visual focus.
+  static const LinearGradient lightPage = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFFAF8), Color(0xFFF7F4EF), Color(0xFFFDF1ED)],
+  );
+
+  static const LinearGradient darkPage = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF191413), Color(0xFF1B1514), Color(0xFF211817)],
+  );
+
+  static const LinearGradient lightEmpty = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFF8F6), Color(0xFFF8F5F0)],
+  );
+
+  static const LinearGradient darkEmpty = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF231B19), Color(0xFF1B1615)],
+  );
+
+  static LinearGradient page(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkPage : lightPage;
+
+  static LinearGradient empty(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? darkEmpty : lightEmpty;
+
   static LinearGradient forContext(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? darkSurface : warm;
 }

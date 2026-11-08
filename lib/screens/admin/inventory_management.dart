@@ -14,9 +14,17 @@ import '../../widgets/illustrations.dart';
 /// queue. The previous build's inventory page was read-only and held a second,
 /// divergent copy of the blood unit list.
 class InventoryManagementPage extends StatefulWidget {
-  const InventoryManagementPage({super.key, required this.currentUser});
+  const InventoryManagementPage({
+    super.key,
+    required this.currentUser,
+    this.embedded = false,
+  });
 
   final AppUser currentUser;
+
+  /// Embedded inside [OperationsWorkspacePage]: keeps the same tabs and
+  /// actions but drops the large duplicate page header.
+  final bool embedded;
 
   @override
   State<InventoryManagementPage> createState() =>
@@ -59,24 +67,37 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final pad = context.pagePadding;
     return SingleChildScrollView(
-      padding: context.pagePadding,
+      padding: widget.embedded
+          ? EdgeInsets.fromLTRB(pad.left, 0, pad.right, pad.bottom)
+          : pad,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageHeader(
-            title: 'Inventory & requests',
-            subtitle: 'Manage blood units, monitor expiry, and work the request queue.',
-            actions: [
-              if (widget.currentUser.role.canManageInventory)
-                FilledButton.icon(
-                  onPressed: () => _showAddUnitDialog(context),
-                  icon: const Icon(Icons.add, size: 15),
-                  label: const Text('Add unit'),
-                ),
-            ],
-          ),
-          const SizedBox(height: TabangSpace.xl),
+          if (!widget.embedded)
+            PageHeader(
+              title: 'Inventory & requests',
+              subtitle: 'Manage blood units, monitor expiry, and work the request queue.',
+              actions: [
+                if (widget.currentUser.role.canManageInventory)
+                  FilledButton.icon(
+                    onPressed: () => _showAddUnitDialog(context),
+                    icon: const Icon(Icons.add, size: 15),
+                    label: const Text('Add unit'),
+                  ),
+              ],
+            )
+          else if (widget.currentUser.role.canManageInventory)
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: () => _showAddUnitDialog(context),
+                icon: const Icon(Icons.add, size: 15),
+                label: const Text('Add unit'),
+              ),
+            ),
+          SizedBox(height: widget.embedded ? TabangSpace.md : TabangSpace.xl),
 
           // Tabs
           Wrap(

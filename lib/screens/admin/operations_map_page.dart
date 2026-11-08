@@ -23,11 +23,16 @@ class OperationsMapPage extends StatefulWidget {
     required this.user,
     this.onOpenInventory,
     this.onOpenUsers,
+    this.embedded = false,
   });
 
   final AppUser user;
   final VoidCallback? onOpenInventory;
   final VoidCallback? onOpenUsers;
+
+  /// Embedded inside [OperationsWorkspacePage]: keeps its own responsive body
+  /// but drops the page header and the duplicate inventory shortcut.
+  final bool embedded;
 
   @override
   State<OperationsMapPage> createState() => _OperationsMapPageState();
@@ -95,29 +100,40 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 1024;
-    final map = _buildMap(context);
-    final panel = _buildPanel(context);
-    return compact
-        ? ListView(
-            padding: context.pagePadding,
-            children: [
-              SizedBox(height: 380, child: map),
-              const SizedBox(height: TabangSpace.lg),
-              panel,
-            ],
-          )
-        : Padding(
-            padding: context.pagePadding,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 3, child: SizedBox(height: 640, child: map)),
-                const SizedBox(width: TabangSpace.lg),
-                Expanded(flex: 2, child: SingleChildScrollView(child: panel)),
-              ],
-            ),
-          );
+    final pad = context.pagePadding;
+    final padding = widget.embedded
+        ? EdgeInsets.fromLTRB(pad.left, 0, pad.right, pad.bottom)
+        : pad;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 860;
+        final map = _buildMap(context);
+        final panel = _buildPanel(context);
+        return compact
+            ? ListView(
+                padding: padding,
+                children: [
+                  SizedBox(height: widget.embedded ? 340 : 380, child: map),
+                  const SizedBox(height: TabangSpace.lg),
+                  panel,
+                ],
+              )
+            : Padding(
+                padding: padding,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: SizedBox(height: 640, child: map)),
+                    const SizedBox(width: TabangSpace.lg),
+                    Expanded(
+                      flex: 2,
+                      child: SingleChildScrollView(child: panel),
+                    ),
+                  ],
+                ),
+              );
+      },
+    );
   }
 
   Widget _buildMap(BuildContext context) {
@@ -410,20 +426,22 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        PageHeader(
-          title: 'Operations map',
-          subtitle: selected == null
-              ? 'Requests, donors and registrations across the 26 barangays.'
-              : 'Barangay $selected at a glance.',
-          actions: [
-            OutlinedButton.icon(
-              onPressed: widget.onOpenInventory,
-              icon: const Icon(Icons.inventory_2_outlined, size: 15),
-              label: const Text('Inventory queue'),
-            ),
-          ],
-        ),
-        const SizedBox(height: TabangSpace.lg),
+        if (!widget.embedded) ...[
+          PageHeader(
+            title: 'Operations map',
+            subtitle: selected == null
+                ? 'Requests, donors and registrations across the 26 barangays.'
+                : 'Barangay $selected at a glance.',
+            actions: [
+              OutlinedButton.icon(
+                onPressed: widget.onOpenInventory,
+                icon: const Icon(Icons.inventory_2_outlined, size: 15),
+                label: const Text('Inventory queue'),
+              ),
+            ],
+          ),
+          const SizedBox(height: TabangSpace.lg),
+        ],
         Row(
           children: [
             Expanded(
@@ -721,33 +739,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               ),
               const SizedBox(height: TabangSpace.sm),
               for (final response in pending)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(response.donorAlias),
-                  subtitle: Text(response.message ?? 'No message'),
-                  trailing: TextButton(
-                    onPressed: () {
-                      final thread = _repo.selectResponse(
-                        responseId: response.id,
-                        selectedById: widget.user.id,
-                      );
-                      if (thread == null) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Not selectable yet — the requester and donor '
-                              'must both have sent a message first.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                      Navigator.pop(dialogContext);
-                    },
-                    child: const Text('Select'),
-                  ),
-                ),
+                _responderTile(dialogContext, request, response),
             ],
           ),
         ),
@@ -758,6 +750,52 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _responderTile(
+    BuildContext context,
+    BloodRequest request,
+    RequestResponse response,
+  ) {
+    final commitment = _repo.commitmentForDonor(
+      response.donorId,
+      excludingRequestId: request.id,
+    );
+    return ListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(response.donorAlias),
+      subtitle: Text(
+        commitment == null
+            ? (response.message ?? 'No message')
+            : 'Coordinating request ${commitment.requestId} — cannot be '
+                  'selected for a second active request.',
+      ),
+      trailing: commitment != null
+          ? const StatusPill('Coordinating', tone: Tone.info, dense: true)
+          : TextButton(
+              onPressed: () {
+                final thread = _repo.selectResponse(
+                  responseId: response.id,
+                  selectedById: widget.user.id,
+                );
+                if (thread == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Not selectable yet — the requester and donor must '
+                        'both have sent a message first, and the donor must '
+                        'still be eligible.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Select'),
+            ),
     );
   }
 

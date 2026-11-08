@@ -413,14 +413,26 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                 final subscores = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'READINESS SCORE',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.3,
-                        color: Colors.white.withValues(alpha: 0.72),
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          'READINESS SCORE',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.3,
+                            color: Colors.white.withValues(alpha: 0.72),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const StatusPill(
+                          'Live',
+                          tone: Tone.success,
+                          icon: Icons.bolt,
+                          dense: true,
+                          onImage: true,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Wrap(
@@ -447,8 +459,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Weighted from supply coverage, donor capacity, request '
-                      'pressure and shelf-life health.',
+                      'Live score out of 100%, recalculated whenever units, '
+                      'requests, registered users or eligible donors change. '
+                      'Weighted across five measures.',
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.45,
@@ -594,7 +607,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'out of 100',
+                  'of 100% max',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -749,11 +762,13 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           ),
           _KpiCard(
             label: 'Registered users',
-            value: '$verified / $totalUsers',
+            value: '$totalUsers',
             icon: Icons.badge_outlined,
             tone: Tone.info,
-            footnote: '${summary.donationsThisMonth} donations this month',
-            progress: totalUsers == 0 ? 0 : verified / totalUsers,
+            footnote:
+                '$verified verified · ${summary.donationsThisMonth} donations '
+                'this month',
+            progress: score.valueFor('Community reach'),
           ),
         ];
         return Wrap(
@@ -1137,7 +1152,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
   }
 }
 
-/// The headline score and its four weighted components.
+/// The headline score and its five weighted components.
 class _ReadinessScore {
   const _ReadinessScore(this.value, this.components);
 
@@ -1152,9 +1167,11 @@ class _ReadinessScore {
   }
 
   /// Supply coverage and shelf-life are weighted most heavily because they are
-  /// the two things a chapter can act on today. Donor capacity is the leading
-  /// indicator; request pressure is deliberately inverted (fewer open requests
-  /// is better).
+  /// the two things a chapter can act on today. Donor capacity and community
+  /// reach are the leading indicators; request pressure is deliberately
+  /// inverted (fewer open requests is better). Every input is read from the
+  /// repository on rebuild, so the score moves as staff record units, donors
+  /// update availability, users register or requests open and close.
   static _ReadinessScore compute({
     required AnalyticsSummary summary,
     required int expiringCount,
@@ -1168,12 +1185,14 @@ class _ReadinessScore {
     final shelfLife = total == 0
         ? 1.0
         : (1 - expiringCount / total).clamp(0.0, 1.0);
+    final community = (summary.registeredUsers / 60).clamp(0.0, 1.0);
 
     final components = [
-      _ScoreComponent('Supply coverage', supply, 0.35),
-      _ScoreComponent('Donor capacity', donors, 0.25),
-      _ScoreComponent('Request pressure', requestPressure, 0.20),
-      _ScoreComponent('Shelf-life health', shelfLife, 0.20),
+      _ScoreComponent('Supply coverage', supply, 0.30),
+      _ScoreComponent('Donor capacity', donors, 0.20),
+      _ScoreComponent('Request pressure', requestPressure, 0.15),
+      _ScoreComponent('Shelf-life health', shelfLife, 0.15),
+      _ScoreComponent('Community reach', community, 0.20),
     ];
     final weighted = components.fold<double>(
       0,

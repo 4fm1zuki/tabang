@@ -31,14 +31,18 @@ class TabangApp extends StatefulWidget {
 class _TabangAppState extends State<TabangApp> {
   final TabangRepository _repo = TabangRepository.instance;
 
-  /// Follow the operating system by default, so a desktop or phone that
-  /// switches to dark for the evening darkens the app and its map in one step.
-  /// Light, Dark and System remain explicit choices in Settings.
-  ThemeMode _themeMode = ThemeMode.system;
+  /// Light is the default. Dark remains an explicit choice in Settings; the
+  /// operating-system theme is deliberately not followed so the community
+  /// surfaces keep their warm, high-contrast presentation.
+  ThemeMode _themeMode = ThemeMode.light;
 
   /// Slim rails: hide the bottom-bar labels and keep the side rail at icon
   /// width. Chosen in Settings; off by default.
   bool _compactNav = false;
+
+  /// Whether desktop sidebars stay pinned open. Chosen in Settings and shared
+  /// by both shells so the preference survives role changes.
+  bool _railPinned = true;
 
   @override
   void initState() {
@@ -64,6 +68,10 @@ class _TabangAppState extends State<TabangApp> {
     setState(() => _compactNav = value);
   }
 
+  void _setRailPinned(bool value) {
+    setState(() => _railPinned = value);
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = _repo.currentUser;
@@ -81,8 +89,13 @@ class _TabangAppState extends State<TabangApp> {
       // Non-edge-to-edge by design: reserve the system status and gesture/nav
       // insets around the whole navigator. Text never sits under the clock,
       // and the bottom bar never collides with gesture navigation.
-      builder: (context, child) => ColoredBox(
-        color: Theme.of(context).scaffoldBackgroundColor,
+      builder: (context, child) => DecoratedBox(
+        // A barely-there wash keeps large empty pages from reading as flat
+        // sheets of grey without competing with cards and the map.
+        decoration: BoxDecoration(
+          gradient: TabangGradients.page(context),
+          color: Theme.of(context).scaffoldBackgroundColor,
+        ),
         child: SafeArea(child: child ?? const SizedBox.shrink()),
       ),
       home: _buildHome(user),
@@ -106,6 +119,8 @@ class _TabangAppState extends State<TabangApp> {
         onThemeModeChanged: _setThemeMode,
         compactNav: _compactNav,
         onCompactNavChanged: _setCompactNav,
+        railPinned: _railPinned,
+        onRailPinnedChanged: _setRailPinned,
       );
     }
 
@@ -115,6 +130,8 @@ class _TabangAppState extends State<TabangApp> {
       onThemeModeChanged: _setThemeMode,
       compactNav: _compactNav,
       onCompactNavChanged: _setCompactNav,
+      railPinned: _railPinned,
+      onRailPinnedChanged: _setRailPinned,
     );
   }
 }

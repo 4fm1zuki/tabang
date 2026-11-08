@@ -546,6 +546,26 @@ class TabangRepository {
     );
   }
 
+  /// Correct the donation window without counting a second donation.
+  ///
+  /// After a transfusion or a late data entry, staff may need to move the
+  /// recorded donation date or change the component. The total donation count
+  /// stays untouched; only the cooldown anchor moves.
+  void updateDonationWindow(
+    String userId, {
+    required DateTime lastDonationDate,
+    BloodComponent? component,
+  }) {
+    final user = userById(userId);
+    if (user == null) return;
+    updateUser(
+      user.copyWith(
+        lastDonationDate: lastDonationDate,
+        lastDonationComponent: component ?? user.lastDonationComponent,
+      ),
+    );
+  }
+
   void setUserStatus(String userId, AccountStatus status, {String? reason}) {
     final user = userById(userId);
     if (user == null) return;
@@ -844,6 +864,44 @@ class TabangRepository {
     return response;
   }
 
+  /// A donor who has already been selected for another active request.
+  ///
+  /// The donor stays visible in Find Donor and in the response list, but a
+  /// requester cannot silently reserve the same person twice. Fairness is
+  /// enforced when selecting, not by hiding the donor.
+  RequestResponse? commitmentForDonor(
+    String donorId, {
+    String? excludingRequestId,
+  }) {
+    for (final response in _responses) {
+      if (response.donorId != donorId ||
+          response.status != ResponseStatus.selected) {
+        continue;
+      }
+      if (excludingRequestId != null &&
+          response.requestId == excludingRequestId) {
+        continue;
+      }
+      final request = _firstOrNull(
+        _requests,
+        (r) => r.id == response.requestId,
+      );
+      if (request == null) continue;
+      if (request.status == RequestStatus.open ||
+          request.status == RequestStatus.matched) {
+        return response;
+      }
+    }
+    return null;
+  }
+
+  /// The request a donor is currently committed to, if any.
+  BloodRequest? activeCommitmentFor(String donorId) {
+    final response = commitmentForDonor(donorId);
+    if (response == null) return null;
+    return _firstOrNull(_requests, (r) => r.id == response.requestId);
+  }
+
   /// The requester (or staff/admin) selects a donor response. Selection creates
   /// the coordination thread and, once enough donors are selected, moves the
   /// request to `matched`. No unit is counted as fulfilled until staff record
@@ -890,6 +948,12 @@ class TabangRepository {
       return null;
     }
 
+    // One donor, one active commitment. A second requester must not be able to
+    // reserve someone who is already coordinating another donation.
+    if (commitmentForDonor(donor.id, excludingRequestId: request.id) != null) {
+      return null;
+    }
+
     final index = _responses.indexWhere((r) => r.id == responseId);
     _responses[index] = response.copyWith(status: ResponseStatus.selected);
 
@@ -901,6 +965,8 @@ class TabangRepository {
         participantAAlias: requester.alias,
         participantBId: donor.id,
         participantBAlias: donor.alias,
+        participantAReadAt: DateTime.now(),
+        participantBReadAt: DateTime.now(),
         messages: [
           ChatMessage(
             id: 'MSG-${DateTime.now().microsecondsSinceEpoch}',
@@ -1205,6 +1271,7 @@ class TabangRepository {
         participantAAlias: initiator.alias,
         participantBId: otherId,
         participantBAlias: other.alias,
+        participantAReadAt: DateTime.now(),
         messages: const [],
       );
       _threads.insert(0, thread);
@@ -1212,8 +1279,10 @@ class TabangRepository {
 
     final trimmed = firstMessage?.trim();
     if (trimmed != null && trimmed.isNotEmpty) {
+      final sentAt = DateTime.now();
       final index = _threads.indexWhere((t) => t.id == thread!.id);
       _threads[index] = thread.copyWith(
+        participantAReadAt: sentAt,
         messages: [
           ...thread.messages,
           ChatMessage(
@@ -1221,7 +1290,7 @@ class TabangRepository {
             senderId: initiatorId,
             senderAlias: initiator.alias,
             text: trimmed,
-            sentAt: DateTime.now(),
+            sentAt: sentAt,
             flag: _classify(trimmed),
           ),
         ],
@@ -1344,19 +1413,61 @@ class TabangRepository {
     if (isBlockedBetween(senderId, otherId)) return;
 
     final sender = userById(senderId);
+    final sentAt = DateTime.now();
     final message = ChatMessage(
       id: 'MSG-${DateTime.now().microsecondsSinceEpoch}',
       senderId: senderId,
       senderAlias: sender?.alias ?? 'Unknown',
       text: trimmed,
-      sentAt: DateTime.now(),
+      sentAt: sentAt,
       flag: _classify(trimmed),
     );
 
-    _threads[index] = thread.copyWith(messages: [...thread.messages, message]);
+    _threads[index] = thread.copyWith(
+      messages: [...thread.messages, message],
+      // Sending a message implies you have seen the thread up to that point.
+      participantAReadAt: thread.participantAId == senderId
+          ? sentAt
+          : thread.participantAReadAt,
+      participantBReadAt: thread.participantBId == senderId
+          ? sentAt
+          : thread.participantBReadAt,
+    );
     markActive(senderId);
     _notify();
   }
+
+  /// Mark one conversation as read for [userId]. Called when the person opens
+  /// the thread, so the navigation badge clears as soon as there is nothing
+  /// new to see.
+  bool markThreadRead(String threadId, String userId) {
+    final index = _threads.indexWhere((t) => t.id == threadId);
+    if (index == -1) return false;
+    final thread = _threads[index];
+    if (thread.readAtFor(userId) != null && !thread.hasUnreadFor(userId)) {
+      return false;
+    }
+    final now = DateTime.now();
+    _threads[index] = thread.copyWith(
+      participantAReadAt: thread.participantAId == userId
+          ? now
+          : thread.participantAReadAt,
+      participantBReadAt: thread.participantBId == userId
+          ? now
+          : thread.participantBReadAt,
+    );
+    _notify();
+    return true;
+  }
+
+  /// Total unread messages across every conversation for [userId].
+  int unreadMessageCountFor(String userId) =>
+      threadsFor(userId)
+          .fold<int>(0, (sum, thread) => sum + thread.unreadCountFor(userId));
+
+  /// Number of conversations with at least one unread message.
+  int unreadThreadCountFor(String userId) =>
+      threadsFor(userId).where((thread) => thread.hasUnreadFor(userId)).length;
 
   void flagMessage(String threadId, String messageId, ModerationFlag flag) {
     final index = _threads.indexWhere((t) => t.id == threadId);
@@ -1435,10 +1546,12 @@ class TabangRepository {
     required String reporterId,
     required String reportedUserId,
     required String reason,
+    String? details,
     String? threadId,
   }) {
     final reporter = userById(reporterId);
     final reported = userById(reportedUserId);
+    final trimmedDetails = details?.trim();
     final report = UserReport(
       id: 'RPT-${(_reports.length + 1).toString().padLeft(3, '0')}',
       reporterId: reporterId,
@@ -1446,6 +1559,9 @@ class TabangRepository {
       reportedUserId: reportedUserId,
       reportedAlias: reported?.alias ?? 'Unknown',
       reason: reason.trim(),
+      details: trimmedDetails == null || trimmedDetails.isEmpty
+          ? null
+          : trimmedDetails,
       createdAt: DateTime.now(),
       threadId: threadId,
     );
@@ -1499,7 +1615,7 @@ class TabangRepository {
         .where(
           (u) =>
               u.lastDonationDate != null &&
-              u.lastDonationDate!.isAfter(monthStart),
+              !u.lastDonationDate!.isBefore(monthStart),
         )
         .length;
 
@@ -2608,6 +2724,8 @@ class TabangRepository {
         participantAAlias: 'Recipient 209',
         participantBId: 'USR-001',
         participantBAlias: 'Iver',
+        participantAReadAt: now.subtract(const Duration(hours: 2, minutes: 44)),
+        participantBReadAt: now.subtract(const Duration(hours: 3, minutes: 5)),
         messages: [
           ChatMessage(
             id: 'MSG-001',
@@ -2639,6 +2757,8 @@ class TabangRepository {
         participantBId: 'USR-003',
         participantBAlias: 'Juan',
         isMuted: true,
+        participantAReadAt: now.subtract(const Duration(hours: 1, minutes: 50)),
+        participantBReadAt: now.subtract(const Duration(hours: 1, minutes: 50)),
         messages: [
           ChatMessage(
             id: 'MSG-101',
@@ -2671,6 +2791,8 @@ class TabangRepository {
         participantAAlias: 'Angel',
         participantBId: 'USR-002',
         participantBAlias: 'Tere',
+        participantAReadAt: now.subtract(const Duration(hours: 11)),
+        participantBReadAt: now.subtract(const Duration(hours: 11)),
         messages: [
           ChatMessage(
             id: 'MSG-201',
@@ -2690,6 +2812,8 @@ class TabangRepository {
         participantAAlias: 'Recipient 209',
         participantBId: 'USR-012',
         participantBAlias: 'Liza',
+        participantAReadAt: now.subtract(const Duration(hours: 2, minutes: 20)),
+        participantBReadAt: now.subtract(const Duration(hours: 2, minutes: 20)),
         messages: [
           ChatMessage(
             id: 'MSG-301',
@@ -2713,6 +2837,10 @@ class TabangRepository {
         participantAAlias: 'Recipient 209',
         participantBId: 'USR-007',
         participantBAlias: 'Bea',
+        participantAReadAt: now.subtract(
+          const Duration(days: 2, hours: 22, minutes: 30),
+        ),
+        participantBReadAt: now.subtract(const Duration(days: 2, hours: 21)),
         messages: [
           ChatMessage(
             id: 'MSG-401',

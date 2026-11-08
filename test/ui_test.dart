@@ -3,11 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/core/image_credits.dart';
 import 'package:tabang/core/repository.dart';
+import 'package:tabang/screens/admin/admin_overview.dart';
 import 'package:tabang/screens/admin/inventory_management.dart';
 import 'package:tabang/screens/admin/operations_map_page.dart';
+import 'package:tabang/screens/admin/operations_workspace_page.dart';
+import 'package:tabang/screens/admin/user_management_page.dart';
+import 'package:tabang/screens/donor/chat_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_hub_page.dart';
 import 'package:tabang/screens/donor/find_donor_page.dart';
+import 'package:tabang/screens/shared/profile_page.dart';
 import 'package:tabang/theme.dart';
 import 'package:tabang/widgets/common.dart';
 import 'package:tabang/widgets/digos_vector_map.dart';
@@ -411,6 +416,208 @@ void main() {
     expect(find.textContaining('marks donors away'), findsNothing);
     expect(
       find.text('You are visible to compatible recipients.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('operations workspace moves between map and inventory', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: OperationsWorkspacePage(user: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // One Operations destination, with the two working views in an inner rail.
+    expect(find.text('OPERATIONS'), findsOneWidget);
+    expect(find.text('Operations map'), findsOneWidget);
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+
+    await tester.tap(find.text('Inventory'));
+    await tester.pumpAndSettle();
+    expect(find.text('Inventory & requests'), findsOneWidget);
+    expect(find.text('Add unit'), findsOneWidget);
+
+    await tester.tap(find.text('Map'));
+    await tester.pumpAndSettle();
+    expect(find.text('Operations map'), findsOneWidget);
+
+    // The inner rail collapses to icons without hiding the two sections.
+    await tester.tap(find.byTooltip('Collapse operations sidebar'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Expand operations sidebar'), findsOneWidget);
+    expect(find.text('OPERATIONS'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('staff chat can start a new conversation from search', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 850);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: ChatPage(user: staff, allowNewConversation: true)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('New conversation'));
+    await tester.pumpAndSettle();
+    expect(find.text('New conversation'), findsWidgets);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      'Iverson',
+    );
+    await tester.pumpAndSettle();
+
+    final donorTile = find.byKey(const ValueKey('newConversation-USR-001'));
+    expect(donorTile, findsOneWidget);
+    await tester.tap(donorTile);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Write a message'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('staff user record opens details and the donation window', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    final before = repo.userById('USR-001')!.totalDonations;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: UserManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'Iverson');
+    await tester.pumpAndSettle();
+
+    final name = find.text('Iverson D. Briones');
+    expect(name, findsOneWidget);
+    await tester.tap(name);
+    await tester.pumpAndSettle();
+
+    // Contact details stay in the staff/admin-only record dialog.
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('iverson.briones@tabang.app'), findsOneWidget);
+    expect(
+      find.textContaining('visible to chapter staff and administrators only'),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Donation window'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Donation window · Iver'), findsOneWidget);
+
+    await tester.tap(find.text('Update window'));
+    await tester.pumpAndSettle();
+
+    expect(repo.userById('USR-001')!.totalDonations, before);
+    expect(find.text('Donation window updated for Iver.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('avatar picker keeps staff and community sets apart', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    bool showsAsset(String asset) => tester
+        .widgetList<Image>(find.byType(Image))
+        .any(
+          (image) =>
+              image.image is AssetImage &&
+              (image.image as AssetImage).assetName == asset,
+        );
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: ProfilePage(user: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Change avatar'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('separate set'), findsOneWidget);
+    expect(showsAsset('assets/images/avatars/avatar_037.png'), isTrue);
+    expect(showsAsset('assets/images/avatars/avatar_001.png'), isFalse);
+
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: ProfilePage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Change avatar'));
+    await tester.pumpAndSettle();
+    expect(showsAsset('assets/images/avatars/avatar_001.png'), isTrue);
+    expect(showsAsset('assets/images/avatars/avatar_037.png'), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('overview states the readiness maximum and live updates', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: const Scaffold(body: AdminOverviewPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('READINESS SCORE'), findsOneWidget);
+    expect(find.text('of 100% max'), findsOneWidget);
+    expect(find.text('Live'), findsOneWidget);
+    expect(
+      find.textContaining('recalculated whenever units, requests'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);

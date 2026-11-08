@@ -364,6 +364,74 @@ void main() {
       );
     });
 
+    test('a selected donor cannot be reserved by a second active request', () {
+      final firstRequest = addRequest(repo, patientAlias: 'Fairness 1');
+      final secondRequest = addRequest(repo, patientAlias: 'Fairness 2');
+
+      // USR-012 already has a reciprocal seeded conversation with USR-009, so
+      // both offers are selectable under the chat-first rule.
+      final firstResponse = repo.respondToRequest(
+        requestId: firstRequest.id,
+        donorId: 'USR-012',
+      )!;
+      final secondResponse = repo.respondToRequest(
+        requestId: secondRequest.id,
+        donorId: 'USR-012',
+      )!;
+
+      expect(
+        repo.selectResponse(
+          responseId: firstResponse.id,
+          selectedById: 'USR-009',
+        ),
+        isNotNull,
+      );
+      expect(repo.activeCommitmentFor('USR-012')?.id, firstRequest.id);
+      expect(repo.commitmentForDonor('USR-012')?.id, firstResponse.id);
+      expect(
+        repo
+            .commitmentForDonor('USR-012', excludingRequestId: secondRequest.id)
+            ?.id,
+        firstResponse.id,
+      );
+
+      // The donor stays visible in the second request's response list, but the
+      // second selection is refused instead of silently double-booking them.
+      expect(
+        repo.responsesFor(secondRequest.id).single.status,
+        ResponseStatus.pending,
+      );
+      expect(
+        repo.selectResponse(
+          responseId: secondResponse.id,
+          selectedById: 'USR-009',
+        ),
+        isNull,
+      );
+      expect(
+        repo.responsesFor(secondRequest.id).single.status,
+        ResponseStatus.pending,
+      );
+      expect(
+        repo.requests.firstWhere((r) => r.id == secondRequest.id).status,
+        RequestStatus.open,
+      );
+
+      // Once the first request closes, the donor is free again.
+      expect(
+        repo.markRequestFulfilled(firstRequest.id, actorId: 'USR-010'),
+        isTrue,
+      );
+      expect(repo.activeCommitmentFor('USR-012'), isNull);
+      expect(
+        repo.selectResponse(
+          responseId: secondResponse.id,
+          selectedById: 'USR-009',
+        ),
+        isNotNull,
+      );
+    });
+
     test(
       'selection creates one coordination thread and does not double-count',
       () {
@@ -753,11 +821,58 @@ void main() {
       expect(repo.reports.length, before + 1);
       expect(repo.reports.first.id, report.id);
       expect(report.status, ReportStatus.open);
+      expect(report.details, isNull);
       expect(repo.resolveReport(report.id, ReportStatus.resolved), isTrue);
       expect(
         repo.reports.firstWhere((r) => r.id == report.id).status,
         ReportStatus.resolved,
       );
+    });
+
+    test('a report keeps the reporter\'s free-text explanation', () {
+      final report = repo.submitReport(
+        reporterId: 'USR-009',
+        reportedUserId: 'USR-003',
+        reason: 'Harassment or threats',
+        details:
+            '  They demanded cash and threatened to cancel the donation.  ',
+        threadId: 'ROOM-102',
+      );
+
+      expect(report.reason, 'Harassment or threats');
+      expect(
+        report.details,
+        'They demanded cash and threatened to cancel the donation.',
+      );
+      expect(repo.reports.first.details, report.details);
+
+      final blank = repo.submitReport(
+        reporterId: 'USR-009',
+        reportedUserId: 'USR-003',
+        reason: 'Spam or advertising',
+        details: '   ',
+      );
+      expect(blank.details, isNull);
+    });
+
+    test('unread counts follow each participant\'s read marker', () {
+      final thread = repo.threads.firstWhere((t) => t.id == 'ROOM-101');
+      // Two messages from USR-009 arrived after USR-001's read marker.
+      expect(thread.unreadCountFor('USR-001'), 2);
+      expect(repo.unreadMessageCountFor('USR-001'), 2);
+      expect(repo.unreadThreadCountFor('USR-001'), 1);
+
+      expect(repo.markThreadRead('ROOM-101', 'USR-001'), isTrue);
+      expect(thread.unreadCountFor('USR-001'), 2); // old snapshot unchanged
+      final refreshed = repo.threads.firstWhere((t) => t.id == 'ROOM-101');
+      expect(refreshed.unreadCountFor('USR-001'), 0);
+      expect(repo.unreadMessageCountFor('USR-001'), 0);
+      expect(repo.unreadThreadCountFor('USR-001'), 0);
+
+      // The other participant's marker is untouched; they had already read
+      // the conversation before the last message was sent.
+      expect(refreshed.unreadCountFor('USR-009'), 0);
+      expect(repo.markThreadRead('ROOM-101', 'USR-001'), isFalse);
     });
 
     test('blocking disables messaging in both directions', () {
@@ -814,6 +929,24 @@ void main() {
         ).isEligible,
         isFalse,
       );
+    });
+
+    test('staff can correct the window without counting another donation', () {
+      final donor = repo.userById('USR-012')!;
+      final before = donor.totalDonations;
+      final at = DateTime.now().subtract(const Duration(days: 10));
+
+      repo.updateDonationWindow(
+        donor.id,
+        lastDonationDate: at,
+        component: BloodComponent.wholeBlood,
+      );
+
+      final updated = repo.userById(donor.id)!;
+      expect(updated.totalDonations, before);
+      expect(updated.lastDonationDate, at);
+      expect(updated.lastDonationComponent, BloodComponent.wholeBlood);
+      expect(EligibilityEngine.evaluate(updated).isEligible, isFalse);
     });
   });
 

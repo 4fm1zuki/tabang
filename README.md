@@ -130,9 +130,11 @@ were bypassed.
   barangay, never outside the city outline.
   A **metric scale bar** shows distance; one fit-city control (corner-bracket
   icon) re-frames the whole city in the pane; `+`/`−` step the zoom within
-  10.5–18; the map style follows the app theme — and the system theme when the
-  app is set to System — with a desktop-only toggle that overrides it for the
-  visit. The map opens framed to the whole city
+  10.5–18; the map style follows the app theme, with a desktop-only toggle that
+  overrides it for the visit. A **Live** pill and an unread badge flag new
+  activity, and a donor already coordinating an active request stays visible
+  with a **coordinating** badge rather than disappearing from the map. The map
+  opens framed to the whole city
   instead of falling back to street level. Map panels fade while the map is
   being touched and return when the gesture ends; a layers button hides them for
   an unobstructed view, and the phone control stack is reduced to 30 px buttons
@@ -179,10 +181,15 @@ were bypassed.
   anonymous **`Donor #<id>`** handle rather than their nickname. **Chat comes
   first:** the requester must exchange a real, reciprocal human message with a
   donor before selection is enabled, and a system notice does not count.
+  Selection is also fair: a donor already selected for another open request is
+  flagged **coordinating**, stays visible in the response list, and cannot be
+  silently reserved twice until the first request closes.
 - **Messages** — double-blind coordination threads, bilateral identity reveal
   (request then accept), block/unblock with a 48-hour re-block cooldown,
-  persisted reports to staff, and the **chapter support thread** created by the
-  Help page's feedback form. The chapter thread is an organization identity, not
+  persisted reports to staff with a required reason and an optional free-text
+  explanation, and the **chapter support thread** created by the Help page's
+  feedback form. Unread counters mark new chat activity in the rail, bottom bar
+  and Find Donor; opening a thread clears it immediately. The chapter thread is an organization identity, not
   a person: it shows the Philippine Red Cross — Davao del Sur Chapter name, a
   blue verified tick and an info card, and it never exposes a staff member's
   real name. Registering as a donor opens that thread automatically, and every
@@ -196,7 +203,8 @@ were bypassed.
   the others. The page also carries blood-card verification state, blood type,
   weight, last donation component and notification preferences. Availability is
   set once, in Settings and Donor Hub, rather than repeated here.
-- **Settings** — appearance (system/light/dark), notification summaries, donor
+- **Settings** — appearance (light is the default, dark is explicit), a
+  **keep the sidebar pinned open** switch, slim navigation rails, donor
   availability, privacy/data and account sections, each with a contextual `?`
   help tip.
 - **Guides & Help** — a separate destination with task guides (donating,
@@ -211,44 +219,55 @@ were bypassed.
 
 ### Staff / admin surface
 
-- **Statistics** — a KIN-SCORE-style hierarchy: one weighted readiness score
-  with a gauge and four labelled subscores, primary KPI cards with progress
-  bars, supply/community detail, then supporting exceptions. Every figure is
-  computed from the repository, and an explicit **Roles & permissions** card
-  spells out what Clinical Personnel and System Administrators can each do.
-  The open-requests card links straight to the inventory queue. **User
-  management** opens with the donor registrations awaiting staff — card on
-  file, planned visit, notes — where each one can be verified, returned for
-  documents or not accepted. On phones and small tablets the staff console uses
-  the same bottom-bar shell as the community app; the icon rail is desktop-only.
-- **Operations** — a staff/admin map of the same Digos template with a legend
-  switch between the amber **open-request heat layer** and the same
-  **donor-density heatmap** the community map uses. Tapping a
-  barangay scopes the side panel to that barangay: eligible donors, pending
-  registrations, open requests with responders, and donor applications waiting
-  for review. Staff can open a request's details, select a donor response
-  (still gated by the reciprocal-chat rule), mark a request fulfilled, and jump
-  to the inventory queue or user management. This is the operational counterpart
-  to the community Find Donor map.
-- **Inventory** — units are a tappable list; selecting one opens the full
-  record including the barcode graphic and the name of the person holding it.
-- **Inventory** — staff receive new stock with **Add unit** (blood type,
-  component, storage bay, collection date, optional barcode; expiry is derived
-  from the component shelf life), change unit status, release a held bag back to
-  available stock after screening, monitor effective expiry pressure, confirm
-  booked **appointments** in a dedicated queue, work the request queue, and
-  select donor responses when a requester is unavailable. Only staff/admin can
-  mark a request fulfilled.
+- **Overview** — a KIN-SCORE-style hierarchy: one weighted readiness score
+  explicitly capped at **100% max**, built from five labelled components
+  (supply coverage, shelf-life, donor capacity, community reach and request
+  pressure) that recalculate live whenever units, requests, registered users or
+  active donors change. Primary KPI cards with progress bars, supply/community
+  detail and supporting exceptions all read the same repository snapshot, and
+  an explicit **Roles & permissions** card spells out what Clinical Personnel
+  and System Administrators can each do. The open-requests and low-stock cards
+  deep-link into the Operations workspace, and **User management** opens with
+  the donor registrations awaiting staff — card on file, planned visit, notes —
+  where each one can be verified, returned for documents or not accepted. On
+  phones and small tablets the staff console uses the same bottom-bar shell as
+  the community app; the icon rail is desktop-only.
+- **Operations** — one destination for the operational work that used to be
+  split between Map and Inventory. A collapsible inner sidebar switches views on
+  wide windows, and a segmented control does the same on narrow ones. The map
+  is the same Digos template with a legend switch between the amber
+  **open-request heat layer** and the **donor-density heatmap** the community
+  map uses. Tapping a barangay scopes the side panel to eligible donors,
+  pending registrations, open requests with responders, and donor applications
+  waiting for review. Staff can open request details, select a donor response
+  (still gated by the reciprocal-chat rule and the cross-request commitment
+  guard), mark a request fulfilled, and jump to user management.
+- **Inventory** — the second Operations view. Units are a tappable list;
+  selecting one opens the full record including the barcode graphic and the
+  name of the person holding it. Staff receive new stock with **Add unit**
+  (blood type, component, storage bay, collection date, optional barcode;
+  expiry is derived from the component shelf life), change unit status, release
+  a held bag back to available stock after screening, monitor effective expiry
+  pressure, confirm booked **appointments** in a dedicated queue, work the
+  request queue, and select donor responses when a requester is unavailable.
+  Only staff/admin can mark a request fulfilled.
+- **Messages** — staff and admins use the community chat surface and can start
+  a new conversation with another staff member or any community user; unread
+  counters stay live across the console.
 - **Users** — create walk-in accounts with fixed-choice fields and a one-time
   temporary password, verify blood cards, issue warnings, suspend and reinstate
   donor and recipient accounts, and record a completed donation with its
-  component. Staff cannot manage their own account, another staff account, or
-  an admin; only an admin can manage another staff member or add staff.
+  component. Clicking a user opens a staff/admin-only record with contact
+  details, standing and history; from there staff can message the user or
+  correct the **donation window** after a transfusion without counting another
+  donation. Staff cannot manage their own account, another staff account, or an
+  admin; only an admin can manage another staff member or add staff.
 - **Moderation** — review flagged messages, clear or escalate flags, mute
-  threads, resolve or dismiss the persisted user-report queue, and **reply**
-  from the console: staff answer the official chapter threads under the
-  organization identity, while person-to-person coordination threads stay
-  read-only. Threads are listed most-recent first.
+  threads, resolve or dismiss the persisted user-report queue with the
+  reporter's free-text explanation attached, and **reply** from the console:
+  staff answer the official chapter threads under the organization identity,
+  while person-to-person coordination threads stay read-only. Threads are
+  listed most-recent first.
 
 ---
 
@@ -261,12 +280,12 @@ were bypassed.
 | Component-aware compatibility and cooldowns (p.11) | `EligibilityEngine` uses 84 days for whole blood/packed RBC, 14 days for platelets, and 28 days for plasma. Plasma uses the reverse ABO rule; platelets use the red-cell baseline in this prototype. |
 | Read-only inventory visibility (SEIPS, p.11) | The donation history and public stock are read-only. Community users may place a time-limited hold, but dispatch, quarantine, cross-matching, expiry and final reservation release remain staff actions. |
 | Double-blind messaging and privacy (p.34) | The map and donor directory show only a stable `Donor #<id>` handle; messaging shows the nickname. Real names and contact details appear only after a bilateral reveal request is accepted. Selection requires a reciprocal human chat first. |
-| Reports, blocks and moderation (p.12/24) | Reports persist in the repository and appear in the staff queue. Blocking disables messaging in both directions and enforces a 48-hour re-block cooldown. |
+| Reports, blocks and moderation (p.12/24) | Reports persist in the repository with a required reason and optional free-text details, and appear in the staff queue with both. Blocking disables messaging in both directions and enforces a 48-hour re-block cooldown. |
 | Expiry-aware inventory (p.15) | `BloodUnit.effectiveStatus` marks expired stock even if its stored status is still `available`; expired units are excluded from usable stock, compatibility counts and expiring-soon lists. |
 | Donor eligibility: age 18–65, weight, availability, standing (p.17) | `EligibilityEngine` enforces the rules; registration computes exact age, rejects donors outside 18–65, and requires a self-reported weight. Donors below 50 kg or without a recorded weight are blocked from matching. |
 | Registration fields (p.22) | A three-step community-account wizard collects full name, unique nickname, email, contact number, birth date, blood type, weight and barangay. Everything is persisted; the nickname is the only public identity. Donor status is a separate opt-in upgrade in Donor Hub. |
 | Email credential authentication (p.28) | Salted SHA-256 credential store, session routing by role, and no self-service admin/staff registration. |
-| Request lifecycle and staff-only fulfilment | Donor-network: open → matched (after chat-first selection) → fulfilled (staff/admin only). Blood-bank: staff process the request and fulfil it directly. Cancellation is guarded; fulfilled/cancelled requests cannot be re-opened or fulfilled twice. |
+| Request lifecycle and staff-only fulfilment | Donor-network: open → matched (after chat-first selection) → fulfilled (staff/admin only). A donor already committed to one active request cannot be selected for another until it closes. Blood-bank: staff process the request and fulfil it directly. Cancellation is guarded; fulfilled/cancelled requests cannot be re-opened or fulfilled twice. |
 | Appointment with blood | `DonationAppointment` records patient name, blood type, component, hospital, ward, units and slot. Requesters book; staff confirm. A slot does not allocate a specific bag. |
 | Image attribution | Every bundled file has its own entry in `lib/core/image_credits.dart`, a visible caption under the image and a hover/detail credit with title, author, licence and source URL. |
 | SUS / SEIPS evaluation (external) | The app supplies the workflow and criteria; the SUS/SEIPS surveys are conducted externally and are not embedded. |
@@ -311,7 +330,8 @@ lib/
     ├── auth/                  # login, community registration
     ├── donor/                 # DonorShell + Home, Blood Bank, Map,
     │                          # Requests, Messages, Donor Hub
-    ├── admin/                 # AdminShell + Statistics, Inventory, Users, Moderation
+    ├── admin/                 # AdminShell + Overview, Operations (map/inventory),
+    │                          # Messages, Users, Moderation
     └── shared/                # Settings, Profile, Guides & Help / About
 ```
 
@@ -369,12 +389,15 @@ map stacks above the donor list; from 1024 px up the sidebar is the default
 navigation, expanded and pinnable, with hover-open still available after
 unpinning, and the classic side-by-side splits. On phones the bottom bar slides
 down out of the way while the page scrolls toward its end and returns on any
-scroll up or tab change. Settings adds a **slim navigation rails** switch: the
-bottom bar drops its labels and the side rail stays at icon width, ignoring
-hover and pin. `MaterialApp.builder` wraps the navigator in `SafeArea`, so
+scroll up or tab change; when the destinations do not fit, the bar scrolls
+horizontally instead of overflowing. Settings adds a **slim navigation rails**
+switch and a **keep the sidebar pinned open** switch: the first drops bottom-bar
+labels and keeps the side rail at icon width, the second survives restarts
+through the root app. `MaterialApp.builder` wraps the navigator in `SafeArea`, so
 status-bar and gesture insets are never painted
-over. The theme follows the **system** by default; light and dark stay explicit
-choices in Settings, and the map style follows whichever theme is active.
+over. **Light is the default theme**; dark is an explicit choice in Settings,
+the system theme option is gone, and the map style follows whichever theme is
+active.
 
 **Accounts can be created at the chapter desk.** Staff register walk-in donors
 and patient representatives from User management. Every field is a fixed choice
@@ -388,7 +411,7 @@ manage themselves, other staff, or admins. Only an admin can manage another
 staff member. Fulfilment checks the actor's role in the repository.
 
 **Analytics are computed.** `TabangRepository.summary()` derives every figure
-on the admin statistics page from the underlying records, so the readiness
+on the admin Overview page from the underlying records, so the readiness
 score, KPI cards and tables beneath them always agree.
 
 **Attribution matches the file.** `lib/core/image_credits.dart` is the single
@@ -545,7 +568,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**86 tests** cover:
+**110 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -564,14 +587,17 @@ flutter test
   requests rejecting donor responses, chat-first selection (one-sided chat is
   refused until both people send a message), selection authorization,
   selection-time eligibility rechecks, thread creation, leftover offers being
-  declined, staff-only fulfilment, and cancellation guards.
+  declined, cross-request donor fairness (a committed donor cannot be reserved
+  twice), staff-only fulfilment, and cancellation guards.
 - **Inventory holds and appointments** — a unit can be held once, a second
   person cannot claim it, only its holder can release it, appointments start
   pending, requesters cannot confirm their own slot, and staff confirmation
   works.
-- **Privacy and safety** — bilateral reveal accept/decline, persisted reports,
+- **Privacy and safety** — bilateral reveal accept/decline, persisted reports
+  with a trimmed free-text explanation, per-participant unread/read markers,
   symmetric blocking, and the 48-hour re-block cooldown.
-- **Donation recording** — component capture and component-specific cooldown.
+- **Donation recording** — component capture, component-specific cooldown, and
+  a staff donation-window correction that does not increment the donation count.
 - **Automatic away availability** — a donor inactive for 30+ days is blocked
   with the `away` reason and never reaches the directory; `markActive` clears
   it, and the seed keeps exactly 15 eligible donors alongside the two
@@ -605,18 +631,23 @@ flutter test
   control stack, and selects a barangay on tap. The Donor Hub additionally
   renders the automatic-away notice and clears it through the **I'm active**
   action, the staff Operations map renders its request layer and switches to
-  the donor-density heatmap from the legend, and Inventory
-  exposes Add unit plus the appointment queue.
+  the donor-density heatmap from the legend, the Operations workspace moves
+  between its Map and Inventory views and collapses its inner sidebar, staff
+  chat starts a new conversation from search, a user record opens its
+  staff-only details and donation-window editor, the readiness score states its
+  100% maximum, and the avatar picker keeps the staff and community sets apart.
+  Inventory exposes Add unit plus the appointment queue.
 - **Narrow-screen layout** — Home, Blood Bank (including unit selection and
-  the appointment dialog) and Statistics render at a 360 × 780 phone viewport
+  the appointment dialog) and Overview render at a 360 × 780 phone viewport
   without overflow; the unit list reflows to one column and the appointment
   dialog stacks its fields.
-- **Sidebar** — unpinning the desktop rail collapses it to the icon-only
-  layout, each rail item's icon stays dead-centre in its pill (the regression
-  that left the selection accent bar pushing icons off-centre), and the compact
-  pin control remains under the logo so an unpinned donor or admin rail can be
-  pinned open again. The map style also follows the active theme, and the
-  rebased pins stay on their OSM buildings under the nudged raster.
+- **Sidebar** — the Settings pin collapses or reopens the desktop rail, each
+  rail item's icon stays dead-centre in its pill (the regression that left the
+  selection accent bar pushing icons off-centre), and the compact pin control
+  remains under the logo so an unpinned donor or admin rail can be pinned open
+  again. The map style also follows the active theme, and the rebased pins stay
+  on their OSM buildings under the nudged raster. Unread badges clear live when
+  a conversation is read, and the phone bar scrolls instead of overflowing.
 - **Barangay canonicalisation** — parenthetical stripping, case/punctuation
   normalisation, and round-tripping all 26 names.
 - **Map topology** — all 75 shared arcs stitch 26 complete barangay rings and

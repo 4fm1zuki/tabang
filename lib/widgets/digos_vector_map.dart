@@ -968,9 +968,14 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     final base = requestCounts != null
         ? digosRequestColor(count, dark: dark)
         : digosHeatColor(count, dark: dark);
+    // Hover is a deliberate preview of a possible selection, not a faint
+    // tint. The ring and wash make the barangay under the pointer obvious
+    // even over the darkest part of the heat ramp.
     final fill = hovered
         ? Color.alphaBlend(
-            (dark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+            (dark ? Colors.white : Colors.black).withValues(
+              alpha: dark ? 0.22 : 0.14,
+            ),
             base,
           )
         : base;
@@ -983,9 +988,14 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       color: fill.withValues(
         alpha: requestCounts != null
             ? (count == 0 ? 0.10 : digosHeatOpacity(count) + 0.08)
-            : digosHeatOpacity(count),
+            : digosHeatOpacity(count) + (hovered ? 0.10 : 0),
       ),
-      borderStrokeWidth: 0,
+      borderColor: hovered
+          ? (dark
+                ? Colors.white.withValues(alpha: 0.9)
+                : TabangColors.crimsonDark)
+          : Colors.transparent,
+      borderStrokeWidth: hovered ? 2 : 0,
     );
   }
 

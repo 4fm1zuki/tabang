@@ -1045,11 +1045,18 @@ class _RequestsPageState extends State<RequestsPage> {
           request.bloodType,
           request.component,
         );
+    // A donor selected by another requester stays listed so the requester can
+    // see what happened, but cannot be reserved twice from this queue.
+    final commitment = _repo.commitmentForDonor(
+      response.donorId,
+      excludingRequestId: request.id,
+    );
     final canSelect =
         response.status == ResponseStatus.pending &&
         request.status == RequestStatus.open &&
         stillCompatible &&
-        (eligibility?.isEligible ?? false);
+        (eligibility?.isEligible ?? false) &&
+        commitment == null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: TabangSpace.sm),
@@ -1122,7 +1129,10 @@ class _RequestsPageState extends State<RequestsPage> {
                 ],
                 const SizedBox(height: 2),
                 Text(
-                  eligibility == null
+                  commitment != null
+                      ? 'Coordinating request ${commitment.requestId} · still '
+                            'visible, but cannot be selected twice'
+                      : eligibility == null
                       ? 'Donor record unavailable'
                       : eligibility.isEligible
                       ? 'Eligible now · responded '
@@ -1131,10 +1141,11 @@ class _RequestsPageState extends State<RequestsPage> {
                             '${formatRelative(response.createdAt)}',
                   style: TextStyle(
                     fontSize: 10.5,
-                    color:
-                        eligibility != null &&
-                            !eligibility.isEligible &&
-                            eligibility.blocker == EligibilityBlocker.cooldown
+                    color: commitment != null
+                        ? TabangColors.info
+                        : eligibility != null &&
+                              !eligibility.isEligible &&
+                              eligibility.blocker == EligibilityBlocker.cooldown
                         ? TabangColors.warning
                         : context.textMuted,
                   ),
@@ -1147,9 +1158,11 @@ class _RequestsPageState extends State<RequestsPage> {
             const StatusPill('Selected', tone: Tone.success, dense: true)
           else if (response.status == ResponseStatus.declined)
             const StatusPill('Declined', tone: Tone.neutral, dense: true)
+          else if (commitment != null)
+            const StatusPill('Coordinating', tone: Tone.info, dense: true)
           else if (canSelect)
             TextButton(
-              onPressed: () => _selectResponse(context, response),
+              onPressed: () => _selectResponse(context, request, response),
               child: const Text('Select donor'),
             ),
         ],
@@ -1288,7 +1301,40 @@ class _RequestsPageState extends State<RequestsPage> {
     );
   }
 
-  void _selectResponse(BuildContext context, RequestResponse response) {
+  void _selectResponse(
+    BuildContext context,
+    BloodRequest request,
+    RequestResponse response,
+  ) {
+    final donor = _repo.userById(response.donorId);
+    final commitment = _repo.commitmentForDonor(
+      response.donorId,
+      excludingRequestId: request.id,
+    );
+    if (commitment != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${donor?.mapHandle ?? 'This donor'} is already coordinating '
+            'request ${commitment.requestId}. They stay visible here, but '
+            'cannot be reserved for a second active request.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (donor != null && !_repo.hasReciprocalChat(_user.id, donor.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Message ${donor.mapHandle} first. Both of you need to exchange at '
+            'least one message before a donor can be selected.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final thread = _repo.selectResponse(
       responseId: response.id,
       selectedById: _user.id,
