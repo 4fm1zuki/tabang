@@ -56,7 +56,6 @@ class _SettingsPageState extends State<SettingsPage> {
   /// [didUpdateWidget] keeps the page in sync when the shell does rebuild it.
   late ThemeMode _themeMode = widget.themeMode;
   late bool _compactNav = widget.compactNav;
-  late bool _railPinned = widget.railPinned;
 
   @override
   void initState() {
@@ -70,9 +69,6 @@ class _SettingsPageState extends State<SettingsPage> {
     if (oldWidget.themeMode != widget.themeMode) _themeMode = widget.themeMode;
     if (oldWidget.compactNav != widget.compactNav) {
       _compactNav = widget.compactNav;
-    }
-    if (oldWidget.railPinned != widget.railPinned) {
-      _railPinned = widget.railPinned;
     }
   }
 
@@ -136,38 +132,23 @@ class _SettingsPageState extends State<SettingsPage> {
                 'Always use the dark theme',
               ),
               const SizedBox(height: TabangSpace.md),
+              // The sidebar pin lives in the rail header; this switch only
+              // decides how the rail looks. Turning slim rails on also unpins
+              // the sidebar, so the two controls can never contradict each
+              // other, and pinning the sidebar turns slim rails back off.
               _switchRow(
                 context,
                 'Slim navigation rails',
                 'Hide the names under icons on the bottom bar, and keep the '
-                    'side rail at icon width',
+                    'side rail at icon width. Pin the sidebar open with the '
+                    'pin in its header.',
                 _compactNav,
                 (value) {
                   setState(() => _compactNav = value);
                   widget.onCompactNavChanged?.call(value);
+                  if (value) widget.onRailPinnedChanged?.call(false);
                 },
               ),
-              // The pin only controls the desktop side rail, so it is hidden
-              // where there is no rail. While slim rails are on, the rail is
-              // icon-width by definition; the switch explains that instead of
-              // silently doing nothing.
-              if (MediaQuery.sizeOf(context).width >=
-                  TabangBreakpoints.navigationRail)
-                _switchRow(
-                  context,
-                  'Keep the sidebar pinned open',
-                  _compactNav
-                      ? 'Turn off slim navigation rails to pin the sidebar open'
-                      : 'Desktop sidebars stay expanded. When off, they open on '
-                            'hover and collapse when the pointer leaves.',
-                  _railPinned,
-                  _compactNav
-                      ? null
-                      : (value) {
-                          setState(() => _railPinned = value);
-                          widget.onRailPinnedChanged?.call(value);
-                        },
-                ),
             ],
           ),
           const SizedBox(height: TabangSpace.lg),

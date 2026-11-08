@@ -325,30 +325,49 @@ void main() {
       );
     }
 
-    // Slim rails are off in this host; the pin switch is enabled.
+    // The rail pin lives in the sidebar; Settings only carries the slim
+    // switch, so there is no disabled control to click on.
     expect(switchFor('Slim navigation rails').value, isFalse);
-    expect(switchFor('Keep the sidebar pinned open').value, isTrue);
+    expect(find.text('Keep the sidebar pinned open'), findsNothing);
+    expect(find.text('slim=off pin=on'), findsOneWidget);
 
     await tester.tap(find.text('Slim navigation rails'));
     await tester.pumpAndSettle();
     expect(switchFor('Slim navigation rails').value, isTrue);
-
-    // While slim rails are on the pin switch is disabled and explains why.
-    final pinWhileSlim = switchFor('Keep the sidebar pinned open');
-    expect(pinWhileSlim.value, isTrue);
-    expect(pinWhileSlim.onChanged, isNull);
-    expect(
-      find.textContaining('Turn off slim navigation rails'),
-      findsOneWidget,
-    );
+    // Enabling slim rails unpins the sidebar so the two controls agree.
+    expect(find.text('slim=on pin=off'), findsOneWidget);
 
     await tester.tap(find.text('Slim navigation rails'));
     await tester.pumpAndSettle();
     expect(switchFor('Slim navigation rails').value, isFalse);
+    // The rail stays unpinned until the sidebar pin is used.
+    expect(find.text('slim=off pin=off'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
-    await tester.tap(find.text('Keep the sidebar pinned open'));
+  testWidgets('sidebar pin reopens the rail from slim mode', (tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: _ShellHost(user: repo.userById('USR-001')!),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(switchFor('Keep the sidebar pinned open').value, isFalse);
+
+    // Slim rails on, sidebar unpinned: icon-only rail, pin still reachable.
+    expect(find.byTooltip('Pin sidebar'), findsOneWidget);
+    expect(find.text('Digos City'), findsNothing);
+
+    await tester.tap(find.byTooltip('Pin sidebar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    // Pinning exits slim, so the rail slides open with its labels.
+    expect(find.text('Digos City'), findsOneWidget);
+    expect(find.byTooltip('Unpin sidebar'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
@@ -371,7 +390,46 @@ class _SettingsHostState extends State<_SettingsHost> {
 
   @override
   Widget build(BuildContext context) {
-    return SettingsPage(
+    return Column(
+      children: [
+        Text(
+          'slim=${compactNav ? 'on' : 'off'} pin=${railPinned ? 'on' : 'off'}',
+        ),
+        Expanded(
+          child: SettingsPage(
+            user: widget.user,
+            themeMode: theme,
+            onThemeModeChanged: (value) => setState(() => theme = value),
+            compactNav: compactNav,
+            onCompactNavChanged: (value) => setState(() => compactNav = value),
+            railPinned: railPinned,
+            onRailPinnedChanged: (value) => setState(() => railPinned = value),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Root-like owner for a real shell, so the sidebar pin can be exercised the
+/// way the app wires it: compactNav and railPinned shared with one owner.
+class _ShellHost extends StatefulWidget {
+  const _ShellHost({required this.user});
+
+  final AppUser user;
+
+  @override
+  State<_ShellHost> createState() => _ShellHostState();
+}
+
+class _ShellHostState extends State<_ShellHost> {
+  ThemeMode theme = ThemeMode.light;
+  bool compactNav = true;
+  bool railPinned = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return DonorShell(
       user: widget.user,
       themeMode: theme,
       onThemeModeChanged: (value) => setState(() => theme = value),

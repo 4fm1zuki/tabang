@@ -34,7 +34,8 @@ class AdminShell extends StatefulWidget {
   final ValueChanged<ThemeMode> onThemeModeChanged;
 
   /// Slim rails: labels hidden on the phone bottom bar, and the side rail
-  /// stays at icon width instead of expanding on hover or pin.
+  /// stays at icon width. The sidebar pin exits slim rails and reopens the
+  /// full labelled rail, so the pin always works.
   final bool compactNav;
   final ValueChanged<bool>? onCompactNavChanged;
 
@@ -124,6 +125,11 @@ class _AdminShellState extends State<AdminShell> {
       if (oldWidget.railPinned != widget.railPinned) {
         _pinned = widget.railPinned;
       }
+      // Slim rails force the icon-only rail, so an unpinned state is the only
+      // one that can be true while they are on.
+      if (oldWidget.compactNav != widget.compactNav && widget.compactNav) {
+        _pinned = false;
+      }
       if ((oldWidget.themeMode != widget.themeMode ||
               oldWidget.compactNav != widget.compactNav ||
               oldWidget.railPinned != widget.railPinned) &&
@@ -211,7 +217,8 @@ class _AdminShellState extends State<AdminShell> {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < TabangBreakpoints.navigationRail;
     final wide = !compact;
-    // Slim rails keep the rail collapsed and ignore hover and pin.
+    // Slim rails keep the rail collapsed and ignore hover; the rail pin exits
+    // slim instead of being hidden.
     final slim = widget.compactNav;
     final railExpanded = wide && !slim && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
@@ -344,7 +351,7 @@ class _AdminShellState extends State<AdminShell> {
                 selectedIndex: _index,
                 railExpanded: railExpanded,
                 expanded: showLabels,
-                showPinControl: !slim,
+                showPinControl: wide,
                 pinned: _pinned,
                 onSlideEnd: () {
                   if (!mounted) return;
@@ -354,15 +361,24 @@ class _AdminShellState extends State<AdminShell> {
                 },
                 onSelect: _select,
                 onTogglePin: () {
+                  final wasSlim = widget.compactNav;
                   setState(() {
                     // Only drop the labels when the width actually animates;
                     // otherwise onSlideEnd never fires and they stay hidden.
-                    final wasExpanded = wide && (_pinned || _hovering);
+                    final wasExpanded =
+                        wide && !wasSlim && (_pinned || _hovering);
                     _pinned = !_pinned;
-                    final willExpand = wide && (_pinned || _hovering);
+                    final willExpand =
+                        wide && !wasSlim && (_pinned || _hovering);
                     _railSettled = willExpand == wasExpanded;
                   });
                   widget.onRailPinnedChanged?.call(_pinned);
+                  // Pinning while slim rails are on exits slim, which is what
+                  // makes the pin visibly reopen the full sidebar.
+                  if (_pinned && wasSlim) {
+                    widget.onCompactNavChanged?.call(false);
+                    setState(() => _railSettled = false);
+                  }
                 },
               ),
             ),
@@ -586,7 +602,8 @@ class _AdminSidebar extends StatelessWidget {
   /// Labels are laid out only once the slide has finished.
   final bool expanded;
 
-  /// Slim rails hide the pin: the setting, not hover, controls the width.
+  /// Pin control for the wide rail. Pressing it exits slim rails, so the
+  /// full labelled rail can always be reopened from the collapsed state.
   final bool showPinControl;
   final bool pinned;
   final VoidCallback onSlideEnd;

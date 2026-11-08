@@ -208,10 +208,10 @@ were bypassed.
   the others. The page also carries blood-card verification state, blood type,
   weight, last donation component and notification preferences. Availability is
   set once, in Settings and Donor Hub, rather than repeated here.
-- **Settings** — appearance (light is the default, dark is explicit), a
-  **keep the sidebar pinned open** switch, slim navigation rails, donor
-  availability, privacy/data and account sections, each with a contextual `?`
-  help tip.
+- **Settings** — appearance (light is the default, dark is explicit), slim
+  navigation rails, donor availability, privacy/data and account sections, each
+  with a contextual `?` help tip. The sidebar itself is pinned or unpinned from
+  the pin control in the rail header, not from Settings.
 - **Guides & Help** — a separate destination with task guides (donating,
   requesting, messaging, Home, profile/donor registration and settings),
   a **left-aligned FAQ** (each question is a bubble above its answer, both
@@ -403,11 +403,12 @@ down out of the way while the page scrolls toward its end and returns on any
 scroll up or tab change, and it pins itself at the top or the bottom of the page
 so navigation is never stranded at the end of a list; when the destinations do
 not fit, the bar scrolls horizontally instead of overflowing. Settings adds a
-**slim navigation rails** switch and a **keep the sidebar pinned open** switch:
-slim rails are **on by default** (they drop bottom-bar labels and keep the side
-rail at icon width), and the pin switch is only shown on wide windows, where it
-is disabled with an explanation while slim rails are on. Both switches mirror
-their value locally so they respond even when Settings is a pushed phone route.
+**slim navigation rails** switch, **off by default** (turning it on drops
+bottom-bar labels and keeps the side rail at icon width). The desktop rail is
+controlled by the **pin in its header**: pinning reopens the full labelled rail
+and leaves slim mode, while turning slim mode on unpins the sidebar, so the two
+never contradict each other. The Settings switch mirrors its value locally so it
+responds even when Settings is a pushed phone route.
 `MaterialApp.builder` wraps the navigator in `SafeArea`, so
 status-bar and gesture insets are never painted
 over. **Light is the default theme**; dark is an explicit choice in Settings,
@@ -596,7 +597,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**119 tests** cover:
+**120 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -670,8 +671,9 @@ flutter test
   100% maximum with per-bar targets and a **Details** dialog, the Overview lists
   recent transfusions and account changes with a working filter, the avatar
   picker keeps the staff and community sets apart, the chapter mark ships the
-  bundled Red Cross emblem, and Settings switches mirror
-  their values immediately (the pin switch disables itself under slim rails).
+  bundled Red Cross emblem, Settings switches mirror their values immediately
+  (enabling slim rails unpins the sidebar), and the sidebar pin reopens the
+  full rail from slim mode.
   Inventory exposes Add unit plus the appointment queue, and the phone bottom
   bar pins itself at the end of a scroll instead of staying hidden.
 - **Narrow-screen layout** — Home, Blood Bank (including unit selection and

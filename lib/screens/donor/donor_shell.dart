@@ -45,7 +45,8 @@ class DonorShell extends StatefulWidget {
   final ValueChanged<ThemeMode> onThemeModeChanged;
 
   /// Slim rails: labels hidden on the phone bottom bar, and the side rail
-  /// stays at icon width instead of expanding on hover or pin.
+  /// stays at icon width. The sidebar pin exits slim rails and reopens the
+  /// full labelled rail, so the pin always works.
   final bool compactNav;
   final ValueChanged<bool>? onCompactNavChanged;
 
@@ -134,6 +135,11 @@ class _DonorShellState extends State<DonorShell> {
         oldWidget.railPinned != widget.railPinned) {
       if (oldWidget.railPinned != widget.railPinned) {
         _pinned = widget.railPinned;
+      }
+      // Slim rails force the icon-only rail, so an unpinned state is the only
+      // one that can be true while they are on.
+      if (oldWidget.compactNav != widget.compactNav && widget.compactNav) {
+        _pinned = false;
       }
       if (_pages.containsKey(7)) _pages[7] = _buildPage(7);
     }
@@ -272,7 +278,7 @@ class _DonorShellState extends State<DonorShell> {
     final wide = !compact;
     // `railExpanded` is the width target; `showLabels` waits for the slide to
     // finish before labels are built. Slim rails keep the rail collapsed and
-    // ignore hover and pin.
+    // ignore hover; the pin exits slim instead of being hidden.
     final slim = widget.compactNav;
     final railExpanded = wide && !slim && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
@@ -410,7 +416,7 @@ class _DonorShellState extends State<DonorShell> {
                   railExpanded: railExpanded,
                   expanded: showLabels,
                   wide: wide,
-                  showPinControl: !slim,
+                  showPinControl: wide,
                   pinned: _pinned,
                   onSlideEnd: () {
                     if (!mounted) return;
@@ -420,17 +426,26 @@ class _DonorShellState extends State<DonorShell> {
                   },
                   onSelect: _select,
                   onTogglePin: () {
+                    final wasSlim = widget.compactNav;
                     setState(() {
                       // If pinning does not change the rail's width (for
                       // example while it is already open because of hover),
                       // no slide animation runs and onSlideEnd never fires —
                       // so the labels must not be hidden in that case.
-                      final wasExpanded = wide && (_pinned || _hovering);
+                      final wasExpanded =
+                          wide && !wasSlim && (_pinned || _hovering);
                       _pinned = !_pinned;
-                      final willExpand = wide && (_pinned || _hovering);
+                      final willExpand =
+                          wide && !wasSlim && (_pinned || _hovering);
                       _railSettled = willExpand == wasExpanded;
                     });
                     widget.onRailPinnedChanged?.call(_pinned);
+                    // Pinning while slim rails are on exits slim, which is
+                    // what makes the pin visibly reopen the full sidebar.
+                    if (_pinned && wasSlim) {
+                      widget.onCompactNavChanged?.call(false);
+                      setState(() => _railSettled = false);
+                    }
                   },
                   onToggleExpand: null,
                 ),
@@ -629,7 +644,8 @@ class _Sidebar extends StatelessWidget {
   final bool expanded;
   final bool wide;
 
-  /// Slim rails hide the pin: the setting, not hover, controls the width.
+  /// Pin control for the wide rail. Pressing it exits slim rails, so the
+  /// full labelled rail can always be reopened from the collapsed state.
   final bool showPinControl;
   final bool pinned;
   final VoidCallback onSlideEnd;
