@@ -209,6 +209,7 @@ enum UserRole {
       'Everything Clinical Personnel can do',
       'Create and manage all accounts, including staff',
       'Issue warnings, suspend and reinstate',
+      'Set the chapter readiness targets',
       'Full audit of inventory, requests and moderation',
     ],
     UserRole.staff => const [
@@ -1030,6 +1031,73 @@ class AnalyticsSummary {
   final int openRequests;
 }
 
+/// Admin-editable planning targets behind the readiness score.
+///
+/// The score itself is never typed in by hand: it is computed live from the
+/// chapter's units, donors, requests and accounts. Admins set the denominators
+/// (what "full marks" means for this chapter) so the score reflects local
+/// capacity instead of a fixed number chosen by the developer.
+class ReadinessTargets {
+  const ReadinessTargets({
+    this.unitTarget = 32,
+    this.donorTarget = 20,
+    this.requestPressureCap = 16,
+    this.communityTarget = 60,
+  });
+
+  /// Usable units on the shelf that count as full supply coverage.
+  final int unitTarget;
+
+  /// Eligible, available donors that count as full donor capacity.
+  final int donorTarget;
+
+  /// Open requests at which the request-pressure bar scores zero.
+  final int requestPressureCap;
+
+  /// Registered accounts that count as full community reach.
+  final int communityTarget;
+
+  static const ReadinessTargets defaults = ReadinessTargets();
+
+  /// Every target must be a positive whole number; a zero denominator would
+  /// divide by zero or make the bar meaningless.
+  bool get isValid =>
+      unitTarget > 0 &&
+      donorTarget > 0 &&
+      requestPressureCap > 0 &&
+      communityTarget > 0;
+
+  ReadinessTargets copyWith({
+    int? unitTarget,
+    int? donorTarget,
+    int? requestPressureCap,
+    int? communityTarget,
+  }) {
+    return ReadinessTargets(
+      unitTarget: unitTarget ?? this.unitTarget,
+      donorTarget: donorTarget ?? this.donorTarget,
+      requestPressureCap: requestPressureCap ?? this.requestPressureCap,
+      communityTarget: communityTarget ?? this.communityTarget,
+    );
+  }
+
+  String describe() =>
+      '$unitTarget units · $donorTarget donors · '
+      '$requestPressureCap request cap · $communityTarget accounts';
+
+  @override
+  bool operator ==(Object other) =>
+      other is ReadinessTargets &&
+      other.unitTarget == unitTarget &&
+      other.donorTarget == donorTarget &&
+      other.requestPressureCap == requestPressureCap &&
+      other.communityTarget == communityTarget;
+
+  @override
+  int get hashCode =>
+      Object.hash(unitTarget, donorTarget, requestPressureCap, communityTarget);
+}
+
 /// What a chapter activity entry records.
 ///
 /// Staff use this feed to answer two operational questions after the fact:
@@ -1049,6 +1117,7 @@ enum ActivityKind {
   requestVerified,
   requestRejected,
   inventory,
+  readinessTargets,
 }
 
 /// One entry in the chapter activity log, newest first.

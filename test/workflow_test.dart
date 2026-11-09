@@ -702,6 +702,55 @@ void main() {
     });
   });
 
+  group('Readiness targets', () {
+    test('only an admin can change the score targets', () {
+      const targets = ReadinessTargets(
+        unitTarget: 40,
+        donorTarget: 24,
+        requestPressureCap: 12,
+        communityTarget: 75,
+      );
+
+      // Staff can read the targets but not change them.
+      expect(repo.setReadinessTargets(targets, actorId: 'USR-010'), isFalse);
+      expect(repo.readinessTargets, ReadinessTargets.defaults);
+
+      expect(repo.setReadinessTargets(targets, actorId: 'USR-011'), isTrue);
+      expect(repo.readinessTargets, targets);
+      expect(
+        repo.activityLog.any(
+          (event) => event.kind == ActivityKind.readinessTargets,
+        ),
+        isTrue,
+      );
+    });
+
+    test('invalid targets are refused', () {
+      const invalid = ReadinessTargets(
+        unitTarget: 0,
+        donorTarget: 20,
+        requestPressureCap: 0,
+        communityTarget: -5,
+      );
+      expect(repo.setReadinessTargets(invalid, actorId: 'USR-011'), isFalse);
+      expect(repo.readinessTargets, ReadinessTargets.defaults);
+    });
+
+    test('an admin can restore the shipped defaults', () {
+      expect(
+        repo.setReadinessTargets(
+          const ReadinessTargets(unitTarget: 10),
+          actorId: 'USR-011',
+        ),
+        isTrue,
+      );
+      expect(repo.readinessTargets.unitTarget, 10);
+      expect(repo.resetReadinessTargets(actorId: 'USR-010'), isFalse);
+      expect(repo.resetReadinessTargets(actorId: 'USR-011'), isTrue);
+      expect(repo.readinessTargets, ReadinessTargets.defaults);
+    });
+  });
+
   group('Donor request authoring and anonymity', () {
     test('a donor can post a request that other donors can serve', () {
       final created = repo.addRequest(

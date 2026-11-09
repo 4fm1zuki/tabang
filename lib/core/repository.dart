@@ -131,6 +131,10 @@ class TabangRepository {
   final List<DonationAppointment> _appointments = [];
   final List<DonorApplication> _donorApplications = [];
 
+  /// Admin-editable denominators for the readiness score. The score itself is
+  /// always computed from live data; only these planning targets are settable.
+  ReadinessTargets _readinessTargets = ReadinessTargets.defaults;
+
   /// `<driveId>|<userId>` keys for donors who told the chapter they are
   /// attending a drive.
   final Set<String> _driveInterests = {};
@@ -1900,6 +1904,55 @@ class TabangRepository {
 
   // ------------------------------------------------------------ analytics
 
+  /// Planning targets behind the readiness score, as set by an admin.
+  ReadinessTargets get readinessTargets => _readinessTargets;
+
+  /// Replaces the readiness targets. Only an admin may change them, every
+  /// value must be positive, and the change is written to the activity log so
+  /// the rest of the chapter can see why the score moved.
+  bool setReadinessTargets(
+    ReadinessTargets targets, {
+    required String actorId,
+  }) {
+    final actor = userById(actorId);
+    if (actor == null || actor.role != UserRole.admin) return false;
+    if (!targets.isValid) return false;
+    final previous = _readinessTargets;
+    if (previous.unitTarget == targets.unitTarget &&
+        previous.donorTarget == targets.donorTarget &&
+        previous.requestPressureCap == targets.requestPressureCap &&
+        previous.communityTarget == targets.communityTarget) {
+      return true;
+    }
+    _readinessTargets = targets;
+    _logActivity(
+      kind: ActivityKind.readinessTargets,
+      actorId: actorId,
+      summary:
+          'Updated readiness targets: ${targets.describe()} '
+          '(was ${previous.describe()})',
+    );
+    _notify();
+    return true;
+  }
+
+  /// Restores the shipped planning targets. Admin only, same as setting them.
+  bool resetReadinessTargets({required String actorId}) {
+    final actor = userById(actorId);
+    if (actor == null || actor.role != UserRole.admin) return false;
+    if (_readinessTargets == ReadinessTargets.defaults) return true;
+    _readinessTargets = ReadinessTargets.defaults;
+    _logActivity(
+      kind: ActivityKind.readinessTargets,
+      actorId: actorId,
+      summary:
+          'Reset readiness targets to the chapter defaults: '
+          '${ReadinessTargets.defaults.describe()}',
+    );
+    _notify();
+    return true;
+  }
+
   /// Computed from the live seed data rather than hardcoded literals, so the
   /// numbers on the admin overview always agree with the tables below them.
   AnalyticsSummary summary({DateTime? now}) {
@@ -2026,6 +2079,7 @@ class TabangRepository {
     // drive interest survive into the next test.
     _donorApplications.clear();
     _driveInterests.clear();
+    _readinessTargets = ReadinessTargets.defaults;
     currentUser = null;
     _seed();
     _notify();

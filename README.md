@@ -244,6 +244,12 @@ were bypassed.
   active donors change. Every bar names its actual count against a stated
   planning target (`10 of 32 units`), the KPI cards repeat those targets, and a
   **Details** button opens the weights, targets and method behind the total.
+  A **Set targets** button (admin only) edits the four planning denominators —
+  supply units, eligible donors, request-pressure cap and registered accounts —
+  with validation, a **Use defaults** action that restores the shipped values
+  for review before saving, and an audit-log entry for every change. The score
+  itself is never entered by hand: it keeps recalculating
+  from live chapter data, so the number cannot be flattered.
   Primary KPI cards with progress bars, supply/community detail and supporting
   exceptions all read the same repository snapshot, and an explicit **Roles &
   permissions** card spells out what Clinical Personnel and System
@@ -454,7 +460,9 @@ on the admin Overview page from the underlying records, so the readiness
 score, KPI cards and tables beneath them always agree. Every readiness bar
 shows the actual count against a stated chapter planning target (for example
 `10 of 32 units`), not a bare percentage, and the **Details** button opens the
-weights and targets behind the total out of 100%.
+weights and targets behind the total out of 100%. Only an admin can change
+those targets, through **Set targets**; staff can read them but not edit them,
+and each change is written to the activity log.
 
 **Staff can review what changed.** `TabangRepository.activityLog` records every
 recorded transfusion, donation-window correction, verification, warning,
@@ -620,7 +628,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**126 tests** cover:
+**130 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -658,6 +666,10 @@ flutter test
 - **Warnings and drives** — warnings cap at three, a third warning suspends,
   suspended accounts cannot be warned again, reinstatement resets the count,
   and only donor accounts can join a drive list.
+- **Readiness targets** — only an admin can change the four planning
+  denominators, invalid values (zero or negative) are refused, staff attempts
+  are rejected, an admin can restore the shipped defaults, and every change is
+  written to the activity log.
 - **Chapter activity log** — the seeded feed covers transfusions and account
   changes; recorded donations, donation-window corrections and profile/avatar
   changes each append an entry, per-user filtering returns only that account's
@@ -699,7 +711,9 @@ flutter test
   between its Map and Inventory views and collapses its inner sidebar, staff
   chat starts a new conversation from search, a user record opens its
   staff-only details and donation-window editor, the readiness score states its
-  100% maximum with per-bar targets and a **Details** dialog, the Overview lists
+  100% maximum with per-bar targets and a **Details** dialog, an admin can open
+  **Set targets**, change all four denominators, and see the score and KPI
+  footnotes recalculate, the Overview lists
   recent transfusions and account changes with a working filter, the avatar
   picker keeps the staff and community sets apart, the chapter mark ships the
   bundled Red Cross emblem, Settings switches mirror their values immediately

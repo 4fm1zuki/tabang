@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/core/image_credits.dart';
+import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
 import 'package:tabang/screens/admin/admin_overview.dart';
 import 'package:tabang/screens/admin/inventory_management.dart';
@@ -650,9 +651,61 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('How the readiness score works'), findsOneWidget);
-    expect(find.textContaining('internal planning target'), findsOneWidget);
+    expect(
+      find.textContaining('planning target set by this chapter'),
+      findsOneWidget,
+    );
     expect(find.textContaining('30% of score'), findsOneWidget);
     expect(find.textContaining('Target: 0 open requests'), findsOneWidget);
+    // The viewer here has no admin account, so targets stay read-only.
+    expect(find.text('Set targets'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('only an admin can set the readiness targets', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final admin = repo.userById('USR-011')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: AdminOverviewPage(user: admin)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Set targets'));
+    await tester.pumpAndSettle();
+    expect(find.text('Set readiness targets'), findsOneWidget);
+
+    final fields = find.byType(TextFormField);
+    expect(fields, findsNWidgets(4));
+
+    // The dialog edits denominators, not the score itself.
+    await tester.enterText(fields.at(0), '40');
+    await tester.enterText(fields.at(1), '25');
+    await tester.enterText(fields.at(2), '10');
+    await tester.enterText(fields.at(3), '80');
+    await tester.tap(find.text('Save targets'));
+    await tester.pumpAndSettle();
+
+    expect(repo.readinessTargets.unitTarget, 40);
+    expect(repo.readinessTargets.donorTarget, 25);
+    expect(repo.readinessTargets.requestPressureCap, 10);
+    expect(repo.readinessTargets.communityTarget, 80);
+    expect(find.textContaining('of 40 units'), findsWidgets);
+    expect(find.textContaining('of 25 donors'), findsWidgets);
+    expect(find.textContaining('of 80 target'), findsWidgets);
+    expect(
+      repo.activityLog.any(
+        (event) =>
+            event.kind == ActivityKind.readinessTargets &&
+            event.summary.contains('Updated readiness targets'),
+      ),
+      isTrue,
+    );
     expect(tester.takeException(), isNull);
   });
 

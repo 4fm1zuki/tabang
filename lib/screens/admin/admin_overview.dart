@@ -184,6 +184,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     final score = _ReadinessScore.compute(
       summary: summary,
       expiringCount: expiring.length,
+      targets: _repo.readinessTargets,
     );
 
     return SingleChildScrollView(
@@ -467,26 +468,28 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                     ),
                     const SizedBox(height: 4),
                     // The old paragraph said "out of 100%" but never explained
-                    // what each bar measured. The button opens the targets and
-                    // weights instead of hiding them in prose.
-                    OutlinedButton.icon(
-                      onPressed: () => _showScoreDetails(context, score),
-                      icon: const Icon(Icons.info_outline, size: 15),
-                      label: const Text('Details'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.45),
+                    // what each bar measured. The buttons open the targets and
+                    // weights instead of hiding them in prose; an admin can
+                    // also set the targets the score is measured against.
+                    Wrap(
+                      spacing: TabangSpace.sm,
+                      runSpacing: TabangSpace.xs,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _showScoreDetails(context, score),
+                          icon: const Icon(Icons.info_outline, size: 15),
+                          label: const Text('Details'),
+                          style: _heroButtonStyle,
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: TabangSpace.md,
-                          vertical: 6,
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                        if (widget.user?.role == UserRole.admin)
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _showTargetsDialog(context, score.targets),
+                            icon: const Icon(Icons.tune, size: 15),
+                            label: const Text('Set targets'),
+                            style: _heroButtonStyle,
+                          ),
+                      ],
                     ),
                     const SizedBox(height: TabangSpace.lg),
                     for (final item in score.components)
@@ -593,6 +596,182 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     return 'Supply is constrained';
   }
 
+  ButtonStyle get _heroButtonStyle => OutlinedButton.styleFrom(
+    foregroundColor: Colors.white,
+    side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+    padding: const EdgeInsets.symmetric(
+      horizontal: TabangSpace.md,
+      vertical: 6,
+    ),
+    textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+  );
+
+  /// Admins set the denominators; they do not type in a score.
+  ///
+  /// Letting someone enter "95%" by hand would make the dashboard useless as
+  /// an operations signal. The dialog therefore edits only the planning
+  /// targets, and the score keeps recalculating from live units, donors,
+  /// requests and accounts.
+  void _showTargetsDialog(BuildContext context, ReadinessTargets current) {
+    final formKey = GlobalKey<FormState>();
+    final unitController = TextEditingController(text: '${current.unitTarget}');
+    final donorController = TextEditingController(
+      text: '${current.donorTarget}',
+    );
+    final pressureController = TextEditingController(
+      text: '${current.requestPressureCap}',
+    );
+    final communityController = TextEditingController(
+      text: '${current.communityTarget}',
+    );
+
+    String? validate(String? raw, int max, String label) {
+      final value = int.tryParse((raw ?? '').trim());
+      if (value == null || value < 1) {
+        return 'Enter a whole number of at least 1';
+      }
+      if (value > max) return 'Keep $label at $max or below';
+      return null;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Set readiness targets'),
+        content: SizedBox(
+          width: 500,
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'The score is always calculated from live chapter data. '
+                    'These targets decide what a full bar means, so align them '
+                    'with the current chapter plan rather than a national '
+                    'standard.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.55,
+                      color: dialogContext.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: TabangSpace.lg),
+                  _targetField(
+                    controller: unitController,
+                    label: 'Supply coverage',
+                    helper: 'Usable units on the shelf that count as 100%.',
+                    max: 500,
+                    validate: validate,
+                  ),
+                  const SizedBox(height: TabangSpace.md),
+                  _targetField(
+                    controller: donorController,
+                    label: 'Donor capacity',
+                    helper: 'Eligible, available donors that count as 100%.',
+                    max: 500,
+                    validate: validate,
+                  ),
+                  const SizedBox(height: TabangSpace.md),
+                  _targetField(
+                    controller: pressureController,
+                    label: 'Request pressure cap',
+                    helper:
+                        'Open requests at which this bar scores zero. Lower '
+                        'is better, so 0 requests is always a full bar.',
+                    max: 500,
+                    validate: validate,
+                  ),
+                  const SizedBox(height: TabangSpace.md),
+                  _targetField(
+                    controller: communityController,
+                    label: 'Community reach',
+                    helper:
+                        'Registered donor and recipient accounts that count '
+                        'as 100%.',
+                    max: 5000,
+                    validate: validate,
+                  ),
+                  const SizedBox(height: TabangSpace.lg),
+                  Text(
+                    'Weights stay fixed: supply 30%, donor capacity 20%, '
+                    'community reach 20%, request pressure 15% and shelf-life '
+                    'health 15%. Every change is written to the activity log.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.5,
+                      color: dialogContext.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              unitController.text = '${ReadinessTargets.defaults.unitTarget}';
+              donorController.text = '${ReadinessTargets.defaults.donorTarget}';
+              pressureController.text =
+                  '${ReadinessTargets.defaults.requestPressureCap}';
+              communityController.text =
+                  '${ReadinessTargets.defaults.communityTarget}';
+            },
+            child: const Text('Use defaults'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              final targets = ReadinessTargets(
+                unitTarget: int.parse(unitController.text.trim()),
+                donorTarget: int.parse(donorController.text.trim()),
+                requestPressureCap: int.parse(pressureController.text.trim()),
+                communityTarget: int.parse(communityController.text.trim()),
+              );
+              final ok = _repo.setReadinessTargets(
+                targets,
+                actorId: widget.user!.id,
+              );
+              Navigator.pop(dialogContext);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ok
+                        ? 'Readiness targets updated: ${targets.describe()}'
+                        : 'Those targets could not be saved.',
+                  ),
+                ),
+              );
+            },
+            child: const Text('Save targets'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _targetField({
+    required TextEditingController controller,
+    required String label,
+    required String helper,
+    required int max,
+    required String? Function(String?, int, String) validate,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label, helperText: helper),
+      validator: (value) => validate(value, max, label.toLowerCase()),
+    );
+  }
+
   /// Explains every bar in plain terms: what is counted, what it is compared
   /// against, and how much the bar weighs in the final score.
   void _showScoreDetails(BuildContext context, _ReadinessScore score) {
@@ -608,8 +787,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
               children: [
                 Text(
                   'The score is the weighted average of the five bars, shown '
-                  'out of 100%. Each bar compares the chapter today with an '
-                  'internal planning target for this prototype, not a national '
+                  'out of 100%. Each bar compares the chapter today with a '
+                  'planning target set by this chapter’s admin — not a national '
                   'or DOH standard. A full bar means the target is met; the '
                   'value beside each bar shows the actual count against it.',
                   style: TextStyle(
@@ -673,7 +852,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                 ],
                 Text(
                   'The score recalculates live whenever units, requests, '
-                  'registered users, donors or expiry dates change.',
+                  'registered users, donors or expiry dates change. '
+                  '${widget.user?.role == UserRole.admin ? 'Use Set targets to change the denominators; the score itself is never entered by hand.' : 'An admin can change the planning targets from this card.'}',
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.5,
@@ -866,7 +1046,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             icon: Icons.inventory_2_outlined,
             tone: Tone.brand,
             footnote:
-                '${summary.unitsAvailable} of ${_ReadinessScore.unitTarget} '
+                '${summary.unitsAvailable} of ${score.targets.unitTarget} '
                 'target units',
             progress: score.valueFor('Supply coverage'),
           ),
@@ -876,7 +1056,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             icon: Icons.people_outline,
             tone: Tone.success,
             footnote:
-                '${summary.activeDonors} of ${_ReadinessScore.donorTarget} '
+                '${summary.activeDonors} of ${score.targets.donorTarget} '
                 'target donors',
             progress: score.valueFor('Donor capacity'),
           ),
@@ -896,7 +1076,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
             icon: Icons.badge_outlined,
             tone: Tone.info,
             footnote:
-                '$totalUsers of ${_ReadinessScore.communityTarget} target '
+                '$totalUsers of ${score.targets.communityTarget} target '
                 'users · ${summary.donationsThisMonth} donations this month',
             progress: score.valueFor('Community reach'),
           ),
@@ -1026,6 +1206,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.requestVerified => Icons.fact_check_outlined,
     ActivityKind.requestRejected => Icons.assignment_late_outlined,
     ActivityKind.inventory => Icons.inventory_2_outlined,
+    ActivityKind.readinessTargets => Icons.tune,
   };
 
   Color _activityColor(ActivityKind kind) => switch (kind) {
@@ -1042,6 +1223,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.requestVerified => TabangColors.success,
     ActivityKind.requestRejected => TabangColors.danger,
     ActivityKind.inventory => TabangColors.warning,
+    ActivityKind.readinessTargets => TabangColors.crimson,
   };
 
   void _showActivityDialog(BuildContext context) {
@@ -1503,17 +1685,15 @@ enum _ActivityFilter { all, transfusions, changes }
 
 /// The headline score and its five weighted components.
 class _ReadinessScore {
-  const _ReadinessScore(this.value, this.components);
+  const _ReadinessScore(this.value, this.components, this.targets);
 
   final int value;
   final List<_ScoreComponent> components;
 
-  /// Internal chapter planning targets for this prototype. They are not
-  /// national standards; they exist so every bar has a visible denominator.
-  static const int unitTarget = 32;
-  static const int donorTarget = 20;
-  static const int requestPressureCap = 16;
-  static const int communityTarget = 60;
+  /// The admin-set planning targets the bars are measured against. They are
+  /// not national standards; they exist so every bar has a visible
+  /// denominator, and an admin can align them with this chapter's plan.
+  final ReadinessTargets targets;
 
   double valueFor(String label) {
     for (final component in components) {
@@ -1531,6 +1711,7 @@ class _ReadinessScore {
   static _ReadinessScore compute({
     required AnalyticsSummary summary,
     required int expiringCount,
+    required ReadinessTargets targets,
   }) {
     final units = summary.unitsAvailable;
     // expiringSoon() already counts usable units, so it can never exceed the
@@ -1538,13 +1719,16 @@ class _ReadinessScore {
     final expiring = expiringCount.clamp(0, units);
     final inDate = units - expiring;
 
-    final supply = (units / unitTarget).clamp(0.0, 1.0);
-    final donors = (summary.activeDonors / donorTarget).clamp(0.0, 1.0);
+    final supply = (units / targets.unitTarget).clamp(0.0, 1.0);
+    final donors = (summary.activeDonors / targets.donorTarget).clamp(0.0, 1.0);
     final requestPressure = summary.openRequests == 0
         ? 1.0
-        : (1 - summary.openRequests / requestPressureCap).clamp(0.0, 1.0);
+        : (1 - summary.openRequests / targets.requestPressureCap).clamp(
+            0.0,
+            1.0,
+          );
     final shelfLife = units == 0 ? 1.0 : inDate / units;
-    final community = (summary.registeredUsers / communityTarget).clamp(
+    final community = (summary.registeredUsers / targets.communityTarget).clamp(
       0.0,
       1.0,
     );
@@ -1554,8 +1738,9 @@ class _ReadinessScore {
         label: 'Supply coverage',
         fraction: supply,
         weight: 0.30,
-        valueLabel: '$units of $unitTarget units',
-        targetSummary: 'Target: $unitTarget usable units on the shelf.',
+        valueLabel: '$units of ${targets.unitTarget} units',
+        targetSummary:
+            'Target: ${targets.unitTarget} usable units on the shelf.',
         method:
             'Usable units across all components, counted against the chapter '
             'planning target.',
@@ -1564,9 +1749,10 @@ class _ReadinessScore {
         label: 'Donor capacity',
         fraction: donors,
         weight: 0.20,
-        valueLabel: '${summary.activeDonors} of $donorTarget donors',
+        valueLabel: '${summary.activeDonors} of ${targets.donorTarget} donors',
         targetSummary:
-            'Target: $donorTarget donors eligible and available today.',
+            'Target: ${targets.donorTarget} donors eligible and available '
+            'today.',
         method: 'Donors the eligibility engine would match right now.',
       ),
       _ScoreComponent(
@@ -1575,8 +1761,8 @@ class _ReadinessScore {
         weight: 0.15,
         valueLabel: '${summary.openRequests} open',
         targetSummary:
-            'Target: 0 open requests. At $requestPressureCap or more, this '
-            'bar scores zero.',
+            'Target: 0 open requests. At ${targets.requestPressureCap} or '
+            'more, this bar scores zero.',
         method:
             'Lower is better: the bar starts full when nothing is waiting and '
             'falls as open requests pile up.',
@@ -1598,8 +1784,10 @@ class _ReadinessScore {
         label: 'Community reach',
         fraction: community,
         weight: 0.20,
-        valueLabel: '${summary.registeredUsers} of $communityTarget users',
-        targetSummary: 'Target: $communityTarget registered accounts.',
+        valueLabel:
+            '${summary.registeredUsers} of ${targets.communityTarget} users',
+        targetSummary:
+            'Target: ${targets.communityTarget} registered accounts.',
         method:
             'Total registered accounts in this chapter, donors and recipients '
             'together.',
@@ -1609,7 +1797,7 @@ class _ReadinessScore {
       0,
       (sum, c) => sum + c.fraction * c.weight,
     );
-    return _ReadinessScore((weighted * 100).round(), components);
+    return _ReadinessScore((weighted * 100).round(), components, targets);
   }
 }
 
