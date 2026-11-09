@@ -978,7 +978,11 @@ class _FindDonorPageState extends State<FindDonorPage> {
                           : 'Hide map panels',
                       size: compact ? 30 : 36,
                     ),
-                    if (!compact) ...[
+                    // On desktop the chevron flips between map-only and the
+                    // split. On phones the same button appears only while the
+                    // list is hidden, so "Map only" is never a trap; the
+                    // dropdown that picks all four layouts lives in the list.
+                    if (!compact || _mapMode == _DonorMapMode.mapOnly) ...[
                       const SizedBox(height: 12),
                       _mapButton(
                         context,
@@ -993,15 +997,8 @@ class _FindDonorPageState extends State<FindDonorPage> {
                         tooltip: _mapMode == _DonorMapMode.mapOnly
                             ? 'Show donor list'
                             : 'Hide donor list',
+                        size: compact ? 30 : 36,
                       ),
-                    ],
-                    // Phone sizing: one tap advances through Map only → Half
-                    // screen → Hide map → Strip + list, using the same four
-                    // arrangements as the staff Operations map. The restore
-                    // control for "Hide map" lives above the donor list.
-                    if (compact) ...[
-                      const SizedBox(height: 4),
-                      _mapModeCycleButton(context),
                     ],
                   ],
                 ),
@@ -1417,6 +1414,11 @@ class _FindDonorPageState extends State<FindDonorPage> {
                       tone: Tone.brand,
                       dense: true,
                     ),
+                    // The map-size dropdown belongs to the list it rearranges.
+                    if (compact) ...[
+                      const SizedBox(width: 6),
+                      _mapModeMenu(context),
+                    ],
                     if (_selectedBarangay != null) ...[
                       const SizedBox(width: 6),
                       InkWell(
