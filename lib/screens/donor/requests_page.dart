@@ -671,6 +671,18 @@ class _RequestsPageState extends State<RequestsPage> {
             runSpacing: 4,
             children: [
               _meta(context, Icons.place_outlined, request.barangay),
+              // A reviewed request reads "Verified" so staff approval is
+              // visible inside the list, not only in the full record.
+              if (request.reviewedById != null &&
+                  request.status != RequestStatus.pendingReview &&
+                  request.status != RequestStatus.rejected &&
+                  request.status != RequestStatus.cancelled)
+                const StatusPill(
+                  'Verified',
+                  tone: Tone.success,
+                  icon: Icons.verified_outlined,
+                  dense: true,
+                ),
               if (request.scheduledFor != null)
                 _meta(
                   context,
@@ -708,6 +720,29 @@ class _RequestsPageState extends State<RequestsPage> {
               text:
                   'Rejected by chapter staff: '
                   '${request.reviewNote ?? 'No reason recorded.'}',
+            ),
+          ] else if (isOwn &&
+              (request.status == RequestStatus.matched ||
+                  request.status == RequestStatus.open ||
+                  request.status == RequestStatus.fulfilled)) ...[
+            // The requester must be able to tell verification happened, not
+            // just notice that the pending notice vanished.
+            const SizedBox(height: TabangSpace.md),
+            _reviewNotice(
+              context,
+              icon: Icons.verified_outlined,
+              color: TabangColors.success,
+              text: request.status == RequestStatus.fulfilled
+                  ? 'Verified and fulfilled by chapter staff. Thank you — '
+                        'this donation is recorded in the chapter activity log.'
+                  : request.source == RequestSource.bloodBank
+                  ? 'Verified by chapter staff — your slot is confirmed and '
+                        'compatible units are held for you. '
+                        '${request.assignedUnitIds.isEmpty ? '' : '${request.assignedUnitIds.length} unit${request.assignedUnitIds.length == 1 ? '' : 's'} on hold. '}'
+                        'Staff will notify you when the units are released.'
+                  : 'Verified by chapter staff — your slot is confirmed and '
+                        'the request is visible to compatible donors. New '
+                        'responses appear on this card.',
             ),
           ],
 

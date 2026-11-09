@@ -10,6 +10,7 @@ import '../../widgets/digos_vector_map.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/request_document_list.dart';
 import '../../widgets/request_review_dialogs.dart';
+import '../../widgets/user_record_dialog.dart';
 
 /// Staff/admin operational map.
 ///
@@ -786,6 +787,35 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               '$selectedCount selected · ${responders.length} response(s)',
               style: TextStyle(fontSize: 11, color: context.textMuted),
             ),
+            const SizedBox(height: 2),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 2,
+              children: [
+                Text(
+                  'Requested by',
+                  style: TextStyle(fontSize: 11, color: context.textMuted),
+                ),
+                UserMention(
+                  userId: request.requesterId,
+                  style: TextStyle(fontSize: 11, color: context.textMuted),
+                ),
+                if (responders.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '· Responders:',
+                    style: TextStyle(fontSize: 11, color: context.textMuted),
+                  ),
+                  for (final response in responders)
+                    UserMention(
+                      userId: response.donorId,
+                      fallback: response.donorAlias,
+                      style: TextStyle(fontSize: 11, color: context.textMuted),
+                    ),
+                ],
+              ],
+            ),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
@@ -863,6 +893,12 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               ),
             ),
             TextButton(
+              onPressed: applicant == null
+                  ? null
+                  : () => showUserRecordDialog(context, applicant),
+              child: const Text('Details'),
+            ),
+            TextButton(
               onPressed: widget.onOpenUsers,
               child: const Text('Review'),
             ),
@@ -921,6 +957,15 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: () {
+              final requester = _repo.userById(request.requesterId);
+              if (requester != null) {
+                showUserRecordDialog(dialogContext, requester);
+              }
+            },
+            child: const Text('Requester details'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),

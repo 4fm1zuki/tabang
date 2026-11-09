@@ -8,6 +8,7 @@ import '../../widgets/common.dart';
 import '../../widgets/chapter_identity.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/photo.dart';
+import '../../widgets/user_record_dialog.dart';
 
 /// How the conversation list is ordered. Both modes sort the chapter thread
 /// alongside people; it is an organization, not an exception to the list.
@@ -798,6 +799,16 @@ class _ChatPageState extends State<ChatPage> {
                   requestedByOther: requestedByOther,
                 )
               else ...[
+                if (!_isChapter(thread) &&
+                    widget.user.role.isAdminSide &&
+                    other != null)
+                  // Staff/admin conversations still hide the alias, but the
+                  // chapter record is one tap away so staff can act on it.
+                  IconButton(
+                    tooltip: 'Show details for ${other.alias}',
+                    icon: const Icon(Icons.badge_outlined, size: 17),
+                    onPressed: () => showUserRecordDialog(context, other),
+                  ),
                 if (_isChapter(thread))
                   // The chapter is an organization: no identity reveal, no
                   // blocking or reporting the official support channel.

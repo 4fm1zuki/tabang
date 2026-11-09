@@ -99,6 +99,9 @@ class _DonorShellState extends State<DonorShell> {
 
   final Map<int, Widget> _pages = {};
 
+  // Profile, Settings and About & Help deliberately stay out of the rail:
+  // they open from the account menu, so repeating them as destinations only
+  // made the sidebar longer without adding a route.
   static const _destinations = <_Destination>[
     _Destination('Home', Icons.home_outlined, Icons.home),
     _Destination('Blood Bank', Icons.inventory_2_outlined, Icons.inventory_2),
@@ -110,14 +113,50 @@ class _DonorShellState extends State<DonorShell> {
       Icons.volunteer_activism_outlined,
       Icons.volunteer_activism,
     ),
-    _Destination('Profile', Icons.person_outline, Icons.person),
-    _Destination('Settings', Icons.settings_outlined, Icons.settings),
-    _Destination('About & Help', Icons.help_outline, Icons.help),
   ];
 
   /// Destinations shown in the phone bottom bar. Profile, Settings and About
   /// stay in the identity menu so the bar keeps a manageable five-to-six items.
   static const _phoneIndices = <int>[0, 1, 2, 3, 4, 5];
+
+  /// Repository "new activity" surface behind each destination. Messages keep
+  /// their own unread counter instead.
+  static const Map<int, String> _tabKeys = {
+    0: 'home',
+    1: 'bloodbank',
+    2: 'find_donor',
+    3: 'requests',
+    5: 'donor_hub',
+  };
+
+  bool _hasNewFor(int index) {
+    final key = _tabKeys[index];
+    if (key == null) return false;
+    return _repo.tabActivityCount(widget.user.id, key) > 0;
+  }
+
+  Set<int> get _newIndices => {
+    for (final index in _tabKeys.keys)
+      if (_hasNewFor(index)) index,
+  };
+
+  /// One icon for the rail and the phone bar: unread count for Messages, a
+  /// small dot for surfaces with unseen activity, the plain icon otherwise.
+  Widget _destinationIcon(
+    int index, {
+    required bool active,
+    required int unreadMessages,
+    required Set<int> newIndices,
+  }) {
+    final icon = Icon(
+      active ? _destinations[index].activeIcon : _destinations[index].icon,
+    );
+    if (index == 4) {
+      return _UnreadBadge(count: unreadMessages, child: icon);
+    }
+    if (newIndices.contains(index)) return _NewDot(child: icon);
+    return icon;
+  }
 
   @override
   void initState() {
@@ -126,6 +165,8 @@ class _DonorShellState extends State<DonorShell> {
     _pages[0] = _buildPage(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // Home is already on screen at startup, so its dot would never clear.
+      _repo.markTabSeen(widget.user.id, 'home');
       final user = _repo.userById(widget.user.id) ?? widget.user;
       if (!user.onboardingCompleted) showWelcomeGuide(context, user);
     });
@@ -160,12 +201,13 @@ class _DonorShellState extends State<DonorShell> {
       if (oldWidget.compactNav != widget.compactNav && widget.compactNav) {
         _pinned = false;
       }
-      if (_pages.containsKey(7)) _pages[7] = _buildPage(7);
     }
   }
 
   void _select(int index) {
     if (index < 0 || index >= _destinations.length) return;
+    final tabKey = _tabKeys[index];
+    if (tabKey != null) _repo.markTabSeen(widget.user.id, tabKey);
     final compact =
         MediaQuery.sizeOf(context).width < TabangBreakpoints.navigationRail;
     if (compact && !_phoneIndices.contains(index)) {
@@ -225,14 +267,16 @@ class _DonorShellState extends State<DonorShell> {
   }
 
   void _pushStandalone(int index) {
-    final page = _buildPage(index);
+    _pushPage(_destinations[index].label, _buildPage(index));
+  }
+
+  /// Pushes a page that is not a rail destination — the account menu's
+  /// Profile, Settings and About & Help entries live here.
+  void _pushPage(String title, Widget page) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(_destinations[index].label),
-            leading: const BackButton(),
-          ),
+          appBar: AppBar(title: Text(title), leading: const BackButton()),
           body: DecoratedBox(
             decoration: BoxDecoration(gradient: TabangGradients.page(context)),
             child: page,
@@ -240,6 +284,30 @@ class _DonorShellState extends State<DonorShell> {
         ),
       ),
     );
+  }
+
+  void _openProfile() => _pushPage('Profile', ProfilePage(user: widget.user));
+
+  void _openSettings() {
+    _pushPage(
+      'Settings',
+      SettingsPage(
+        user: widget.user,
+        themeMode: widget.themeMode,
+        onThemeModeChanged: widget.onThemeModeChanged,
+        compactNav: widget.compactNav,
+        onCompactNavChanged: widget.onCompactNavChanged,
+        railPinned: _pinned,
+        onRailPinnedChanged: (value) {
+          setState(() => _pinned = value);
+          widget.onRailPinnedChanged?.call(value);
+        },
+      ),
+    );
+  }
+
+  void _openHelp() {
+    _pushPage('About & Help', AboutHelpPage(onOpenMessages: () => _select(4)));
   }
 
   Widget _buildPage(int index) {
@@ -273,26 +341,6 @@ class _DonorShellState extends State<DonorShell> {
           onOpenRequests: () => _select(3),
           onOpenMessages: () => _select(4),
         );
-      case 6:
-        return ProfilePage(user: widget.user);
-      case 7:
-        return SettingsPage(
-          user: widget.user,
-          themeMode: widget.themeMode,
-          onThemeModeChanged: widget.onThemeModeChanged,
-          compactNav: widget.compactNav,
-          onCompactNavChanged: widget.onCompactNavChanged,
-          railPinned: _pinned,
-          onRailPinnedChanged: (value) {
-            setState(() {
-              _pinned = value;
-              if (_pages.containsKey(7)) _pages[7] = _buildPage(7);
-            });
-            widget.onRailPinnedChanged?.call(value);
-          },
-        );
-      case 8:
-        return AboutHelpPage(onOpenMessages: () => _select(4));
       default:
         return DiscoverPage(user: widget.user, onNavigate: _select);
     }
@@ -313,6 +361,7 @@ class _DonorShellState extends State<DonorShell> {
     final railExpanded = wide && !slim && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
     final unreadMessages = _repoUnreadCount;
+    final newIndices = _newIndices;
 
     final content = IndexedStack(
       index: _index,
@@ -334,9 +383,9 @@ class _DonorShellState extends State<DonorShell> {
                   unreadMessages: unreadMessages,
                   navPinned: _navPinned,
                   onToggleNavPin: _toggleNavPin,
-                  onOpenProfile: () => _pushStandalone(6),
-                  onOpenSettings: () => _pushStandalone(7),
-                  onOpenHelp: () => _pushStandalone(8),
+                  onOpenProfile: _openProfile,
+                  onOpenSettings: _openSettings,
+                  onOpenHelp: _openHelp,
                   onOpenChat: () => _select(4),
                 ),
                 Expanded(
@@ -386,24 +435,18 @@ class _DonorShellState extends State<DonorShell> {
                                 destinations: [
                                   for (final index in _phoneIndices)
                                     NavigationDestination(
-                                      icon: index == 4
-                                          ? _UnreadBadge(
-                                              count: unreadMessages,
-                                              child: Icon(
-                                                _destinations[index].icon,
-                                              ),
-                                            )
-                                          : Icon(_destinations[index].icon),
-                                      selectedIcon: index == 4
-                                          ? _UnreadBadge(
-                                              count: unreadMessages,
-                                              child: Icon(
-                                                _destinations[index].activeIcon,
-                                              ),
-                                            )
-                                          : Icon(
-                                              _destinations[index].activeIcon,
-                                            ),
+                                      icon: _destinationIcon(
+                                        index,
+                                        active: false,
+                                        unreadMessages: unreadMessages,
+                                        newIndices: newIndices,
+                                      ),
+                                      selectedIcon: _destinationIcon(
+                                        index,
+                                        active: true,
+                                        unreadMessages: unreadMessages,
+                                        newIndices: newIndices,
+                                      ),
                                       label: _destinations[index].label,
                                       tooltip: _destinations[index].label,
                                     ),
@@ -443,6 +486,7 @@ class _DonorShellState extends State<DonorShell> {
                 child: _Sidebar(
                   user: widget.user,
                   unreadMessages: unreadMessages,
+                  newIndices: newIndices,
                   destinations: _destinations,
                   selectedIndex: _index,
                   railExpanded: railExpanded,
@@ -457,6 +501,9 @@ class _DonorShellState extends State<DonorShell> {
                     }
                   },
                   onSelect: _select,
+                  onOpenProfile: _openProfile,
+                  onOpenSettings: _openSettings,
+                  onOpenHelp: _openHelp,
                   onTogglePin: () {
                     final wasSlim = widget.compactNav;
                     setState(() {
@@ -522,6 +569,22 @@ class _UnreadBadge extends StatelessWidget {
           color: Colors.white,
         ),
       ),
+      child: child,
+    );
+  }
+}
+
+/// A small dot marking a destination with unseen activity.
+class _NewDot extends StatelessWidget {
+  const _NewDot({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      smallSize: 7,
+      backgroundColor: TabangColors.crimson,
       child: child,
     );
   }
@@ -665,6 +728,7 @@ class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.user,
     required this.unreadMessages,
+    required this.newIndices,
     required this.destinations,
     required this.selectedIndex,
     required this.railExpanded,
@@ -674,14 +738,23 @@ class _Sidebar extends StatelessWidget {
     required this.pinned,
     required this.onSlideEnd,
     required this.onSelect,
+    required this.onOpenProfile,
+    required this.onOpenSettings,
+    required this.onOpenHelp,
     required this.onTogglePin,
     required this.onToggleExpand,
   });
 
   final AppUser user;
   final int unreadMessages;
+  final Set<int> newIndices;
   final List<_Destination> destinations;
   final int selectedIndex;
+
+  /// Account-menu actions, kept out of [destinations] so the rail stays short.
+  final VoidCallback onOpenProfile;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onOpenHelp;
 
   /// Width target of the slide animation.
   final bool railExpanded;
@@ -855,6 +928,15 @@ class _Sidebar extends StatelessWidget {
     final selected = index == selectedIndex;
     final primary = Theme.of(context).colorScheme.primary;
     final foreground = selected ? primary : context.textMuted;
+    final iconSize = expanded ? 19.0 : 21.0;
+    final icon = Icon(
+      selected ? destination.activeIcon : destination.icon,
+      size: iconSize,
+      color: foreground,
+    );
+    final decoratedIcon = index == 4
+        ? _UnreadBadge(count: unreadMessages, child: icon)
+        : (newIndices.contains(index) ? _NewDot(child: icon) : icon);
 
     final item = Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -889,24 +971,7 @@ class _Sidebar extends StatelessWidget {
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      index == 4
-                          ? _UnreadBadge(
-                              count: unreadMessages,
-                              child: Icon(
-                                selected
-                                    ? destination.activeIcon
-                                    : destination.icon,
-                                size: 19,
-                                color: foreground,
-                              ),
-                            )
-                          : Icon(
-                              selected
-                                  ? destination.activeIcon
-                                  : destination.icon,
-                              size: 19,
-                              color: foreground,
-                            ),
+                      decoratedIcon,
                       const SizedBox(width: TabangSpace.sm),
                       Expanded(
                         child: Text(
@@ -923,26 +988,7 @@ class _Sidebar extends StatelessWidget {
                       ),
                     ],
                   )
-                : Center(
-                    child: index == 4
-                        ? _UnreadBadge(
-                            count: unreadMessages,
-                            child: Icon(
-                              selected
-                                  ? destination.activeIcon
-                                  : destination.icon,
-                              size: 21,
-                              color: foreground,
-                            ),
-                          )
-                        : Icon(
-                            selected
-                                ? destination.activeIcon
-                                : destination.icon,
-                            size: 21,
-                            color: foreground,
-                          ),
-                  ),
+                : Center(child: decoratedIcon),
           ),
         ),
       ),
@@ -999,11 +1045,11 @@ class _Sidebar extends StatelessWidget {
         onSelected: (value) {
           switch (value) {
             case 'profile':
-              onSelect(6);
+              onOpenProfile();
             case 'settings':
-              onSelect(7);
+              onOpenSettings();
             case 'help':
-              onSelect(8);
+              onOpenHelp();
             case 'signout':
               TabangRepository.instance.signOut();
           }
@@ -1072,15 +1118,16 @@ class _Sidebar extends StatelessWidget {
 /// Account menu shared by the phone header and the sidebar profile card.
 ///
 /// The old popup was four bare text rows, so it never showed *who* was signed
-/// in. This opens with the identity, then keeps one icon + label per action and
-/// ends with a destructive sign-out separated by a divider.
+/// in. This opens with the identity — now itself a clickable row that opens
+/// Profile, replacing the separate Profile entry — then keeps one icon + label
+/// per action and ends with a destructive sign-out behind a divider.
 List<PopupMenuEntry<String>> accountMenuItems(
   BuildContext context,
   AppUser user,
 ) {
   return [
     PopupMenuItem<String>(
-      enabled: false,
+      value: 'profile',
       height: 72,
       child: Row(
         children: [
@@ -1121,16 +1168,11 @@ List<PopupMenuEntry<String>> accountMenuItems(
               ],
             ),
           ),
+          Icon(Icons.chevron_right, size: 18, color: context.textMuted),
         ],
       ),
     ),
     const PopupMenuDivider(),
-    _accountItem(
-      context,
-      value: 'profile',
-      icon: Icons.person_outline,
-      label: 'Profile',
-    ),
     _accountItem(
       context,
       value: 'settings',

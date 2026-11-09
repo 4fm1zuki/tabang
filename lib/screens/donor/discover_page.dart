@@ -330,10 +330,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
         OutlinedButton.icon(
           onPressed: () => widget.onNavigate?.call(2),
           icon: const Icon(Icons.map_outlined, size: 18),
-          label: const Text('Find donors near you'),
+          label: const Text('Find a donor'),
         ),
-        // Sits beside "Find donors near you" as requested; jumps to the drives
-        // rail instead of leaving the page.
+        // Sits beside "Find a donor" as requested; jumps to the drives rail
+        // instead of leaving the page.
         OutlinedButton.icon(
           onPressed: _jumpToDrives,
           icon: const Icon(Icons.event_outlined, size: 18),

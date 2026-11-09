@@ -412,65 +412,86 @@ Future<void> showBloodRequestDialog(
                         ),
                       )
                     else
+                      // Plain dropdowns, not form fields: both values derive
+                      // from `scheduledFor`, so picking a new day must
+                      // immediately rebuild the Time list for that day (a
+                      // FormField keeps its old value and could offer an hour
+                      // that day does not publish).
                       Row(
                         children: [
                           Expanded(
                             flex: 3,
-                            child: DropdownButtonFormField<DateTime>(
-                              initialValue: selectedDay,
-                              isExpanded: true,
+                            child: InputDecorator(
                               decoration: const InputDecoration(
                                 labelText: 'Day',
                               ),
-                              items: slotDays
-                                  .map(
-                                    (day) => DropdownMenuItem(
-                                      value: day,
-                                      child: Text(
-                                        _formatSlotDay(day),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (day) => setDialogState(() {
-                                if (day == null) return;
-                                final firstHour = slots.firstWhere(
-                                  (slot) =>
-                                      slot.year == day.year &&
-                                      slot.month == day.month &&
-                                      slot.day == day.day,
-                                );
-                                scheduledFor = firstHour;
-                              }),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<DateTime>(
+                                  value: selectedDay,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: slotDays
+                                      .map(
+                                        (day) => DropdownMenuItem(
+                                          value: day,
+                                          child: Text(
+                                            _formatSlotDay(day),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (day) => setDialogState(() {
+                                    if (day == null) return;
+                                    final firstHour = slots.firstWhere(
+                                      (slot) =>
+                                          slot.year == day.year &&
+                                          slot.month == day.month &&
+                                          slot.day == day.day,
+                                    );
+                                    scheduledFor = firstHour;
+                                  }),
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: TabangSpace.md),
                           Expanded(
                             flex: 2,
-                            child: DropdownButtonFormField<int>(
-                              initialValue: scheduledFor?.hour,
-                              isExpanded: true,
+                            child: InputDecorator(
                               decoration: const InputDecoration(
                                 labelText: 'Time',
                               ),
-                              items: hours
-                                  .map(
-                                    (hour) => DropdownMenuItem(
-                                      value: hour,
-                                      child: Text(_formatSlotHour(hour)),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (hour) => setDialogState(() {
-                                if (hour == null || selectedDay == null) return;
-                                scheduledFor = DateTime(
-                                  selectedDay.year,
-                                  selectedDay.month,
-                                  selectedDay.day,
-                                  hour,
-                                );
-                              }),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value:
+                                      scheduledFor != null &&
+                                          hours.contains(scheduledFor!.hour)
+                                      ? scheduledFor!.hour
+                                      : null,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: hours
+                                      .map(
+                                        (hour) => DropdownMenuItem(
+                                          value: hour,
+                                          child: Text(_formatSlotHour(hour)),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (hour) => setDialogState(() {
+                                    if (hour == null || selectedDay == null) {
+                                      return;
+                                    }
+                                    scheduledFor = DateTime(
+                                      selectedDay.year,
+                                      selectedDay.month,
+                                      selectedDay.day,
+                                      hour,
+                                    );
+                                  }),
+                                ),
+                              ),
                             ),
                           ),
                         ],

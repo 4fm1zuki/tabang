@@ -49,11 +49,11 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_hydration.jpg',
-    title: 'Water droplets on blue glass surface',
-    author: 'Photos-public-domain.com',
-    license: 'Public domain',
+    title: 'Boy drinks water from a glass at home',
+    author: 'Shixart1985',
+    license: 'CC BY 2.0',
     kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Water_droplets_on_blue_glass_surface.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Boy_drinks_water_from_glass_in_a_cozy_home_environment.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_nutrition.jpg',
@@ -65,11 +65,11 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_recovery.jpg',
-    title: 'Bloodletting and blood donation, Philippine Red Cross, Baliuag',
-    author: 'Judgefloro',
-    license: 'CC0',
+    title: 'Applying the bandage after a blood donation',
+    author: 'Tech. Sgt. Nicholas Alder, U.S. Air Force',
+    license: 'Public domain',
     kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_03.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Ramstein_blood_donation_expands;_saves_lives_(7395803).jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_screening.jpg',
@@ -82,19 +82,20 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_drive.jpg',
-    title: 'Bloodletting and blood donation, Philippine Red Cross, Baliuag',
-    author: 'Judgefloro',
-    license: 'CC0',
+    title: 'A donated bag of blood held at a collection session',
+    author: 'Bibeyjj',
+    license: 'CC BY-SA 4.0',
     kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_07.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Blood_Donation_Bag.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/drive_community.jpg',
-    title: 'Bloodletting and blood donation, Philippine Red Cross, Baliuag',
-    author: 'Judgefloro',
-    license: 'CC0',
+    title: 'Blood donation camp with donors resting on beds',
+    author: 'Ameyawiki',
+    license: 'CC BY-SA 4.0',
     kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_04.jpg',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:Blood_donation_GIFT.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_story.jpg',
@@ -106,10 +107,38 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_privacy.jpg',
-    title: 'Privacy and identity protection artwork',
-    author: 'TABANG original artwork (tools/make_media_assets.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
+    title: 'Anonymised blood donor card with name and number redacted',
+    author: 'Wikimedia Commons contributor',
+    license: 'CC BY-SA 4.0',
+    kind: 'photo',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Blood_donor_card_japan_20141024.jpg',
+  ),
+  ImageCredit(
+    asset: 'assets/images/content_tattoo.jpg',
+    title: 'Tattooed upper arm',
+    author: 'Tony Alter',
+    license: 'CC BY 2.0',
+    kind: 'photo',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:Arm_tattoo_of_Neptune.jpg',
+  ),
+  ImageCredit(
+    asset: 'assets/images/content_donation_day.jpg',
+    title: 'Needle in place during a blood donation',
+    author: 'Makysm',
+    license: 'CC0',
+    kind: 'photo',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:Blood_donation_process.jpg',
+  ),
+  ImageCredit(
+    asset: 'assets/images/content_aftercare.jpg',
+    title: 'Resting the arm after a plasma donation',
+    author: 'U3061292',
+    license: 'CC BY-SA 3.0',
+    kind: 'photo',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:After_Plasma_Donation.jpg',
   ),
   ImageCredit(
     asset: 'assets/branding/app_icon.png',

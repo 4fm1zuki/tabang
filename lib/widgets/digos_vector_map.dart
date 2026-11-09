@@ -47,7 +47,10 @@ class DigosMapColors {
     colors: [Color(0xFF0F1822), Color(0xFF05090E)],
   );
 
-  static const Color internalBorder = Color(0xFFD08A76);
+  /// Barangay borders. A deeper terracotta than the old pale rose so the
+  /// internal outlines stay legible over both the raster base and the heat
+  /// fills instead of washing out.
+  static const Color internalBorder = Color(0xFFB85C42);
   static const Color internalBorderDark = Color(0xFF8E5A4B);
   static const Color cityBorder = Color(0xFF5A1512);
   static const Color cityBorderDark = Color(0xFFFFDAD4);
@@ -566,8 +569,8 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   @override
   Widget build(BuildContext context) {
     final dark = widget.mapDark;
-    final internalWidth = _lerp(9, 1.2, 18, 2.6);
-    final outerWidth = _lerp(9, 2.2, 18, 4.0);
+    final internalWidth = _lerp(9, 1.5, 18, 3.0);
+    final outerWidth = _lerp(9, 2.6, 18, 4.6);
     final labelSize = _lerp(10.5, 9.5, 18, 15);
     // Pins shrink with the map so a city-wide view does not drown in markers,
     // and grow back to full size once the user is at street level.

@@ -82,7 +82,7 @@ were bypassed.
 - **Home** (the first navigation destination, home icon) — one compact toolbar,
   then horizontal rails for upcoming blood drives, announcements and stories,
   and short learning cards, ending with a visit planner. Quick actions are
-  *Request blood*, *Find donors near you* and *Find a drive* (which scrolls the
+  *Request blood*, *Find a donor* and *Find a drive* (which scrolls the
   feed to the drives rail). The urgent
   shortage callout lives on Blood Bank and the map, not here. Credit text is
   no longer printed under feed cards — attribution appears in the article and
@@ -107,17 +107,16 @@ were bypassed.
   raster tiles (the Humanitarian style, chosen because the standard Carto
   style scatters brown mountain-peak triangles across the Digos highlands)
   under an inverse mask that hides everything outside the city. The mask and
-  the canvas under the raster tiles use a clean two-stop gradient rather than
-  the old flat off-white and beige fills, so the wide margins around the city
-  read as map space instead of a dirty band. The 26-barangay topology from
+  the canvas under the raster tiles are plain white, so the base map stays
+  neutral instead of picking up an off-white, beige or blue cast; barangay
+  outlines use a deeper terracotta and slightly heavier strokes so the cutouts
+  read over both the raster and the heat fills. The 26-barangay topology from
   the standalone `map/` project ships locally in
   `lib/core/digos_geodata.dart` (75 shared topological arcs that stitch into the
   barangays plus the city perimeter, so no mapping SDK or API key is involved).
-  The base keeps the standalone map project's street detail, retuned to a
-  clean, cool, low-contrast template, so roads, water, buildings and land use
-  show through while farmland hatching and baked-in place names are muted. The
-  canvas and the inverse city mask use a simple sky-blue gradient — the old
-  off-white and beige fills made the wide margins look dirty. The
+  The base keeps the standalone map project's street detail untinted in light
+  mode — no warm or cool matrix — so roads, water and buildings show through
+  exactly as the Humanitarian raster draws them. The
   raster template alone is nudged down-right (`DigosVectorMap.baseMapOffset`)
   so its streets sit better under the hand-traced cutouts; the vector layers
   never move. The nudge is calibrated at `baseMapOffsetZoom` and scales with
@@ -167,13 +166,11 @@ were bypassed.
   a donor card moves the map to the barangay that donor is from (not just a
   highlight). Over the map the cursor switches to a pointing hand whenever a
   barangay is under the mouse, so "click a region to select it" is discoverable.
-  On phones one **map size** button replaces the old half/full-screen pair and
-  advances through all four arrangements on each tap: **Map only** → **Half
-  screen** (the default split) → **Hide map** → **Strip + list** → **Map
-  only**. Hiding the map leaves the donor directory in place with a **Show
-  map** button above it, and that button restores the short strip. The donor
-  pane's own collapse arrow switches to **Map only**, and the cycle button is
-  always in the map's control stack. The map credit reads
+  The map is a simple on/off switch: **Hide map** in the donor list header
+  leaves the directory full-page with a **Show map** button above it, and that
+  button restores exactly the default half split. The donor pane's own collapse
+  arrow switches to **Map only** independently, where a **Show donor list**
+  chevron in the map stack brings the list back. The map credit reads
   `© OpenStreetMap contributors`.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Availability is managed two
@@ -233,6 +230,12 @@ were bypassed.
   accepted) posts an official update there. The conversation list can be sorted
   **Most recent** or **Alphabetical (A–Z)**; the chapter sorts alongside people
   in both modes.
+- **Tab activity dots** — every shell destination (Home, Blood Bank, Find
+  Donor, Requests and Donor Hub; Overview, Operations, Users and Moderation for
+  staff) shows a small dot while the chapter activity log holds events for that
+  surface — new requests, verified requests, inventory moves, registrations,
+  warnings or reports — and opening the tab clears it. Messages keep their
+  numeric unread badge.
 - **Profile** — a per-component eligibility view with multi-select chips:
   checking whole blood, packed red cells, platelets and plasma together shows a
   separate cooldown row for each component, so one donation type no longer hides
@@ -300,7 +303,10 @@ were bypassed.
 - **Inventory** — the second Operations view. Units are a compact list with a
   **Details** button and a status-menu; the full record opens with the barcode
   graphic, the holder's name (staff-only information) and a **Remove unit**
-  action for discarded or mislabelled bags. A one-line legend explains
+  action for discarded or mislabelled bags. Removing, adding and verifying all
+  confirm with an **Undo** action, and a **Removed units** tab keeps the ledger
+  of removals with who removed each bag and a **Restore to stock** button that
+  refuses a barcode already back in use. A one-line legend explains
   Available, Reserved, Quarantined and Expired. Staff receive new stock with
   **Add unit** (blood type, component, storage bay, collection date, optional
   barcode; expiry is derived from the component shelf life), change unit
@@ -308,7 +314,9 @@ were bypassed.
   effective expiry pressure, confirm **booked slots** — derived from requests,
   with each requester's uploaded documents one tap away — in a dedicated queue,
   and work the request queue. Only staff/admin can mark a request
-  fulfilled.
+  fulfilled. Any alias in the queues (requester, responder, holder, applicant,
+  activity actor) is tappable and opens the same account record staff see in
+  User management.
 - **Messages** — staff and admins use the community chat surface and can start
   a new conversation with another staff member or any community user; unread
   counters stay live across the console.
@@ -505,10 +513,9 @@ The About tab renders the full registry with source links. There is no generic
 **The map has one visual language.** A sequential warm-crimson ramp encodes
 available donors, with a legend; selection uses deep brand tones plus a
 contrasting outline, never the blue that previously meant both "selected" and
-"water". The OpenStreetMap base is pushed through a clean, cool version of the
-standalone map project's street template, so streets, water, buildings and land
-use stay revealed while its baked-in names are muted and the standard style's
-mountain-peak triangles never appear; TABANG's own
+"water". The OpenStreetMap base is drawn untinted in light mode on a plain
+white canvas, so streets, water and buildings stay neutral and the standard
+style's mountain-peak triangles never appear; TABANG's own
 labels all sit on their barangay's representative point and never disappear as
 the view widens. The base now follows the
 active theme — the same `invert + hue-rotate` dark recipe keeps water blue and
@@ -613,10 +620,11 @@ off and there is no third-party image host to configure or pay for.
 | Login brand panel, Home hero | `assets/images/hero_donation.jpg` |
 | Hydration and nutrition articles | `content_hydration.jpg`, `content_nutrition.jpg` |
 | Recovery, screening and drive articles | `content_recovery.jpg`, `content_screening.jpg`, `content_drive.jpg` |
-| Privacy article | `content_privacy.jpg` |
+| Privacy, tattoo and donation-day articles | `content_privacy.jpg`, `content_tattoo.jpg`, `content_donation_day.jpg` |
+| Recovery article (aftercare) | `content_aftercare.jpg` |
 | Recipient story | `content_story.jpg` |
 | Donor spotlight and drive cards | `drive_community.jpg`, `content_drive.jpg` |
-| Educational illustrations | `assets/images/educational/edu_*.png` (7 originals) |
+| Educational illustrations (still used where vector art reads better) | `assets/images/educational/edu_*.png` (7 originals) |
 | Profile portraits | `assets/images/avatars/avatar_001.png` … `avatar_048.png` |
 | App icon / PWA icons | `assets/branding/app_icon.png` |
 | Chapter emblem | `assets/branding/prc_logo.png` (Philippine Red Cross; public domain/PD-ineligible, symbol use regulated by the Geneva Conventions) |
@@ -629,8 +637,10 @@ with a visible `PhotoCredit` line and a hover credit that names the actual file,
 creator and licence. The photo is paired with a scrim in the hero and login
 views to keep white copy legible.
 
-**Licences.** Every source photograph is public domain or CC0; original
-artwork is TABANG's own. Source URLs, authors and licence details are recorded
+**Licences.** Source photographs are public domain, CC0 or CC BY/CC BY-SA;
+attribution for the share-alike and attribution licences is shown on the image
+itself and in the About tab. Original artwork is TABANG's own. Source URLs,
+authors and licence details are recorded
 in [`tools/image_sources/CREDITS.md`](tools/image_sources/CREDITS.md) and in the
 About tab's per-image credit cards. The source files are kept in
 `tools/image_sources/`; regenerate the cropped, graded assets and all platform
@@ -653,7 +663,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**141 tests** cover:
+**149 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -673,7 +683,10 @@ flutter test
   without bytes does not count; uploaded files are stored with the request and
   previewed by staff; requests stay hidden from donors until staff verify them;
   rejection carries a written reason; verifying a blood-bank request holds the
-  assigned units for the requester.
+  assigned units for the requester. The requester's card then shows a
+  **Verified** pill and a confirmation notice, and the staff request queue uses
+  the same card anatomy as the booked-slot queue — documents included — with
+  clickable requester and responder names that open the account record.
 - **Request lifecycle** — compatible/ineligible/duplicate responses, blood-bank
   requests rejecting donor responses, requester-only selection, chat-first
   selection (one-sided chat is refused until both people send a message),
@@ -685,6 +698,14 @@ flutter test
   person cannot claim it, only its holder can release it, request slots start
   pending, verifying the request confirms the slot, and cancelling the request
   removes it from the staff queue.
+- **Undo and the removed-units ledger** — a removed bag is listed with who
+  removed it and when, can be restored to the shelf at its original expiry, and
+  refuses to restore over a barcode already back in use; verification undo
+  returns a request to the review queue and releases its holds, while an undo
+  after fulfilment has started is refused.
+- **Tab activity dots** — unseen request, inventory, verification and
+  moderation activity lights the matching shell destination until the tab is
+  visited, and a new event lights it again.
 - **Privacy and safety** — bilateral reveal accept/decline, persisted reports
   with a trimmed free-text explanation, per-participant unread/read markers,
   symmetric blocking, and the 48-hour re-block cooldown.
@@ -747,27 +768,37 @@ flutter test
   (enabling slim rails unpins the sidebar), and the sidebar pin reopens the
   full rail from slim mode.
   Inventory exposes Add unit plus the booked-slot queue; the phone Find Donor
-  and Operations maps cycle or switch between strip, half, full and list-only
-  arrangements, hide and restore the map with the pull-up/**Show map** controls,
-  the metric scale bar keeps its label and line length consistent and follows
-  the live camera, and the bottom-bar pin keeps the bar visible through a long
-  swipe.
+  map hides and restores with one switch while its donor list collapses
+  independently, the Operations map picks strip, half, full and list-only from
+  its size menu and hides with the pull-up/**Show map** controls, the metric
+  scale bar keeps its label and line length consistent and follows the live
+  camera, and the bottom-bar pin keeps the bar visible through a long swipe.
 - **Narrow-screen layout** — Home, Blood Bank (including unit selection and the
-  blood request dialog), the staff booked-slot list, Overview and the login form
-  render at a 360 × 780 phone viewport without overflow; the unit list reflows
+  blood request dialog), Find Donor (map switch and list), the staff
+  booked-slot list, Overview and the login form render at a 360 × 780 phone
+  viewport without overflow; the unit list reflows
   to one column, the request dialog stacks its fields, and the login form scrolls
-  under a slim transient rail instead of a persistent edge scrollbar.
+  under a slim transient rail instead of a persistent edge scrollbar. The
+  schedule dropdown rebuilds its Time list when the Day changes (picking a
+  Saturday offers only the 8–11 half-day), instead of keeping an hour that day
+  does not publish.
 - **Sidebar** — the Settings pin collapses or reopens the desktop rail, each
   rail item's icon stays dead-centre in its pill (the regression that left the
   selection accent bar pushing icons off-centre), and the compact pin control
   remains under the logo so an unpinned donor or admin rail can be pinned open
-  again. The map style also follows the active theme, and the rebased pins stay
-  on their OSM buildings under the nudged raster. Unread badges clear live when
-  a conversation is read, and the phone bar scrolls instead of overflowing.
+  again. Profile, Settings and About & Help stay in the account menu instead of
+  repeating as rail destinations, and the account identity row itself is the
+  Profile shortcut. The map style also follows the active theme, and the rebased
+  pins stay on their OSM buildings under the nudged raster. Unread badges clear
+  live when a conversation is read, and the phone bar scrolls instead of
+  overflowing.
 - **Barangay canonicalisation** — parenthetical stripping, case/punctuation
   normalisation, and round-tripping all 26 names.
 - **Map topology** — all 75 shared arcs stitch 26 complete barangay rings and
   the 60 internal border arcs, so a truncated arc table cannot crash the map.
+- **Light map canvas** — the canvas and outside mask stay plain white, the
+  light raster filter is exactly identity (no warm or cool cast), and the
+  barangay border keeps the deeper opaque terracotta.
 - **Map pin stability** — a drive pin resolves to the same coordinate on every
   call (no zoom-dependent screen-space nudging), and a drive sharing a
   facility's venue receives a fixed south-east offset.

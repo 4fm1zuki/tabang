@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/widgets/digos_vector_map.dart';
 
@@ -57,6 +58,31 @@ void main() {
       final labelMax = label.reduce((a, b) => a > b ? a : b);
       expect(labelMax, greaterThan(120));
       expect(labelMax, lessThan(220));
+    });
+  });
+
+  group('light map canvas', () {
+    test('the canvas and the outside mask are plain white', () {
+      // The base map must not pick up an off-white, beige or blue cast; both
+      // stops of each light gradient are pure white.
+      const white = Color(0xFFFFFFFF);
+      expect(DigosMapColors.paperGradient.colors, [white, white]);
+      expect(DigosMapColors.outsideGradient.colors, [white, white]);
+    });
+
+    test('light tiles are drawn untinted', () {
+      // Identity matrix: no warm or cool cast on the Humanitarian raster.
+      expect(DigosMapColors.lightTileFilter, [
+        1, 0, 0, 0, 0, //
+        0, 1, 0, 0, 0, //
+        0, 0, 1, 0, 0, //
+        0, 0, 0, 1, 0, //
+      ]);
+    });
+
+    test('barangay outlines use the deeper opaque terracotta', () {
+      expect(DigosMapColors.internalBorder, const Color(0xFFB85C42));
+      expect(DigosMapColors.cityBorder, const Color(0xFF5A1512));
     });
   });
 }

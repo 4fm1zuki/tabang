@@ -17,16 +17,11 @@ import '../../widgets/photo.dart';
 
 /// How the map and donor directory share a phone screen.
 ///
-/// The enum order is the order the single map-size button cycles through; the
-/// default is [half].
-///
-/// * [mapOnly] — the map fills the page; the directory is out of the way.
-/// * [half] — the default split: map above, directory below (side by side on
-///   desktop).
-/// * [hidden] — the map is out of the way and the directory fills the page.
-/// * [strip] — a short map strip above the directory, leaving most of the page
-///   for donor cards. This is also the mode **Show map** restores.
-enum _DonorMapMode { mapOnly, half, hidden, strip }
+/// The map is either on (the default [half] split) or off ([hidden]), toggled
+/// by one **Hide map** / **Show map** button. [mapOnly] is the donor list's own
+/// collapsed state, driven by the **Hide donor list** / **Show donor list**
+/// chevron rather than by the map switch.
+enum _DonorMapMode { mapOnly, half, hidden }
 
 /// Find Donor: Digos City vector map plus the donor directory.
 ///
@@ -562,23 +557,15 @@ class _FindDonorPageState extends State<FindDonorPage> {
                 width: width,
                 mapHeight: math.max(220.0, height * 0.52),
               );
-            case _DonorMapMode.strip:
-              // A deliberately shorter strip: the map stays useful for a quick
-              // location check while most of the page belongs to the list.
-              return _stackedMap(
-                context,
-                width: width,
-                mapHeight: (height * 0.38).clamp(200.0, 300.0).toDouble(),
-              );
           }
         }
 
         return switch (_mapMode) {
           _DonorMapMode.mapOnly => _buildMapPane(context, compact: false),
           _DonorMapMode.hidden => _buildDonorOnlyPane(context, compact: false),
-          // The strip is a phone arrangement. On a wide window both visible
-          // modes keep the side-by-side map and directory.
-          _DonorMapMode.half || _DonorMapMode.strip => Row(
+          // One visible arrangement on a wide window: map and directory side
+          // by side.
+          _DonorMapMode.half => Row(
             children: [
               Expanded(child: _buildMapPane(context, compact: false)),
               Container(
@@ -596,7 +583,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
-  /// The two stacked phone arrangements (half split and short strip).
+  /// The stacked phone arrangement: map above the directory.
   Widget _stackedMap(
     BuildContext context, {
     required double width,
@@ -631,9 +618,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
               key: const ValueKey('showDonorMapButton'),
-              // Restore the short strip, matching the mode that follows
-              // "Hide map" in the cycle and the staff Operations control.
-              onPressed: () => setState(() => _mapMode = _DonorMapMode.strip),
+              // The switch is symmetrical: Show map brings back the default
+              // half split, not a special short-strip arrangement.
+              onPressed: () => setState(() => _mapMode = _DonorMapMode.half),
               icon: const Icon(Icons.map_outlined, size: 16),
               label: const Text('Show map'),
             ),
@@ -644,80 +631,19 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
-  /// Map-size dropdown, shown in the donor list header.
-  ///
-  /// One button expands the four staff Operations vocabulary entries — Map
-  /// only, Half screen, Hide map and Strip + list — instead of cycling through
-  /// them silently on every tap, and it lives with the list it rearranges.
-  Widget _mapModeMenu(BuildContext context) {
-    final currentIcon = switch (_mapMode) {
-      _DonorMapMode.mapOnly => Icons.open_in_full,
-      _DonorMapMode.half => Icons.horizontal_split_outlined,
-      _DonorMapMode.hidden => Icons.view_list_outlined,
-      _DonorMapMode.strip => Icons.view_agenda_outlined,
-    };
-    return PopupMenuButton<_DonorMapMode>(
-      key: const ValueKey('findDonorMapModeMenu'),
-      tooltip: 'Map size',
-      position: PopupMenuPosition.under,
-      onSelected: (mode) => setState(() => _mapMode = mode),
-      itemBuilder: (context) => [
-        _mapModeItem(_DonorMapMode.mapOnly, Icons.open_in_full, 'Map only'),
-        _mapModeItem(
-          _DonorMapMode.half,
-          Icons.horizontal_split_outlined,
-          'Half screen',
-        ),
-        _mapModeItem(
-          _DonorMapMode.hidden,
-          Icons.view_list_outlined,
-          'Hide map',
-        ),
-        _mapModeItem(
-          _DonorMapMode.strip,
-          Icons.view_agenda_outlined,
-          'Strip + list',
-        ),
-      ],
-      child: Material(
-        color: context.surface.withValues(alpha: 0.96),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TabangRadius.sm),
-          side: BorderSide(color: context.border),
-        ),
-        child: SizedBox(
-          width: 44,
-          height: 28,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(currentIcon, size: 14, color: context.textColor),
-              Icon(
-                Icons.keyboard_arrow_down,
-                size: 16,
-                color: context.textMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  PopupMenuItem<_DonorMapMode> _mapModeItem(
-    _DonorMapMode value,
-    IconData icon,
-    String label,
-  ) {
-    return PopupMenuItem(
-      value: value,
-      height: 42,
-      child: Row(
-        children: [
-          Icon(icon, size: 17),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontSize: 12.5)),
-        ],
+  /// One switch button for map visibility, sitting where the old size menu
+  /// was in the donor list header. The hidden state reuses the **Show map**
+  /// button rendered above the list.
+  Widget _hideMapButton(BuildContext context) {
+    return OutlinedButton.icon(
+      key: const ValueKey('hideDonorMapButton'),
+      onPressed: () => setState(() => _mapMode = _DonorMapMode.hidden),
+      icon: const Icon(Icons.visibility_off_outlined, size: 15),
+      label: const Text('Hide map'),
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        textStyle: const TextStyle(fontSize: 12),
       ),
     );
   }
@@ -1365,6 +1291,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     Tooltip(
                       message: 'Hide donor list',
                       child: InkWell(
+                        key: const ValueKey('collapseDonorListButton'),
                         onTap: () =>
                             setState(() => _mapMode = _DonorMapMode.mapOnly),
                         borderRadius: BorderRadius.circular(20),
@@ -1414,10 +1341,13 @@ class _FindDonorPageState extends State<FindDonorPage> {
                       tone: Tone.brand,
                       dense: true,
                     ),
-                    // The map-size dropdown belongs to the list it rearranges.
-                    if (compact) ...[
+                    // The map on/off switch belongs to the list it rearranges.
+                    // While the map is hidden the one **Show map** button
+                    // above the list is the switch, so a second button here
+                    // would be a duplicate.
+                    if (compact && _mapMode != _DonorMapMode.hidden) ...[
                       const SizedBox(width: 6),
-                      _mapModeMenu(context),
+                      _hideMapButton(context),
                     ],
                     if (_selectedBarangay != null) ...[
                       const SizedBox(width: 6),

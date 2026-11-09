@@ -604,6 +604,24 @@ Tone toneForUrgency(RequestUrgency urgency) {
   }
 }
 
+/// Maps a request status to a display tone.
+Tone toneForRequest(RequestStatus status) {
+  switch (status) {
+    case RequestStatus.pendingReview:
+      return Tone.warning;
+    case RequestStatus.open:
+      return Tone.info;
+    case RequestStatus.matched:
+      return Tone.brand;
+    case RequestStatus.fulfilled:
+      return Tone.success;
+    case RequestStatus.rejected:
+      return Tone.danger;
+    case RequestStatus.cancelled:
+      return Tone.neutral;
+  }
+}
+
 /// Maps unit status to a display tone.
 Tone toneForUnit(UnitStatus status) {
   switch (status) {

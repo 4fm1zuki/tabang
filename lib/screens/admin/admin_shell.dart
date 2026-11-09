@@ -82,22 +82,43 @@ class _AdminShellState extends State<AdminShell> {
     });
   }
 
-  /// Opens a destination that is not in the phone bottom bar.
-  void _pushStandalone(int index) {
+  /// Opens an account-menu page that is deliberately not a rail destination.
+  void _pushPage(String title, Widget page) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(_destinations[index].label),
-            leading: const BackButton(),
-          ),
+          appBar: AppBar(title: Text(title), leading: const BackButton()),
           body: DecoratedBox(
             decoration: BoxDecoration(gradient: TabangGradients.page(context)),
-            child: _pages.putIfAbsent(index, () => _buildPage(index)),
+            child: page,
           ),
         ),
       ),
     );
+  }
+
+  void _openProfile() => _pushPage('Profile', ProfilePage(user: widget.user));
+
+  void _openSettings() {
+    _pushPage(
+      'Settings',
+      SettingsPage(
+        user: widget.user,
+        themeMode: widget.themeMode,
+        onThemeModeChanged: widget.onThemeModeChanged,
+        compactNav: widget.compactNav,
+        onCompactNavChanged: widget.onCompactNavChanged,
+        railPinned: _pinned,
+        onRailPinnedChanged: (value) {
+          setState(() => _pinned = value);
+          widget.onRailPinnedChanged?.call(value);
+        },
+      ),
+    );
+  }
+
+  void _openHelp() {
+    _pushPage('About & Help', AboutHelpPage(onOpenMessages: () => _select(2)));
   }
 
   /// Labels are only built after the rail finishes sliding, so the wordmark
@@ -115,6 +136,9 @@ class _AdminShellState extends State<AdminShell> {
     _pages[0] = _buildPage(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // Overview is already on screen at startup, so its dot would never
+      // clear otherwise.
+      _repo.markTabSeen(widget.user.id, 'overview');
       final user = _repo.userById(widget.user.id) ?? widget.user;
       if (!user.onboardingCompleted) showWelcomeGuide(context, user);
     });
@@ -147,16 +171,12 @@ class _AdminShellState extends State<AdminShell> {
       if (oldWidget.compactNav != widget.compactNav && widget.compactNav) {
         _pinned = false;
       }
-      if ((oldWidget.themeMode != widget.themeMode ||
-              oldWidget.compactNav != widget.compactNav ||
-              oldWidget.railPinned != widget.railPinned) &&
-          _pages.containsKey(6)) {
-        _pages[6] = _buildPage(6);
-      }
     }
   }
 
   void _select(int index) {
+    final tabKey = _tabKeys[index];
+    if (tabKey != null) _repo.markTabSeen(widget.user.id, tabKey);
     setState(() {
       _index = index;
       _navHidden = false;
@@ -171,6 +191,7 @@ class _AdminShellState extends State<AdminShell> {
   /// Opens Operations directly on the inventory section, without adding a
   /// second top-level Inventory destination to the staff sidebar.
   void _openOperationsInventory() {
+    _repo.markTabSeen(widget.user.id, 'operations');
     setState(() {
       _operationsSection = 1;
       _pages.remove(1);
@@ -221,20 +242,55 @@ class _AdminShellState extends State<AdminShell> {
     return false;
   }
 
+  // Profile, Settings and About & Help live in the account menu only; the
+  // rail is limited to the five work destinations staff actually switch
+  // between.
   static const _destinations = <_Destination>[
     _Destination('Overview', Icons.dashboard_outlined, Icons.dashboard),
     _Destination('Operations', Icons.map_outlined, Icons.map),
     _Destination('Messages', Icons.forum_outlined, Icons.forum),
     _Destination('Users', Icons.people_outline, Icons.people),
     _Destination('Moderation', Icons.gavel_outlined, Icons.gavel),
-    _Destination('Profile', Icons.person_outline, Icons.person),
-    _Destination('Settings', Icons.settings_outlined, Icons.settings),
-    _Destination('About & Help', Icons.help_outline, Icons.help),
   ];
 
-  /// Bottom-bar slots on phones and small tablets. Settings and About & Help
-  /// stay in the account menu so the bar keeps six readable destinations.
-  static const _phoneIndices = <int>[0, 1, 2, 3, 4, 5];
+  /// Bottom-bar slots on phones and small tablets.
+  static const _phoneIndices = <int>[0, 1, 2, 3, 4];
+
+  /// Repository "new activity" surface behind each destination. Messages keep
+  /// their own unread counter instead.
+  static const Map<int, String> _tabKeys = {
+    0: 'overview',
+    1: 'operations',
+    3: 'users',
+    4: 'moderation',
+  };
+
+  bool _hasNewFor(int index) {
+    final key = _tabKeys[index];
+    if (key == null) return false;
+    return _repo.tabActivityCount(widget.user.id, key) > 0;
+  }
+
+  Set<int> get _newIndices => {
+    for (final index in _tabKeys.keys)
+      if (_hasNewFor(index)) index,
+  };
+
+  Widget _destinationIcon(
+    int index, {
+    required bool active,
+    required int unreadMessages,
+    required Set<int> newIndices,
+  }) {
+    final icon = Icon(
+      active ? _destinations[index].activeIcon : _destinations[index].icon,
+    );
+    if (index == 2) {
+      return _UnreadBadge(count: unreadMessages, child: icon);
+    }
+    if (newIndices.contains(index)) return _NewDot(child: icon);
+    return icon;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -247,6 +303,7 @@ class _AdminShellState extends State<AdminShell> {
     final railExpanded = wide && !slim && (_pinned || _hovering);
     final showLabels = railExpanded && _railSettled;
     final unreadMessages = _repoUnreadCount;
+    final newIndices = _newIndices;
 
     final content = IndexedStack(
       index: _index,
@@ -269,9 +326,9 @@ class _AdminShellState extends State<AdminShell> {
                   user: widget.user,
                   navPinned: _navPinned,
                   onToggleNavPin: _toggleNavPin,
-                  onOpenProfile: () => _pushStandalone(5),
-                  onOpenSettings: () => _pushStandalone(6),
-                  onOpenHelp: () => _pushStandalone(7),
+                  onOpenProfile: _openProfile,
+                  onOpenSettings: _openSettings,
+                  onOpenHelp: _openHelp,
                 ),
                 Expanded(
                   child: NotificationListener<ScrollNotification>(
@@ -318,24 +375,18 @@ class _AdminShellState extends State<AdminShell> {
                                 destinations: [
                                   for (final index in _phoneIndices)
                                     NavigationDestination(
-                                      icon: index == 2
-                                          ? _UnreadBadge(
-                                              count: unreadMessages,
-                                              child: Icon(
-                                                _destinations[index].icon,
-                                              ),
-                                            )
-                                          : Icon(_destinations[index].icon),
-                                      selectedIcon: index == 2
-                                          ? _UnreadBadge(
-                                              count: unreadMessages,
-                                              child: Icon(
-                                                _destinations[index].activeIcon,
-                                              ),
-                                            )
-                                          : Icon(
-                                              _destinations[index].activeIcon,
-                                            ),
+                                      icon: _destinationIcon(
+                                        index,
+                                        active: false,
+                                        unreadMessages: unreadMessages,
+                                        newIndices: newIndices,
+                                      ),
+                                      selectedIcon: _destinationIcon(
+                                        index,
+                                        active: true,
+                                        unreadMessages: unreadMessages,
+                                        newIndices: newIndices,
+                                      ),
                                       label: _destinations[index].label,
                                       tooltip: _destinations[index].label,
                                     ),
@@ -373,6 +424,7 @@ class _AdminShellState extends State<AdminShell> {
               child: _AdminSidebar(
                 user: widget.user,
                 unreadMessages: unreadMessages,
+                newIndices: newIndices,
                 destinations: _destinations,
                 selectedIndex: _index,
                 railExpanded: railExpanded,
@@ -386,6 +438,9 @@ class _AdminShellState extends State<AdminShell> {
                   }
                 },
                 onSelect: _select,
+                onOpenProfile: _openProfile,
+                onOpenSettings: _openSettings,
+                onOpenHelp: _openHelp,
                 onTogglePin: () {
                   final wasSlim = widget.compactNav;
                   setState(() {
@@ -437,26 +492,6 @@ class _AdminShellState extends State<AdminShell> {
         return UserManagementPage(currentUser: widget.user);
       case 4:
         return ChatModerationPage(currentUser: widget.user);
-      case 5:
-        return ProfilePage(user: widget.user);
-      case 6:
-        return SettingsPage(
-          user: widget.user,
-          themeMode: widget.themeMode,
-          onThemeModeChanged: widget.onThemeModeChanged,
-          compactNav: widget.compactNav,
-          onCompactNavChanged: widget.onCompactNavChanged,
-          railPinned: _pinned,
-          onRailPinnedChanged: (value) {
-            setState(() {
-              _pinned = value;
-              if (_pages.containsKey(6)) _pages[6] = _buildPage(6);
-            });
-            widget.onRailPinnedChanged?.call(value);
-          },
-        );
-      case 7:
-        return AboutHelpPage(onOpenMessages: () => _select(2));
       default:
         return AdminOverviewPage(
           user: widget.user,
@@ -493,6 +528,22 @@ class _UnreadBadge extends StatelessWidget {
           color: Colors.white,
         ),
       ),
+      child: child,
+    );
+  }
+}
+
+/// A small dot marking a destination with unseen activity.
+class _NewDot extends StatelessWidget {
+  const _NewDot({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      smallSize: 7,
+      backgroundColor: TabangColors.crimson,
       child: child,
     );
   }
@@ -622,6 +673,7 @@ class _AdminSidebar extends StatelessWidget {
   const _AdminSidebar({
     required this.user,
     required this.unreadMessages,
+    required this.newIndices,
     required this.destinations,
     required this.selectedIndex,
     required this.railExpanded,
@@ -630,13 +682,20 @@ class _AdminSidebar extends StatelessWidget {
     required this.pinned,
     required this.onSlideEnd,
     required this.onSelect,
+    required this.onOpenProfile,
+    required this.onOpenSettings,
+    required this.onOpenHelp,
     required this.onTogglePin,
   });
 
   final AppUser user;
   final int unreadMessages;
+  final Set<int> newIndices;
   final List<_Destination> destinations;
   final int selectedIndex;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onOpenHelp;
 
   /// Width target of the slide animation.
   final bool railExpanded;
@@ -756,6 +815,11 @@ class _AdminSidebar extends StatelessWidget {
               itemBuilder: (context, i) {
                 final destination = destinations[i];
                 final selected = i == selectedIndex;
+                final icon = Icon(
+                  selected ? destination.activeIcon : destination.icon,
+                  size: 19,
+                  color: selected ? Colors.white : Colors.white70,
+                );
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 2),
@@ -780,25 +844,11 @@ class _AdminSidebar extends StatelessWidget {
                             i == 2
                                 ? _UnreadBadge(
                                     count: unreadMessages,
-                                    child: Icon(
-                                      selected
-                                          ? destination.activeIcon
-                                          : destination.icon,
-                                      size: 19,
-                                      color: selected
-                                          ? Colors.white
-                                          : Colors.white70,
-                                    ),
+                                    child: icon,
                                   )
-                                : Icon(
-                                    selected
-                                        ? destination.activeIcon
-                                        : destination.icon,
-                                    size: 19,
-                                    color: selected
-                                        ? Colors.white
-                                        : Colors.white70,
-                                  ),
+                                : newIndices.contains(i)
+                                ? _NewDot(child: icon)
+                                : icon,
                             if (expanded) ...[
                               const SizedBox(width: TabangSpace.md),
                               Expanded(
@@ -908,30 +958,51 @@ class _AdminSidebar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              user.fullName,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: context.textColor,
-              ),
-            ),
-            Text(
-              '${user.role.label} · ${user.email}',
-              style: TextStyle(fontSize: 12.5, color: context.textMuted),
-            ),
-            const SizedBox(height: TabangSpace.md),
-            const Divider(),
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.person_outline, size: 19),
-              title: const Text('Profile', style: TextStyle(fontSize: 13.5)),
+            // The identity row itself opens Profile, replacing the separate
+            // Profile entry that used to sit below the divider.
+            InkWell(
+              borderRadius: BorderRadius.circular(TabangRadius.xs),
               onTap: () {
                 Navigator.pop(context);
-                onSelect(5);
+                onOpenProfile();
               },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.fullName,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: context.textColor,
+                            ),
+                          ),
+                          Text(
+                            '${user.role.label} · ${user.email}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: context.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: context.textMuted,
+                    ),
+                  ],
+                ),
+              ),
             ),
+            const SizedBox(height: TabangSpace.sm),
+            const Divider(),
             ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
@@ -939,7 +1010,7 @@ class _AdminSidebar extends StatelessWidget {
               title: const Text('Settings', style: TextStyle(fontSize: 13.5)),
               onTap: () {
                 Navigator.pop(context);
-                onSelect(6);
+                onOpenSettings();
               },
             ),
             ListTile(
@@ -952,7 +1023,7 @@ class _AdminSidebar extends StatelessWidget {
               ),
               onTap: () {
                 Navigator.pop(context);
-                onSelect(7);
+                onOpenHelp();
               },
             ),
             const Divider(),

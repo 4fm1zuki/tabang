@@ -121,6 +121,7 @@ class TabangRepository {
 
   final List<AppUser> _users = [];
   final List<BloodUnit> _units = [];
+  final List<RemovedUnitRecord> _removedUnits = [];
   final List<BloodRequest> _requests = [];
   final List<RequestResponse> _responses = [];
   final List<ChatThread> _threads = [];
@@ -1046,6 +1047,40 @@ class TabangRepository {
     return true;
   }
 
+  /// Undo a verification: the request returns to the review queue and any
+  /// blood-bank holds placed at verification time are released.
+  ///
+  /// Refused once fulfilment has started, so an undo cannot unwind a real
+  /// donation.
+  bool revertRequestVerification(String requestId, {required String actorId}) {
+    final actor = userById(actorId);
+    final index = _requests.indexWhere((r) => r.id == requestId);
+    if (actor == null || index == -1) return false;
+    if (!actor.role.isAdminSide) return false;
+    final request = _requests[index];
+    if (request.status != RequestStatus.open || request.unitsFulfilled > 0) {
+      return false;
+    }
+    for (final barcode in request.assignedUnitIds) {
+      cancelReservation(barcode: barcode, userId: request.requesterId);
+    }
+    _requests[index] = request.copyWith(
+      status: RequestStatus.pendingReview,
+      clearReview: true,
+      assignedUnitIds: const [],
+    );
+    _logActivity(
+      kind: ActivityKind.requestSubmitted,
+      actorId: actorId,
+      subjectId: request.requesterId,
+      summary:
+          'Reopened request ${request.id} for review after an undo '
+          '(${request.patientAlias})',
+    );
+    _notify();
+    return true;
+  }
+
   /// A donor offers to serve a request. This does not consume a unit and does
   /// not mark the request matched; the requester must select a response.
   ///
@@ -1368,18 +1403,77 @@ class TabangRepository {
 
   /// Staff remove a bag from the ledger entirely, for example a discarded or
   /// mislabelled unit that should no longer appear in any inventory view.
+  ///
+  /// The removal is recorded in [removedUnits] so the shelf change is visible
+  /// and can be undone with [restoreRemovedUnit].
   bool removeBloodUnit(String barcode, {required String actorId}) {
     final actor = userById(actorId);
     if (actor == null || !actor.role.isAdminSide) return false;
     final index = _units.indexWhere((unit) => unit.barcode == barcode);
     if (index == -1) return false;
     final removed = _units.removeAt(index);
+    _removedUnits.insert(
+      0,
+      RemovedUnitRecord(
+        unit: removed,
+        removedAt: DateTime.now(),
+        removedById: actorId,
+      ),
+    );
     _logActivity(
       kind: ActivityKind.inventory,
       actorId: actorId,
       summary:
           'Removed unit ${removed.barcode} '
           '(${removed.bloodType.label} ${removed.component.label.toLowerCase()})',
+    );
+    _notify();
+    return true;
+  }
+
+  /// Every ledger removal, newest first, including units already restored.
+  List<RemovedUnitRecord> get removedUnits => List.unmodifiable(_removedUnits);
+
+  /// Puts a removed bag back on the shelf.
+  ///
+  /// A restore reuses the original barcode; when a new bag already claimed it
+  /// the caller can pass [newBarcode]. The restored record keeps its history
+  /// entry so the audit trail still shows the removal and the restore.
+  bool restoreRemovedUnit(
+    String barcode, {
+    required String actorId,
+    String? newBarcode,
+  }) {
+    final actor = userById(actorId);
+    if (actor == null || !actor.role.canManageInventory) return false;
+    final index = _removedUnits.indexWhere(
+      (record) => !record.restored && record.unit.barcode == barcode,
+    );
+    if (index == -1) return false;
+    final record = _removedUnits[index];
+    final restored = record.unit;
+    final desired = (newBarcode == null || newBarcode.trim().isEmpty)
+        ? restored.barcode
+        : newBarcode.trim();
+    if (_units.any((unit) => unit.barcode == desired)) return false;
+
+    _units.insert(
+      0,
+      BloodUnit(
+        barcode: desired,
+        bloodType: restored.bloodType,
+        component: restored.component,
+        storageBay: restored.storageBay,
+        status: UnitStatus.available,
+        collectedOn: restored.collectedOn,
+        expiresOn: restored.expiresOn,
+      ),
+    );
+    _removedUnits[index] = record.copyWith(restored: true);
+    _logActivity(
+      kind: ActivityKind.inventory,
+      actorId: actorId,
+      summary: 'Restored unit $desired to available stock',
     );
     _notify();
     return true;
@@ -1663,6 +1757,83 @@ class TabangRepository {
   /// Number of conversations with at least one unread message.
   int unreadThreadCountFor(String userId) =>
       threadsFor(userId).where((thread) => thread.hasUnreadFor(userId)).length;
+
+  /// Which activity kinds light the shell's "new" dot for each surface.
+  ///
+  /// Messages keep their own unread counters; every other tab reads the
+  /// chapter activity log, which already records requests, inventory moves,
+  /// verifications and moderation actions with timestamps.
+  static const Map<String, Set<ActivityKind>> _tabActivityKinds = {
+    'home': {
+      ActivityKind.donation,
+      ActivityKind.inventory,
+      ActivityKind.requestVerified,
+    },
+    'find_donor': {ActivityKind.verification, ActivityKind.requestVerified},
+    'requests': {
+      ActivityKind.requestSubmitted,
+      ActivityKind.requestVerified,
+      ActivityKind.requestRejected,
+    },
+    'bloodbank': {ActivityKind.inventory},
+    'donor_hub': {
+      ActivityKind.application,
+      ActivityKind.verification,
+      ActivityKind.warning,
+      ActivityKind.suspension,
+      ActivityKind.donation,
+      ActivityKind.donationWindow,
+    },
+    'overview': {ActivityKind.donation},
+    'operations': {
+      ActivityKind.requestSubmitted,
+      ActivityKind.requestVerified,
+      ActivityKind.requestRejected,
+      ActivityKind.inventory,
+    },
+    'users': {
+      ActivityKind.application,
+      ActivityKind.verification,
+      ActivityKind.warning,
+      ActivityKind.suspension,
+      ActivityKind.profile,
+      ActivityKind.avatar,
+    },
+    'moderation': {ActivityKind.report},
+  };
+
+  /// Surfaces whose dot only counts events about [userId] rather than the
+  /// whole chapter.
+  static const Set<String> _personalTabs = {'donor_hub'};
+
+  /// Highest seen event count per user and tab. Session state on purpose: a
+  /// fresh login should show what happened since it last looked.
+  final Map<String, Map<String, int>> _tabSeen = {};
+
+  Iterable<ActivityEvent> _tabEvents(String userId, String tab) {
+    final kinds = _tabActivityKinds[tab] ?? const <ActivityKind>{};
+    return _activity.where(
+      (event) =>
+          kinds.contains(event.kind) &&
+          (!_personalTabs.contains(tab) || event.subjectId == userId),
+    );
+  }
+
+  /// Unseen activity behind the "new" dot for [tab]. Zero means nothing new.
+  int tabActivityCount(String userId, String tab) {
+    final seen = _tabSeen[userId]?[tab] ?? 0;
+    final count = _tabEvents(userId, tab).length;
+    return count <= seen ? 0 : count - seen;
+  }
+
+  /// Clears the dot for [tab] and remembers how much activity was on screen.
+  void markTabSeen(String userId, String tab) {
+    if (!_tabActivityKinds.containsKey(tab)) return;
+    final count = _tabEvents(userId, tab).length;
+    final previous = _tabSeen[userId]?[tab];
+    _tabSeen.putIfAbsent(userId, () => {})[tab] = count;
+    if (previous != count) _notify();
+  }
 
   void flagMessage(String threadId, String messageId, ModerationFlag flag) {
     final index = _threads.indexWhere((t) => t.id == threadId);
@@ -2024,6 +2195,7 @@ class TabangRepository {
     _activity.clear();
     _drives.clear();
     _content.clear();
+    _removedUnits.clear();
     _blocks.clear();
     _unblockedAt.clear();
     // These two were the leak that let an earlier test's donor application or
@@ -2031,6 +2203,7 @@ class TabangRepository {
     _donorApplications.clear();
     _driveInterests.clear();
     _readinessTargets = ReadinessTargets.defaults;
+    _tabSeen.clear();
     currentUser = null;
     _seed();
     _notify();
@@ -3474,7 +3647,7 @@ class TabangRepository {
             'The screening nurse makes the final call.',
         tag: 'FAQ',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/educational/edu_eligibility.png',
+        imageAsset: 'assets/images/content_tattoo.jpg',
       ),
       ContentItem(
         id: 'CNT-007',
@@ -3537,7 +3710,7 @@ class TabangRepository {
             'identity and walk you through the questionnaire.',
         tag: 'CHECKLIST',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/educational/edu_prepare.png',
+        imageAsset: 'assets/images/content_donation_day.jpg',
       ),
       ContentItem(
         id: 'CNT-012',
@@ -3564,7 +3737,7 @@ class TabangRepository {
             'chapter if you feel faint or the site starts bleeding.',
         tag: 'AFTERCARE',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/educational/edu_aftercare.png',
+        imageAsset: 'assets/images/content_aftercare.jpg',
       ),
     ]);
   }

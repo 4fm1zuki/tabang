@@ -153,6 +153,32 @@ class BloodUnit {
   bool get isUsable => isUsableAt(DateTime.now());
 }
 
+/// One ledger removal, kept so staff can see what left the shelf and restore a
+/// bag that was discarded by mistake.
+class RemovedUnitRecord {
+  const RemovedUnitRecord({
+    required this.unit,
+    required this.removedAt,
+    required this.removedById,
+    this.restored = false,
+  });
+
+  final BloodUnit unit;
+  final DateTime removedAt;
+  final String removedById;
+
+  /// True once the unit was returned to the shelf; the record stays in the
+  /// history instead of disappearing, so the audit trail is complete.
+  final bool restored;
+
+  RemovedUnitRecord copyWith({bool? restored}) => RemovedUnitRecord(
+    unit: unit,
+    removedAt: removedAt,
+    removedById: removedById,
+    restored: restored ?? this.restored,
+  );
+}
+
 /// Account lifecycle for a registered user.
 enum AccountStatus {
   unverified('Unverified'),
@@ -602,6 +628,7 @@ class BloodRequest {
     bool? postToDonorNetwork,
     String? reviewNote,
     bool clearReviewNote = false,
+    bool clearReview = false,
     String? reviewedById,
     List<String>? assignedUnitIds,
   }) {
@@ -623,8 +650,10 @@ class BloodRequest {
       documents: documents ?? this.documents,
       scheduledFor: scheduledFor ?? this.scheduledFor,
       postToDonorNetwork: postToDonorNetwork ?? this.postToDonorNetwork,
-      reviewNote: clearReviewNote ? null : (reviewNote ?? this.reviewNote),
-      reviewedById: reviewedById ?? this.reviewedById,
+      reviewNote: clearReview || clearReviewNote
+          ? null
+          : (reviewNote ?? this.reviewNote),
+      reviewedById: clearReview ? null : (reviewedById ?? this.reviewedById),
       assignedUnitIds: assignedUnitIds ?? this.assignedUnitIds,
     );
   }

@@ -9,6 +9,7 @@ import 'package:tabang/screens/auth/login_screen.dart';
 import 'package:tabang/screens/donor/blood_bank_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_shell.dart';
+import 'package:tabang/screens/donor/find_donor_page.dart';
 import 'package:tabang/screens/shared/settings_page.dart';
 import 'package:tabang/theme.dart';
 
@@ -132,6 +133,60 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+
+    // Scheduling regression: picking Saturday must rebuild the Time list to
+    // the published half-day hours (8–11), not keep a weekday hour that the
+    // selected day does not offer.
+    final dayDropdown = find.byType(DropdownButton<DateTime>);
+    await tester.ensureVisible(dayDropdown);
+    await tester.pumpAndSettle();
+    await tester.tap(dayDropdown);
+    await tester.pumpAndSettle();
+    // "Sat," only matches the menu labels ("Sat, Nov 14"); the schedule blurb
+    // uses "Sat 8–11" and must not be tapped.
+    await tester.tap(find.textContaining('Sat,').first);
+    await tester.pumpAndSettle();
+
+    final timeDropdown = tester.widget<DropdownButton<int>>(
+      find.byType(DropdownButton<int>),
+    );
+    final saturday = repo
+        .bloodBankSlots(days: 14)
+        .where((slot) => slot.weekday == DateTime.saturday)
+        .first;
+    expect(
+      timeDropdown.items!.map((item) => item.value).toList(),
+      TabangRepository.bloodBankSaturdayHours,
+    );
+    expect(timeDropdown.value, saturday.hour);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('find donor map switch and list fit a 360 px phone', (
+    tester,
+  ) async {
+    await usePhone(tester);
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(host(FindDonorPage(user: donor)));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    // The single map switch: Hide map swaps for Show map above the list, and
+    // only one of the two ever exists.
+    final hideMap = find.byKey(const ValueKey('hideDonorMapButton'));
+    await tester.ensureVisible(hideMap);
+    await tester.pumpAndSettle();
+    await tester.tap(hideMap);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('hideDonorMapButton')), findsNothing);
+    expect(find.byKey(const ValueKey('showDonorMapButton')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const ValueKey('showDonorMapButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('hideDonorMapButton')), findsOneWidget);
+    expect(find.byKey(const ValueKey('showDonorMapButton')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('inventory booked slots fit a 360 px phone', (tester) async {
@@ -149,6 +204,27 @@ void main() {
 
     expect(find.text('Awaiting verification'), findsWidgets);
     expect(find.text('Verify slot'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    // The restyled request queue and the removed-units ledger fit too. The
+    // tab row sits above the queue, so scroll it back into view first.
+    final requestsTab = find.text('Requests');
+    await tester.ensureVisible(requestsTab);
+    await tester.pumpAndSettle();
+    await tester.tap(requestsTab);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    final removedTab = find.textContaining('Removed units');
+    await tester.ensureVisible(removedTab);
+    await tester.pumpAndSettle();
+    await tester.tap(removedTab);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No removed units'),
+      findsOneWidget,
+      reason: 'a fresh session has no ledger removals',
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -298,14 +374,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    Badge messageBadge() => tester.widget<Badge>(
-      find
-          .descendant(
+    // Other destinations now carry unlabeled "new activity" dots, so pick the
+    // navigation badge that actually carries the message count label.
+    Badge messageBadge() => tester
+        .widgetList<Badge>(
+          find.descendant(
             of: find.byType(NavigationBar),
             matching: find.byType(Badge),
-          )
-          .first,
-    );
+          ),
+        )
+        .firstWhere((badge) => badge.label != null);
 
     expect(repo.unreadMessageCountFor('USR-001'), 2);
     expect(messageBadge().isLabelVisible, isTrue);

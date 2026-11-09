@@ -100,6 +100,30 @@ Future<void> showVerifyRequestDialog(
                       ? 'Request ${request.id} verified and opened.'
                       : 'Could not verify ${request.id}.',
                 ),
+                // Verifying also confirms the booked slot; the undo returns
+                // the request to the review queue and releases any holds.
+                action: ok
+                    ? SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () {
+                          final reverted = repo.revertRequestVerification(
+                            request.id,
+                            actorId: actor.id,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                reverted
+                                    ? 'Verification undone; ${request.id} is '
+                                          'back in review.'
+                                    : 'Could not undo the verification; '
+                                          'fulfilment may have started.',
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : null,
               ),
             );
           },

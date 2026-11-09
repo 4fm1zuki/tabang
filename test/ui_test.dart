@@ -20,6 +20,8 @@ import 'package:tabang/widgets/common.dart';
 import 'package:tabang/widgets/digos_vector_map.dart';
 import 'package:tabang/widgets/illustrations.dart';
 import 'package:tabang/widgets/photo.dart';
+import 'package:tabang/widgets/request_document_list.dart';
+import 'package:tabang/widgets/user_record_dialog.dart';
 
 void main() {
   final repo = TabangRepository.instance;
@@ -45,7 +47,7 @@ void main() {
     // Single unified interface: hero, then the two primary actions, then the
     // organised feed. The old four-button + summary stack is gone.
     expect(find.text('View blood requests'), findsOneWidget);
-    expect(find.text('Find donors near you'), findsOneWidget);
+    expect(find.text('Find a donor'), findsOneWidget);
     expect(find.text('Find a drive'), findsOneWidget);
     expect(find.text('Upcoming blood drives'), findsOneWidget);
     expect(find.text('Announcements & stories'), findsOneWidget);
@@ -107,55 +109,43 @@ void main() {
     expect(find.text('© OpenStreetMap contributors'), findsOneWidget);
     expect(find.textContaining('HOT style'), findsNothing);
 
-    // One map-size button replaces the old half/full-screen pair and cycles
-    // through all four arrangements on each tap.
-    final mapModeButton = find.byKey(const ValueKey('findDonorMapModeButton'));
-    expect(mapModeButton, findsOneWidget);
+    // The old four-mode dropdown is gone: one switch hides and shows the map.
+    expect(find.byKey(const ValueKey('findDonorMapModeMenu')), findsNothing);
+    final hideMapButton = find.byKey(const ValueKey('hideDonorMapButton'));
+    expect(hideMapButton, findsOneWidget);
     expect(find.byKey(const ValueKey('showDonorMapButton')), findsNothing);
-    expect(
-      find.byTooltip('Map: Half screen · tap for Hide map'),
-      findsOneWidget,
-    );
+    final halfHeight = tester.getSize(find.byType(DigosVectorMap)).height;
 
     // The donor pane's own collapse arrow still switches to "Map only": the
-    // map keeps the page and the directory steps out of the way.
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
+    // map keeps the page and the directory steps out of the way. The chevron
+    // in the map stack brings the list back.
+    await tester.tap(find.byKey(const ValueKey('collapseDonorListButton')));
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
     expect(find.textContaining('Available donors'), findsNothing);
-
-    // Half screen restores the default split.
-    await tester.tap(mapModeButton);
+    await tester.tap(find.byTooltip('Show donor list'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Available donors'), findsOneWidget);
+    expect(hideMapButton, findsOneWidget);
 
-    // The next tap hides the map; the restore control stays above the list.
-    await tester.tap(mapModeButton);
+    // Hide map swaps the switch for the Show map button above the list.
+    await tester.tap(hideMapButton);
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsNothing);
     expect(find.byKey(const ValueKey('showDonorMapButton')), findsOneWidget);
     expect(find.textContaining('Available donors'), findsOneWidget);
+    expect(hideMapButton, findsNothing);
 
-    // Show map restores the short strip, the mode after "Hide map".
+    // Show map brings back exactly the default half split.
     await tester.tap(find.byKey(const ValueKey('showDonorMapButton')));
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
     expect(find.textContaining('Available donors'), findsOneWidget);
     expect(
-      find.byTooltip('Map: Strip + list · tap for Map only'),
-      findsOneWidget,
+      tester.getSize(find.byType(DigosVectorMap)).height,
+      closeTo(halfHeight, 1),
     );
-
-    // The cycle closes: strip → map only → half screen.
-    await tester.tap(mapModeButton);
-    await tester.pumpAndSettle();
-    expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.textContaining('Available donors'), findsNothing);
-
-    await tester.tap(mapModeButton);
-    await tester.pumpAndSettle();
-    expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.textContaining('Available donors'), findsOneWidget);
+    expect(hideMapButton, findsOneWidget);
   });
 
   testWidgets('find donor desktop layout keeps its overlays and controls', (
@@ -546,6 +536,25 @@ void main() {
     // action are reachable. Slots now belong to requests, not appointments.
     expect(find.text('Awaiting verification'), findsWidgets);
     expect(find.text('Verify slot'), findsWidgets);
+
+    // The staff request queue carries the same card anatomy and tappable
+    // requester/responder names.
+    await tester.tap(find.text('Requests'));
+    await tester.pumpAndSettle();
+    expect(find.byType(UserMention), findsWidgets);
+    expect(find.byType(RequestDocumentList), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    // The removed-units ledger keeps a removal visible and offers a restore.
+    final removed = repo.units.first;
+    expect(repo.removeBloodUnit(removed.barcode, actorId: staff.id), isTrue);
+    await tester.tap(find.textContaining('Removed units'));
+    await tester.pumpAndSettle();
+    expect(find.text('Restore to stock'), findsWidgets);
+    expect(find.textContaining(removed.barcode), findsWidgets);
+    await tester.tap(find.text('Restore to stock').first);
+    await tester.pumpAndSettle();
+    expect(repo.units.any((u) => u.barcode == removed.barcode), isTrue);
     expect(tester.takeException(), isNull);
   });
 

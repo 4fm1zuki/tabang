@@ -1553,4 +1553,123 @@ void main() {
       expect(event.subjectAlias, 'Cardo');
     });
   });
+
+  group('Undo and the removed-units ledger', () {
+    test('a removed unit is listed and can be restored', () {
+      final staff = repo.userById('USR-010')!;
+      final unit = repo.units.firstWhere(
+        (u) => u.effectiveStatus(DateTime.now()) == UnitStatus.available,
+      );
+
+      expect(repo.removeBloodUnit(unit.barcode, actorId: staff.id), isTrue);
+      expect(repo.units.any((u) => u.barcode == unit.barcode), isFalse);
+      expect(repo.activityLog.first.kind, ActivityKind.inventory);
+
+      final record = repo.removedUnits.first;
+      expect(record.unit.barcode, unit.barcode);
+      expect(record.restored, isFalse);
+
+      expect(repo.restoreRemovedUnit(unit.barcode, actorId: staff.id), isTrue);
+      expect(repo.units.any((u) => u.barcode == unit.barcode), isTrue);
+      expect(repo.removedUnits.first.restored, isTrue);
+      // A record is restored once; a second undo is refused.
+      expect(repo.restoreRemovedUnit(unit.barcode, actorId: staff.id), isFalse);
+    });
+
+    test('restoring refuses a barcode that is back in use', () {
+      final staff = repo.userById('USR-010')!;
+      final unit = repo.units.first;
+      expect(repo.removeBloodUnit(unit.barcode, actorId: staff.id), isTrue);
+      expect(
+        repo.addBloodUnit(
+          actorId: staff.id,
+          bloodType: unit.bloodType,
+          component: unit.component,
+          storageBay: unit.storageBay,
+          barcode: unit.barcode,
+        ),
+        isNotNull,
+      );
+      expect(repo.restoreRemovedUnit(unit.barcode, actorId: staff.id), isFalse);
+    });
+
+    test(
+      'verification undo returns a request to review and releases holds',
+      () {
+        final staff = repo.userById('USR-010')!;
+        final created = repo.addRequest(
+          requesterId: 'USR-009',
+          patientAlias: 'Undo verification',
+          bloodType: BloodType.oNeg,
+          component: BloodComponent.packedRbc,
+          unitsNeeded: 1,
+          hospital: DigosFacilities.names.first,
+          barangay: 'Zone 2',
+          urgency: RequestUrgency.urgent,
+          source: RequestSource.bloodBank,
+          documents: uploadedDocuments(),
+          scheduledFor: repo.bloodBankSlots(days: 7).first,
+        )!;
+        final unit = repo
+            .compatibleUnitsFor(
+              recipientType: created.bloodType,
+              component: created.component,
+            )
+            .first;
+
+        expect(
+          repo.verifyRequest(
+            created.id,
+            actorId: staff.id,
+            unitIds: [unit.barcode],
+          ),
+          isTrue,
+        );
+        expect(
+          repo.units.firstWhere((u) => u.barcode == unit.barcode).reservedBy,
+          'USR-009',
+        );
+
+        expect(
+          repo.revertRequestVerification(created.id, actorId: staff.id),
+          isTrue,
+        );
+        final reverted = repo.requests.firstWhere((r) => r.id == created.id);
+        expect(reverted.status, RequestStatus.pendingReview);
+        expect(reverted.assignedUnitIds, isEmpty);
+        expect(
+          repo.units.firstWhere((u) => u.barcode == unit.barcode).reservedBy,
+          isNull,
+        );
+        expect(
+          repo.revertRequestVerification(created.id, actorId: staff.id),
+          isFalse,
+        );
+      },
+    );
+
+    test('tab dots clear when the surface is visited', () {
+      // Seeded donation activity lights Home.
+      expect(repo.tabActivityCount('USR-001', 'home'), greaterThan(0));
+      repo.markTabSeen('USR-001', 'home');
+      expect(repo.tabActivityCount('USR-001', 'home'), 0);
+
+      // A new verified request lights Requests.
+      expect(repo.tabActivityCount('USR-001', 'requests'), 0);
+      final created = repo.addRequest(
+        requesterId: 'USR-009',
+        patientAlias: 'Notification request',
+        bloodType: BloodType.oNeg,
+        component: BloodComponent.packedRbc,
+        unitsNeeded: 1,
+        hospital: DigosFacilities.names.first,
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.urgent,
+        documents: uploadedDocuments(),
+        scheduledFor: repo.bloodBankSlots(days: 7).first,
+      )!;
+      expect(repo.verifyRequest(created.id, actorId: 'USR-010'), isTrue);
+      expect(repo.tabActivityCount('USR-001', 'requests'), greaterThan(0));
+    });
+  });
 }

@@ -7,6 +7,7 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
+import '../../widgets/user_record_dialog.dart';
 
 /// Administrative analytics overview.
 ///
@@ -1179,6 +1180,21 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
               ],
             ),
           ),
+          if (event.subjectId != null &&
+              _repo.userById(event.subjectId!) != null)
+            IconButton(
+              tooltip: 'Show details for ${event.subjectAlias ?? 'account'}',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                Icons.badge_outlined,
+                size: 16,
+                color: context.textMuted,
+              ),
+              onPressed: () => showUserRecordDialog(
+                context,
+                _repo.userById(event.subjectId!)!,
+              ),
+            ),
         ],
       ),
     );

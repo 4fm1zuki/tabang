@@ -9,6 +9,7 @@ import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/request_document_list.dart';
 import '../../widgets/request_review_dialogs.dart';
+import '../../widgets/user_record_dialog.dart';
 
 /// Inventory and request management for chapter staff.
 ///
@@ -114,6 +115,12 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 'Booked slots',
                 _repo.pendingScheduledRequests.length,
               ),
+              _tabButton(
+                context,
+                3,
+                'Removed units',
+                _repo.removedUnits.where((record) => !record.restored).length,
+              ),
             ],
           ),
           const SizedBox(height: TabangSpace.lg),
@@ -121,7 +128,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           switch (_tab) {
             0 => _buildUnitsTab(context),
             1 => _buildRequestsTab(context),
-            _ => _buildBookedSlotsTab(context),
+            2 => _buildBookedSlotsTab(context),
+            _ => _buildRemovedUnitsTab(context),
           },
         ],
       ),
@@ -525,6 +533,26 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                           ? '${unit.barcode} removed from the ledger.'
                           : 'Could not remove ${unit.barcode}.',
                     ),
+                    action: ok
+                        ? SnackBarAction(
+                            label: 'Undo',
+                            onPressed: () {
+                              final restored = _repo.restoreRemovedUnit(
+                                unit.barcode,
+                                actorId: widget.currentUser.id,
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    restored
+                                        ? '${unit.barcode} restored to stock.'
+                                        : 'Could not restore ${unit.barcode}.',
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : null,
                   ),
                 );
               },
@@ -633,6 +661,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             );
           }
 
+          // Same card anatomy as the booked-slot queue: identity row, slot
+          // row, uploaded files, then the response summary. The two queues
+          // describe one record, so they must not read like two products.
           return Padding(
             padding: const EdgeInsets.only(bottom: TabangSpace.md),
             child: SurfaceCard(
@@ -640,6 +671,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       BloodTypeChip(request.bloodType, size: 34),
                       const SizedBox(width: TabangSpace.md),
@@ -647,24 +679,22 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // One pill, one title. Three stacked pills beside
-                            // every request made the staff queue read as noise;
-                            // status and source now sit in the sentence below.
-                            Row(
+                            // Wrap, not Row: on a phone the urgency pill is
+                            // wider than the space left beside a long alias.
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    request.patientAlias,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.2,
-                                      color: context.textColor,
-                                    ),
+                                Text(
+                                  request.patientAlias,
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.2,
+                                    color: context.textColor,
                                   ),
                                 ),
-                                const SizedBox(width: 6),
                                 StatusPill(
                                   request.urgency.label,
                                   tone: toneForUrgency(request.urgency),
@@ -675,53 +705,31 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                             const SizedBox(height: 4),
                             Text(
                               '${request.component.label} · '
-                              '${request.unitsOutstanding} of '
-                              '${request.unitsNeeded} units outstanding · '
+                              '${request.unitsNeeded} unit'
+                              '${request.unitsNeeded == 1 ? '' : 's'} · '
                               '${request.hospital}',
                               style: TextStyle(
                                 fontSize: 12.5,
                                 color: context.textMuted,
                               ),
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${request.status.label} · '
-                              '${request.source == RequestSource.bloodBank ? 'Blood bank' : 'Donor network'}'
-                              ' · posted by ${requester?.alias ?? 'unknown'}'
-                              ' · ${request.barangay}'
-                              ' · ${formatRelative(request.createdAt)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              request.source == RequestSource.bloodBank
-                                  ? '$compatibleUnits compatible units in '
-                                        'stock · ${responses.length} donor '
-                                        'responses'
-                                  : '$compatibleDonors eligible compatible '
-                                        'donors · ${responses.length} responses '
-                                        '($selected selected)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.textMuted,
-                              ),
-                            ),
-                            if (responses.isNotEmpty) ...[
-                              const SizedBox(height: 3),
-                              Text(
-                                'Responders: '
-                                '${responses.map((r) => r.donorAlias).join(', ')}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.textMuted,
-                                ),
-                              ),
-                            ],
                           ],
                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Status and the update menu sit on their own row so the
+                  // long "Awaiting verification" pill cannot squeeze the
+                  // alias column at phone width.
+                  Wrap(
+                    spacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      StatusPill(
+                        request.status.label,
+                        tone: toneForRequest(request.status),
+                        dense: true,
                       ),
                       if (request.status == RequestStatus.open ||
                           request.status == RequestStatus.matched)
@@ -754,6 +762,94 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                         ),
                     ],
                   ),
+                  const SizedBox(height: TabangSpace.sm),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.event_available_outlined,
+                        size: 15,
+                        color: TabangColors.crimson,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          request.scheduledFor == null
+                              ? 'No slot booked'
+                              : formatDateTime(request.scheduledFor!),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: context.textColor,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${request.id} · ',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.textMuted,
+                        ),
+                      ),
+                      UserMention(
+                        userId: request.requesterId,
+                        fallback: requester?.alias,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (request.documents.isNotEmpty) ...[
+                    const SizedBox(height: TabangSpace.sm),
+                    RequestDocumentList(
+                      documents: request.documents,
+                      dense: true,
+                    ),
+                  ],
+                  const SizedBox(height: TabangSpace.sm),
+                  Text(
+                    '${request.source == RequestSource.bloodBank ? 'Blood bank' : 'Donor network'}'
+                    ' · ${request.barangay} · posted '
+                    '${formatRelative(request.createdAt)}',
+                    style: TextStyle(fontSize: 12, color: context.textMuted),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    request.source == RequestSource.bloodBank
+                        ? '$compatibleUnits compatible units in stock · '
+                              '${responses.length} donor responses'
+                        : '$compatibleDonors eligible compatible donors · '
+                              '${responses.length} responses '
+                              '($selected selected)',
+                    style: TextStyle(fontSize: 12, color: context.textMuted),
+                  ),
+                  if (responses.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 3,
+                      children: [
+                        Text(
+                          'Responders:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.textMuted,
+                          ),
+                        ),
+                        for (final response in responses)
+                          UserMention(
+                            userId: response.donorId,
+                            fallback: response.donorAlias,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textMuted,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                   if (request.unitsNeeded > 1) ...[
                     const SizedBox(height: TabangSpace.md),
                     ProportionBar(
@@ -767,6 +863,121 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             ),
           );
         }),
+      ],
+    );
+  }
+
+  /// The removed-units ledger: every deletion stays visible and reversible.
+  Widget _buildRemovedUnitsTab(BuildContext context) {
+    final records = _repo.removedUnits;
+    if (records.isEmpty) {
+      return const EmptyState(
+        art: TabangArt.inventory,
+        title: 'No removed units',
+        message:
+            'Bags removed from the ledger appear here, with a restore action.',
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Every removal is recorded and can be undone. Restoring a bag puts '
+          'it back on the shelf at its original expiry; both actions stay in '
+          'the activity log.',
+          style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
+        ),
+        const SizedBox(height: TabangSpace.md),
+        for (final record in records)
+          Padding(
+            padding: const EdgeInsets.only(bottom: TabangSpace.md),
+            child: SurfaceCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      BloodTypeChip(record.unit.bloodType, size: 34),
+                      const SizedBox(width: TabangSpace.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            UnitBarcode(record.unit.barcode),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${record.unit.component.label} · '
+                              '${record.unit.storageBay} · expires '
+                              '${formatDate(record.unit.expiresOn)}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: context.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusPill(
+                        record.restored ? 'Restored' : 'Removed',
+                        tone: record.restored ? Tone.success : Tone.warning,
+                        dense: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: TabangSpace.sm),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    children: [
+                      Icon(Icons.history, size: 15, color: context.textMuted),
+                      Text(
+                        'Removed ${formatDateTime(record.removedAt)} by',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.textMuted,
+                        ),
+                      ),
+                      UserMention(
+                        userId: record.removedById,
+                        fallback: 'chapter staff',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!record.restored &&
+                      widget.currentUser.role.canManageInventory) ...[
+                    const SizedBox(height: TabangSpace.sm),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final ok = _repo.restoreRemovedUnit(
+                            record.unit.barcode,
+                            actorId: widget.currentUser.id,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                ok
+                                    ? '${record.unit.barcode} restored to stock.'
+                                    : 'Could not restore ${record.unit.barcode}; '
+                                          'its barcode may already be in use.',
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.undo, size: 15),
+                        label: const Text('Restore to stock'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -870,7 +1081,12 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 ),
               ),
               Text(
-                '${request.id} · ${requester?.alias ?? 'unknown requester'}',
+                '${request.id} · ',
+                style: TextStyle(fontSize: 11, color: context.textMuted),
+              ),
+              UserMention(
+                userId: request.requesterId,
+                fallback: requester?.alias,
                 style: TextStyle(fontSize: 11, color: context.textMuted),
               ),
             ],
@@ -922,6 +1138,24 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               content: Text(
                 '${unit.barcode} added — expires '
                 '${formatDate(unit.expiresOn)}.',
+              ),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  final removed = _repo.removeBloodUnit(
+                    unit.barcode,
+                    actorId: widget.currentUser.id,
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        removed
+                            ? '${unit.barcode} removed again.'
+                            : 'Could not undo the addition.',
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           );
