@@ -912,15 +912,34 @@ class _ChatPageState extends State<ChatPage> {
                     title: 'No messages yet',
                     message: 'Say hello to start the conversation.',
                   )
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: context.pagePadding,
-                    itemCount: messages.length,
-                    itemBuilder: (context, i) => _buildBubble(
-                      context,
-                      messages[i],
-                      previous: i > 0 ? messages[i - 1] : null,
-                    ),
+                : Builder(
+                    builder: (context) {
+                      // "Seen" marks the newest own message the other side has
+                      // actually read, using the same read marker as unread
+                      // counters.
+                      final otherReadAt = thread.readAtFor(_otherId(thread));
+                      var lastSeenIndex = -1;
+                      if (otherReadAt != null) {
+                        for (var i = 0; i < messages.length; i++) {
+                          final message = messages[i];
+                          if (message.senderId == widget.user.id &&
+                              !message.sentAt.isAfter(otherReadAt)) {
+                            lastSeenIndex = i;
+                          }
+                        }
+                      }
+                      return ListView.builder(
+                        controller: _scroll,
+                        padding: context.pagePadding,
+                        itemCount: messages.length,
+                        itemBuilder: (context, i) => _buildBubble(
+                          context,
+                          messages[i],
+                          previous: i > 0 ? messages[i - 1] : null,
+                          showSeen: i == lastSeenIndex,
+                        ),
+                      );
+                    },
                   ),
           ),
         ),
@@ -970,6 +989,7 @@ class _ChatPageState extends State<ChatPage> {
     BuildContext context,
     ChatMessage message, {
     ChatMessage? previous,
+    bool showSeen = false,
   }) {
     final mine = message.senderId == widget.user.id;
     final flagged = message.flag != ModerationFlag.clean;
@@ -1060,6 +1080,19 @@ class _ChatPageState extends State<ChatPage> {
                         Icons.warning_amber_rounded,
                         size: 12,
                         color: mine ? Colors.white : TabangColors.danger,
+                      ),
+                    ],
+                    if (showSeen) ...[
+                      const SizedBox(width: 5),
+                      Text(
+                        '· Seen',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: mine
+                              ? Colors.white.withValues(alpha: 0.88)
+                              : TabangColors.info,
+                        ),
                       ),
                     ],
                   ],

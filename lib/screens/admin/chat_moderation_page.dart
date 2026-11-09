@@ -329,18 +329,39 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: TabangSpace.sm),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showReportsDialog(context),
-                  icon: const Icon(Icons.flag_outlined, size: 14),
-                  label: Text(
-                    openReports == 0
-                        ? 'User reports'
-                        : 'User reports ($openReports)',
-                  ),
+              const SizedBox(height: 4),
+              // Flags are keyword hits, not a hidden AI judgement. Staff can
+              // see the exact phrases and extend the list.
+              Text(
+                'Flags come from the keyword lists below. Open a thread to '
+                'see which phrase matched each message.',
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.4,
+                  color: context.textMuted,
                 ),
+              ),
+              const SizedBox(height: TabangSpace.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showReportsDialog(context),
+                      icon: const Icon(Icons.flag_outlined, size: 14),
+                      label: Text(
+                        openReports == 0
+                            ? 'User reports'
+                            : 'User reports ($openReports)',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: TabangSpace.sm),
+                  OutlinedButton.icon(
+                    onPressed: () => _showKeywordsDialog(context),
+                    icon: const Icon(Icons.key_outlined, size: 14),
+                    label: const Text('Keywords'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -626,6 +647,17 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
               color: context.textColor,
             ),
           ),
+          if (flagged && message.flagReason != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Matched keyword: “${message.flagReason}”',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: TabangColors.danger,
+              ),
+            ),
+          ],
           if (flagged) ...[
             const SizedBox(height: TabangSpace.sm),
             Wrap(
@@ -650,6 +682,124 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// The classifier is transparent: staff see the exact phrases, can add
+  /// their own, and can remove ones that cause noise.
+  void _showKeywordsDialog(BuildContext context) {
+    var flag = ModerationFlag.spam;
+    final controller = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final keywords =
+              TabangRepository.moderationKeywords[flag] ?? const [];
+          return AlertDialog(
+            title: const Text('Flag keywords'),
+            content: SizedBox(
+              width: 460,
+              height: 420,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: TabangSpace.sm,
+                    children: [
+                      for (final option in [
+                        ModerationFlag.spam,
+                        ModerationFlag.inappropriate,
+                      ])
+                        ChoiceChip(
+                          label: Text(option.label),
+                          selected: flag == option,
+                          onSelected: (_) =>
+                              setDialogState(() => flag = option),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: TabangSpace.sm),
+                  Text(
+                    'New messages are flagged when they contain one of these '
+                    'phrases (case-insensitive). The matched phrase is shown '
+                    'beside the message so you can check it in context.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.45,
+                      color: dialogContext.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: TabangSpace.sm),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        for (final keyword in keywords)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              keyword,
+                              style: const TextStyle(fontSize: 12.5),
+                            ),
+                            trailing: IconButton(
+                              tooltip: 'Remove keyword',
+                              icon: const Icon(Icons.close, size: 16),
+                              onPressed: () {
+                                TabangRepository.instance
+                                    .removeModerationKeyword(flag, keyword);
+                                setDialogState(() {});
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          decoration: const InputDecoration(
+                            labelText: 'Add a phrase',
+                            isDense: true,
+                          ),
+                          onSubmitted: (value) {
+                            TabangRepository.instance.addModerationKeyword(
+                              flag,
+                              value,
+                            );
+                            controller.clear();
+                            setDialogState(() {});
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: TabangSpace.sm),
+                      FilledButton(
+                        onPressed: () {
+                          TabangRepository.instance.addModerationKeyword(
+                            flag,
+                            controller.text,
+                          );
+                          controller.clear();
+                          setDialogState(() {});
+                        },
+                        child: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

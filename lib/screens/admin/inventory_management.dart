@@ -241,7 +241,19 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             ),
           ],
         ),
-        const SizedBox(height: TabangSpace.lg),
+        const SizedBox(height: TabangSpace.sm),
+        // One-line legend so staff and volunteers read the same statuses.
+        Text(
+          'Available — ready for allocation · Reserved — held for a patient '
+          'or verified request · Quarantined — screening or safety hold · '
+          'Expired — past shelf life and never usable.',
+          style: TextStyle(
+            fontSize: 11.5,
+            height: 1.45,
+            color: context.textMuted,
+          ),
+        ),
+        const SizedBox(height: TabangSpace.md),
         if (units.isEmpty)
           const EmptyState(
             art: TabangArt.inventory,
@@ -342,6 +354,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 ],
               ),
               const SizedBox(width: 4),
+              TextButton(
+                onPressed: () => _showUnitDetails(context, unit, now),
+                child: const Text('Details', style: TextStyle(fontSize: 12)),
+              ),
               PopupMenuButton<UnitStatus>(
                 tooltip: 'Change status',
                 icon: Icon(
@@ -463,6 +479,27 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               },
               child: const Text('Release to stock'),
             ),
+          if (widget.currentUser.role.canManageInventory)
+            TextButton(
+              onPressed: () {
+                final ok = _repo.removeBloodUnit(
+                  unit.barcode,
+                  actorId: widget.currentUser.id,
+                );
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok
+                          ? '${unit.barcode} removed from the ledger.'
+                          : 'Could not remove ${unit.barcode}.',
+                    ),
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(foregroundColor: TabangColors.danger),
+              child: const Text('Remove unit'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
@@ -549,7 +586,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 request.id,
                 actorId: widget.currentUser.id,
               ),
-              RequestStatus.matched || RequestStatus.open => false,
+              RequestStatus.matched ||
+              RequestStatus.open ||
+              RequestStatus.pendingReview ||
+              RequestStatus.rejected => false,
             };
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

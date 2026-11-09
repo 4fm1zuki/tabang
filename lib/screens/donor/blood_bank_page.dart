@@ -358,7 +358,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
                 OutlinedButton.icon(
                   onPressed: widget.onOpenMap,
                   icon: const Icon(Icons.place_outlined, size: 16),
-                  label: const Text('Nearest drive'),
+                  label: const Text('View drives on map'),
                 ),
             ],
           ),
@@ -377,9 +377,14 @@ class _BloodBankPageState extends State<BloodBankPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 820;
+        final hasHolds = holds.isNotEmpty;
+        final hasAppointments = appointments.isNotEmpty;
         final holdCard = _buildHolds(context, holds);
         final appointmentCard = _buildAppointments(context, appointments);
-        if (wide) {
+        // Side by side only when both exist. A missing holds card used to
+        // leave the appointments card stranded in the right column with an
+        // empty left half, which read as a right-aligned section.
+        if (wide && hasHolds && hasAppointments) {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -390,11 +395,12 @@ class _BloodBankPageState extends State<BloodBankPage> {
           );
         }
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            holdCard,
-            if (holds.isNotEmpty && appointments.isNotEmpty)
+            if (hasHolds) holdCard,
+            if (hasHolds && hasAppointments)
               const SizedBox(height: TabangSpace.lg),
-            appointmentCard,
+            if (hasAppointments) appointmentCard,
           ],
         );
       },
@@ -867,14 +873,14 @@ class _BloodBankPageState extends State<BloodBankPage> {
             child: const Text('Clear', style: TextStyle(fontSize: 11)),
           );
           final reserveButton = FilledButton.icon(
-            onPressed: _reserveSelected,
+            onPressed: _requestSelected,
             style: FilledButton.styleFrom(
               minimumSize: const Size(0, 36),
               padding: const EdgeInsets.symmetric(horizontal: TabangSpace.md),
             ),
-            icon: const Icon(Icons.lock_clock_outlined, size: 15),
+            icon: const Icon(Icons.assignment_outlined, size: 15),
             label: const Text(
-              'Reserve selected',
+              'Request this unit',
               style: TextStyle(fontSize: 11.5),
             ),
           );
@@ -906,36 +912,33 @@ class _BloodBankPageState extends State<BloodBankPage> {
     );
   }
 
-  void _reserveSelected() {
-    var reserved = 0;
-    for (final barcode in List.of(_selected)) {
-      if (_repo.reserveUnit(
-        barcode: barcode,
-        userId: widget.user.id,
-        note: 'Public inventory hold',
-      )) {
-        reserved++;
-      }
-    }
+  /// Reserving is a request, not a one-tap hold.
+  ///
+  /// The selected unit only seeds the request dialog with its component and
+  /// blood type; chapter staff verify the documents and place the hold when
+  /// they approve the request.
+  void _requestSelected() {
+    final selected = List<String>.of(_selected);
+    if (selected.isEmpty) return;
+    final unit = _repo.units.firstWhere(
+      (candidate) => candidate.barcode == selected.first,
+      orElse: () => _repo.units.first,
+    );
     setState(_selected.clear);
-    _showSnack(
-      reserved == 0
-          ? 'Those units are no longer available.'
-          : 'Reserved $reserved unit${reserved == 1 ? '' : 's'}. '
-                'Chapter staff will confirm release.',
+    showBloodRequestDialog(
+      context,
+      widget.user,
+      initialComponent: unit.component,
+      initialBloodType: unit.bloodType,
     );
   }
 
   void _reserveOne(BloodUnit unit) {
-    final ok = _repo.reserveUnit(
-      barcode: unit.barcode,
-      userId: widget.user.id,
-      note: 'Public inventory hold',
-    );
-    _showSnack(
-      ok
-          ? 'Hold placed on ${unit.barcode}. Staff confirm release after screening.'
-          : 'That unit is no longer available.',
+    showBloodRequestDialog(
+      context,
+      widget.user,
+      initialComponent: unit.component,
+      initialBloodType: unit.bloodType,
     );
   }
 
@@ -1074,10 +1077,11 @@ class _BloodBankPageState extends State<BloodBankPage> {
                   _detail(
                     context,
                     'Held by',
+                    // Who holds a bag is operational information; community
+                    // members only ever see their own holds.
                     mine
-                        ? 'You'
-                        : (_repo.userById(unit.reservedBy!)?.alias ??
-                              'Another community member'),
+                        ? 'Held for you'
+                        : 'Another member — identity kept private',
                   ),
                 if (unit.reservedAt != null)
                   _detail(
@@ -1135,8 +1139,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
                 Navigator.pop(dialogContext);
                 _reserveOne(unit);
               },
-              icon: const Icon(Icons.lock_clock_outlined, size: 16),
-              label: const Text('Reserve unit'),
+              icon: const Icon(Icons.assignment_outlined, size: 16),
+              label: const Text('Request this unit'),
             ),
         ],
       ),

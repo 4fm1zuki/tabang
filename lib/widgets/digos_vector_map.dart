@@ -23,6 +23,12 @@ class DigosMapColors {
   /// invisible against the surrounding surface.
   static const Color paper = Color(0xFFF6F7F3);
   static const Color paperDark = Color(0xFF171312);
+
+  /// Everything outside the city cutout. Deliberately a step darker than the
+  /// page paper so the Digos silhouette reads at a glance instead of blending
+  /// into the background.
+  static const Color outsideMask = Color(0xFFE1D9CC);
+  static const Color outsideMaskDark = Color(0xFF0C0A09);
   static const Color internalBorder = Color(0xFFD08A76);
   static const Color internalBorderDark = Color(0xFF8E5A4B);
   static const Color cityBorder = Color(0xFF5A1512);
@@ -686,8 +692,8 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                           ],
                           holePointsList: [_cityRing],
                           color: dark
-                              ? DigosMapColors.paperDark
-                              : DigosMapColors.paper,
+                              ? DigosMapColors.outsideMaskDark
+                              : DigosMapColors.outsideMask,
                           borderStrokeWidth: 0,
                         ),
                       ],

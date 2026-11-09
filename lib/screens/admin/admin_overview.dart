@@ -1022,6 +1022,10 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.suspension => Icons.block,
     ActivityKind.application => Icons.assignment_turned_in_outlined,
     ActivityKind.report => Icons.gavel_outlined,
+    ActivityKind.requestSubmitted => Icons.assignment_outlined,
+    ActivityKind.requestVerified => Icons.fact_check_outlined,
+    ActivityKind.requestRejected => Icons.assignment_late_outlined,
+    ActivityKind.inventory => Icons.inventory_2_outlined,
   };
 
   Color _activityColor(ActivityKind kind) => switch (kind) {
@@ -1034,6 +1038,10 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.suspension => TabangColors.danger,
     ActivityKind.application => TabangColors.crimson,
     ActivityKind.report => TabangColors.danger,
+    ActivityKind.requestSubmitted => TabangColors.info,
+    ActivityKind.requestVerified => TabangColors.success,
+    ActivityKind.requestRejected => TabangColors.danger,
+    ActivityKind.inventory => TabangColors.warning,
   };
 
   void _showActivityDialog(BuildContext context) {

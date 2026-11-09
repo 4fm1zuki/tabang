@@ -54,6 +54,11 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   /// from Find Donor.
   bool _showDonorDensity = false;
 
+  /// Phone layout state: compact is set during build, and the expand toggle
+  /// lets the map take the whole workspace instead of the 340 px strip.
+  bool _compact = false;
+  bool _mapExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -107,17 +112,24 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 860;
+        _compact = compact;
         final map = _buildMap(context);
         final panel = _buildPanel(context);
         return compact
-            ? ListView(
-                padding: padding,
-                children: [
-                  SizedBox(height: widget.embedded ? 340 : 380, child: map),
-                  const SizedBox(height: TabangSpace.lg),
-                  panel,
-                ],
-              )
+            ? (_mapExpanded
+                  // Full-height map on phones; the expand button flips back.
+                  ? Padding(padding: padding, child: map)
+                  : ListView(
+                      padding: padding,
+                      children: [
+                        SizedBox(
+                          height: widget.embedded ? 340 : 380,
+                          child: map,
+                        ),
+                        const SizedBox(height: TabangSpace.lg),
+                        panel,
+                      ],
+                    ))
             : Padding(
                 padding: padding,
                 child: Row(
@@ -216,6 +228,15 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 }),
                 tooltip: _mapDark ? 'Use light map' : 'Use dark map',
               ),
+              if (_compact) ...[
+                const SizedBox(height: 4),
+                _mapButton(
+                  context,
+                  _mapExpanded ? Icons.close_fullscreen : Icons.open_in_full,
+                  () => setState(() => _mapExpanded = !_mapExpanded),
+                  tooltip: _mapExpanded ? 'Collapse map' : 'Expand map',
+                ),
+              ],
             ],
           ),
         ),
@@ -412,13 +433,22 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   Widget _buildPanel(BuildContext context) {
     final selected = _selected;
     final requests = selected == null
-        ? _repo.requests
+        ? (List<BloodRequest>.of(_repo.requests)..sort((a, b) {
+                int rank(BloodRequest r) => switch (r.status) {
+                  RequestStatus.pendingReview => 0,
+                  RequestStatus.open => 1,
+                  RequestStatus.matched => 2,
+                  _ => 3,
+                };
+                return rank(a).compareTo(rank(b));
+              }))
               .where(
                 (r) =>
+                    r.status == RequestStatus.pendingReview ||
                     r.status == RequestStatus.open ||
                     r.status == RequestStatus.matched,
               )
-              .take(8)
+              .take(10)
               .toList()
         : _repo.openRequestsIn(selected);
     final applications = _repo.openDonorApplications.where((application) {
@@ -582,19 +612,30 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                StatusPill(
-                  request.urgency.label,
-                  tone: request.urgency == RequestUrgency.critical
-                      ? Tone.danger
-                      : request.urgency == RequestUrgency.urgent
-                      ? Tone.warning
-                      : Tone.neutral,
-                  dense: true,
+                // Wrap, not a fixed row: "Awaiting verification" is a long
+                // status and used to push the barangay past the card edge on
+                // the narrow operations panel.
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      StatusPill(
+                        request.urgency.label,
+                        tone: request.urgency == RequestUrgency.critical
+                            ? Tone.danger
+                            : request.urgency == RequestUrgency.urgent
+                            ? Tone.warning
+                            : Tone.neutral,
+                        dense: true,
+                      ),
+                      StatusPill(request.status.label, dense: true),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 6),
-                StatusPill(request.status.label, dense: true),
-                const Spacer(),
                 Text(
                   request.barangay,
                   style: TextStyle(fontSize: 11, color: context.textMuted),
@@ -625,23 +666,192 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                   onPressed: () => _showRequestDetails(context, request),
                   child: const Text('Details'),
                 ),
-                if (widget.user.role.canFulfillRequests)
+                if (widget.user.role.canFulfillRequests &&
+                    request.isAwaitingReview) ...[
+                  TextButton(
+                    onPressed: () => _reject(context, request),
+                    child: const Text('Reject'),
+                  ),
+                  FilledButton(
+                    onPressed: () => _verify(context, request),
+                    child: const Text('Verify'),
+                  ),
+                ],
+                if (widget.user.role.canFulfillRequests &&
+                    !request.isAwaitingReview &&
+                    request.status != RequestStatus.fulfilled &&
+                    request.status != RequestStatus.rejected &&
+                    request.status != RequestStatus.cancelled)
                   TextButton(
                     onPressed: () => _fulfil(context, request),
                     child: const Text('Mark fulfilled'),
                   ),
-                if (widget.user.role.canFulfillRequests &&
-                    request.source == RequestSource.donorNetwork &&
-                    request.status == RequestStatus.open &&
-                    responders.any((r) => r.status == ResponseStatus.pending))
-                  TextButton(
-                    onPressed: () => _showResponders(context, request),
-                    child: const Text('Select donor'),
-                  ),
+                // Staff no longer pick donors: verification opens the request
+                // and the requester selects from the people who responded.
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Verification confirms the document checklist and, for a blood-bank
+  /// request, holds the compatible units the shelf can actually spare.
+  void _verify(BuildContext context, BloodRequest request) {
+    final assignable = request.source == RequestSource.bloodBank
+        ? _repo
+              .compatibleUnitsFor(
+                recipientType: request.bloodType,
+                component: request.component,
+              )
+              .take(request.unitsNeeded)
+              .toList(growable: false)
+        : const <BloodUnit>[];
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Verify request ${request.id}'),
+        content: SizedBox(
+          width: 460,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Confirm the documents the requester declared, then open the '
+                'request. Donors are never asked before verification.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.5,
+                  color: dialogContext.textMuted,
+                ),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              for (final document in request.documents)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        size: 15,
+                        color: TabangColors.success,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          document,
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (request.scheduledFor != null) ...[
+                const SizedBox(height: TabangSpace.sm),
+                Text(
+                  'Booked slot: ${formatDateTime(request.scheduledFor!)}',
+                  style: const TextStyle(fontSize: 12.5),
+                ),
+              ],
+              if (assignable.isNotEmpty) ...[
+                const SizedBox(height: TabangSpace.sm),
+                Text(
+                  'Holds attached on approval: '
+                  '${assignable.map((unit) => unit.barcode).join(', ')}',
+                  style: const TextStyle(fontSize: 12.5),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final ok = _repo.verifyRequest(
+                request.id,
+                actorId: widget.user.id,
+                unitIds: assignable.map((unit) => unit.barcode).toList(),
+              );
+              Navigator.pop(dialogContext);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ok
+                        ? 'Request ${request.id} verified and opened.'
+                        : 'Could not verify ${request.id}.',
+                  ),
+                ),
+              );
+            },
+            child: const Text('Verify and open'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _reject(BuildContext context, BloodRequest request) {
+    final reasonController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Reject request ${request.id}'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'The requester sees this reason, so be specific about the '
+                'document or detail that needs fixing.',
+                style: TextStyle(fontSize: 12.5, height: 1.5),
+              ),
+              const SizedBox(height: TabangSpace.md),
+              TextField(
+                controller: reasonController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Reason for rejection',
+                  hintText: 'e.g. No transfusion slip attached yet',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final ok = _repo.rejectRequest(
+                request.id,
+                actorId: widget.user.id,
+                reason: reasonController.text,
+              );
+              Navigator.pop(dialogContext);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    ok
+                        ? 'Request ${request.id} rejected with a reason.'
+                        : 'Enter a reason before rejecting.',
+                  ),
+                ),
+              );
+            },
+            child: const Text('Reject request'),
+          ),
+        ],
       ),
     );
   }
@@ -701,10 +911,22 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 'Need: ${request.bloodType.label} · '
                 '${request.component.label} · ${request.unitsNeeded} unit(s)',
               ),
-              Text('Urgency: ${request.urgency.label}'),
+              Text(
+                'Urgency: ${request.urgency.label} · ${request.urgency.detail}',
+              ),
+              Text('Status: ${request.status.label}'),
               Text('Hospital: ${request.hospital}'),
               Text('Barangay: ${request.barangay}'),
               Text('Source: ${request.source.label}'),
+              if (request.scheduledFor != null)
+                Text('Booked slot: ${formatDateTime(request.scheduledFor!)}'),
+              if (request.documents.isNotEmpty)
+                Text('Documents: ${request.documents.join(', ')}'),
+              if (request.assignedUnitIds.isNotEmpty)
+                Text('Held units: ${request.assignedUnitIds.join(', ')}'),
+              if (request.reviewNote != null &&
+                  request.reviewNote!.trim().isNotEmpty)
+                Text('Review note: ${request.reviewNote}'),
               if (request.note != null && request.note!.trim().isNotEmpty)
                 Text('Note: ${request.note}'),
             ],
@@ -715,90 +937,25 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
-        ],
-      ),
-    );
-  }
-
-  void _showResponders(BuildContext context, BloodRequest request) {
-    final pending = _repo
-        .responsesFor(request.id)
-        .where((r) => r.status == ResponseStatus.pending)
-        .toList();
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Select a donor'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selection needs a reciprocal chat between the requester and '
-                'the donor, and re-checks eligibility at this moment.',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-              const SizedBox(height: TabangSpace.sm),
-              for (final response in pending)
-                _responderTile(dialogContext, request, response),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _responderTile(
-    BuildContext context,
-    BloodRequest request,
-    RequestResponse response,
-  ) {
-    final commitment = _repo.commitmentForDonor(
-      response.donorId,
-      excludingRequestId: request.id,
-    );
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      title: Text(response.donorAlias),
-      subtitle: Text(
-        commitment == null
-            ? (response.message ?? 'No message')
-            : 'Coordinating request ${commitment.requestId} — cannot be '
-                  'selected for a second active request.',
-      ),
-      trailing: commitment != null
-          ? const StatusPill('Coordinating', tone: Tone.info, dense: true)
-          : TextButton(
+          if (widget.user.role.canFulfillRequests &&
+              request.isAwaitingReview) ...[
+            TextButton(
               onPressed: () {
-                final thread = _repo.selectResponse(
-                  responseId: response.id,
-                  selectedById: widget.user.id,
-                );
-                if (thread == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Not selectable yet — the requester and donor must '
-                        'both have sent a message first, and the donor must '
-                        'still be eligible.',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
+                _reject(context, request);
               },
-              child: const Text('Select'),
+              child: const Text('Reject'),
             ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _verify(context, request);
+              },
+              child: const Text('Verify'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

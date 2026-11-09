@@ -415,25 +415,58 @@ class AppUser {
   }
 }
 
-/// Urgency of a blood request.
+/// Urgency of a blood request, stated as a response window rather than a bare
+/// label so requesters and staff read the same expectation.
 enum RequestUrgency {
-  routine('Routine'),
-  urgent('Urgent'),
-  critical('Critical');
+  routine('Routine', 'Planned — book a blood-bank slot'),
+  urgent('Urgent', 'Needed within 24–48 hours'),
+  critical('Critical', 'Needed the same day');
 
-  const RequestUrgency(this.label);
+  const RequestUrgency(this.label, this.detail);
   final String label;
+  final String detail;
 }
 
 /// Lifecycle of a blood request.
+///
+/// Nothing reaches the donor network or the inventory queue until chapter
+/// staff have checked the documents: a request starts in [pendingReview] and
+/// is either opened by [verifyRequest] or rejected with a reason.
 enum RequestStatus {
+  pendingReview('Awaiting verification'),
   open('Open'),
   matched('Matched'),
   fulfilled('Fulfilled'),
+  rejected('Rejected'),
   cancelled('Cancelled');
 
   const RequestStatus(this.label);
   final String label;
+}
+
+/// Documents a requester must line up before chapter staff verify a request.
+class RequestDocuments {
+  const RequestDocuments._();
+
+  static const String doctorsForm = "Doctor's request form";
+  static const String transfusionSlip = 'Blood transfusion slip';
+  static const String patientId = 'Valid hospital patient ID';
+  static const String typingResult = 'Blood typing / cross-match result';
+
+  static const List<String> all = [
+    doctorsForm,
+    transfusionSlip,
+    patientId,
+    typingResult,
+  ];
+
+  /// The two documents every request must carry. The typing result is only
+  /// required by some hospitals, so it is optional.
+  static const List<String> required = [
+    doctorsForm,
+    transfusionSlip,
+    patientId,
+  ];
 }
 
 /// Where a request is being fulfilled from.
@@ -462,10 +495,16 @@ class BloodRequest {
     required this.barangay,
     required this.urgency,
     required this.createdAt,
-    this.status = RequestStatus.open,
+    this.status = RequestStatus.pendingReview,
     this.unitsFulfilled = 0,
     this.source = RequestSource.donorNetwork,
     this.note,
+    this.documents = const [],
+    this.scheduledFor,
+    this.postToDonorNetwork = true,
+    this.reviewNote,
+    this.reviewedById,
+    this.assignedUnitIds = const [],
   });
 
   final String id;
@@ -485,20 +524,49 @@ class BloodRequest {
   final RequestSource source;
   final String? note;
 
+  /// Document checklist collected at submission and confirmed by staff during
+  /// verification.
+  final List<String> documents;
+
+  /// The blood-bank slot the requester booked. Always inside the chapter's
+  /// published schedule; staff can still adjust it when verifying.
+  final DateTime? scheduledFor;
+
+  /// Whether the requester agreed to broadcast to the donor network when the
+  /// blood bank cannot cover the request.
+  final bool postToDonorNetwork;
+
+  /// Why staff rejected or adjusted the request.
+  final String? reviewNote;
+  final String? reviewedById;
+
+  /// Units the blood bank put on hold for this request when it was verified.
+  final List<String> assignedUnitIds;
+
   int get unitsOutstanding =>
       (unitsNeeded - unitsFulfilled).clamp(0, unitsNeeded);
 
-  /// Only open donor-network requests accept new donor responses. Blood-bank
-  /// requests are processed by chapter staff, not broadcast to donors.
+  bool get isAwaitingReview => status == RequestStatus.pendingReview;
+
+  /// Only verified open donor-network requests accept new donor responses.
+  /// Blood-bank requests are processed by chapter staff, not broadcast.
   bool get acceptsDonorResponses =>
       status == RequestStatus.open &&
       source == RequestSource.donorNetwork &&
+      postToDonorNetwork &&
       unitsOutstanding > 0;
 
   BloodRequest copyWith({
     RequestStatus? status,
     int? unitsFulfilled,
     RequestSource? source,
+    List<String>? documents,
+    DateTime? scheduledFor,
+    bool? postToDonorNetwork,
+    String? reviewNote,
+    bool clearReviewNote = false,
+    String? reviewedById,
+    List<String>? assignedUnitIds,
   }) {
     return BloodRequest(
       id: id,
@@ -515,6 +583,12 @@ class BloodRequest {
       unitsFulfilled: unitsFulfilled ?? this.unitsFulfilled,
       source: source ?? this.source,
       note: note,
+      documents: documents ?? this.documents,
+      scheduledFor: scheduledFor ?? this.scheduledFor,
+      postToDonorNetwork: postToDonorNetwork ?? this.postToDonorNetwork,
+      reviewNote: clearReviewNote ? null : (reviewNote ?? this.reviewNote),
+      reviewedById: reviewedById ?? this.reviewedById,
+      assignedUnitIds: assignedUnitIds ?? this.assignedUnitIds,
     );
   }
 }
@@ -638,6 +712,7 @@ class ChatMessage {
     required this.text,
     required this.sentAt,
     this.flag = ModerationFlag.clean,
+    this.flagReason,
   });
 
   final String id;
@@ -647,14 +722,20 @@ class ChatMessage {
   final DateTime sentAt;
   final ModerationFlag flag;
 
-  ChatMessage copyWith({ModerationFlag? flag}) => ChatMessage(
-    id: id,
-    senderId: senderId,
-    senderAlias: senderAlias,
-    text: text,
-    sentAt: sentAt,
-    flag: flag ?? this.flag,
-  );
+  /// Which phrase the keyword classifier matched, so staff can see why a
+  /// message was flagged instead of trusting an opaque badge.
+  final String? flagReason;
+
+  ChatMessage copyWith({ModerationFlag? flag, String? flagReason}) =>
+      ChatMessage(
+        id: id,
+        senderId: senderId,
+        senderAlias: senderAlias,
+        text: text,
+        sentAt: sentAt,
+        flag: flag ?? this.flag,
+        flagReason: flagReason ?? this.flagReason,
+      );
 }
 
 /// A conversation between two parties.
@@ -964,6 +1045,10 @@ enum ActivityKind {
   suspension,
   application,
   report,
+  requestSubmitted,
+  requestVerified,
+  requestRejected,
+  inventory,
 }
 
 /// One entry in the chapter activity log, newest first.

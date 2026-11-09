@@ -593,6 +593,9 @@ class TabangRepository {
         status: status,
         suspensionReason: reason,
         clearSuspensionReason: reason == null,
+        // Reinstating an account clears the warning ladder, so a single new
+        // warning starts from one instead of instantly suspending again.
+        warningCount: status == AccountStatus.verified ? 0 : null,
       ),
     );
     _logActivity(
@@ -798,7 +801,15 @@ class TabangRepository {
   bool isInterestedInDrive(String driveId, String userId) =>
       _driveInterests.contains('$driveId|$userId');
 
+  /// Donors only. A community user must become a donor first, so the drive
+  /// list can never promise a donation the chapter cannot screen.
   bool toggleDriveInterest(String driveId, String userId) {
+    final user = userById(userId);
+    if (user == null ||
+        user.role != UserRole.donor ||
+        user.status == AccountStatus.suspended) {
+      return false;
+    }
     final key = '$driveId|$userId';
     final added = _driveInterests.add(key);
     if (!added) _driveInterests.remove(key);
@@ -809,10 +820,17 @@ class TabangRepository {
   int driveInterestCount(String driveId) =>
       _driveInterests.where((key) => key.startsWith('$driveId|')).length;
 
-  void warnUser(String userId) {
+  /// Adds a warning, capped at three.
+  ///
+  /// Repeatedly pressing Warn must not keep stacking: once an account is
+  /// suspended the action is refused, and reinstating an account clears its
+  /// warning count back to zero. Each warning carries the reason staff entered.
+  bool warnUser(String userId, {String? reason}) {
     final user = userById(userId);
-    if (user == null) return;
-    final next = user.warningCount + 1;
+    if (user == null) return false;
+    if (user.status == AccountStatus.suspended) return false;
+    final next = (user.warningCount + 1).clamp(1, 3);
+    final note = reason?.trim();
     updateUser(
       user.copyWith(
         warningCount: next,
@@ -826,8 +844,11 @@ class TabangRepository {
       kind: ActivityKind.warning,
       actorId: currentUser?.id ?? staffAccountId,
       subjectId: userId,
-      summary: 'Issued warning $next to ${user.alias}',
+      summary:
+          'Issued warning $next to ${user.alias}'
+          '${note == null || note.isEmpty ? '' : ': $note'}',
     );
+    return true;
   }
 
   /// `YYYY-MM-DD`, used in activity summaries where the widgets layer is not
@@ -836,7 +857,47 @@ class TabangRepository {
       '${date.year}-${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 
-  void addRequest({
+  /// Published blood-bank service windows. Requests must book inside them;
+  /// staff can only review what the shelf can actually serve.
+  static const List<int> bloodBankWeekdayHours = [8, 9, 10, 11, 13, 14, 15];
+  static const List<int> bloodBankSaturdayHours = [8, 9, 10, 11];
+
+  static List<int> _hoursFor(int weekday) {
+    if (weekday == DateTime.sunday) return const [];
+    if (weekday == DateTime.saturday) return bloodBankSaturdayHours;
+    return bloodBankWeekdayHours;
+  }
+
+  /// True when [slot] falls on a published half-day slot in the future.
+  bool isWithinBloodBankSchedule(DateTime slot, {DateTime? now}) {
+    final base = now ?? DateTime.now();
+    if (!slot.isAfter(base)) return false;
+    if (slot.minute != 0) return false;
+    return _hoursFor(slot.weekday).contains(slot.hour);
+  }
+
+  /// Bookable slots for the next [days] days, already filtered to the
+  /// chapter's published schedule.
+  List<DateTime> bloodBankSlots({int days = 21, DateTime? now}) {
+    final base = now ?? DateTime.now();
+    final slots = <DateTime>[];
+    for (var i = 0; i < days; i++) {
+      final day = DateTime(base.year, base.month, base.day + i);
+      for (final hour in _hoursFor(day.weekday)) {
+        final slot = DateTime(day.year, day.month, day.day, hour);
+        if (slot.isAfter(base)) slots.add(slot);
+      }
+    }
+    return slots;
+  }
+
+  /// Submit a request for chapter verification.
+  ///
+  /// Nothing is posted to donors or held from stock at submission time: the
+  /// request first needs the document checklist and a slot inside the
+  /// blood-bank schedule, then staff verify or reject it. Returns null when
+  /// the submission is incomplete.
+  BloodRequest? addRequest({
     required String requesterId,
     required String patientAlias,
     required BloodType bloodType,
@@ -847,26 +908,129 @@ class TabangRepository {
     required RequestUrgency urgency,
     RequestSource source = RequestSource.donorNetwork,
     String? note,
+    List<String> documents = const [],
+    DateTime? scheduledFor,
+    bool postToDonorNetwork = true,
   }) {
-    _requests.insert(
-      0,
-      BloodRequest(
-        id: 'REQ-${(_requests.length + 1).toString().padLeft(3, '0')}',
-        requesterId: requesterId,
-        patientAlias: patientAlias,
-        bloodType: bloodType,
-        component: component,
-        unitsNeeded: unitsNeeded,
-        hospital: hospital,
-        barangay: barangay,
-        urgency: urgency,
-        createdAt: DateTime.now(),
-        source: source,
-        note: note,
-      ),
+    final trimmedDocs = documents
+        .map((document) => document.trim())
+        .where((document) => document.isNotEmpty)
+        .toList(growable: false);
+    if (trimmedDocs.isEmpty) return null;
+    if (scheduledFor != null && !isWithinBloodBankSchedule(scheduledFor)) {
+      return null;
+    }
+
+    final request = BloodRequest(
+      id: 'REQ-${(_requests.length + 1).toString().padLeft(3, '0')}',
+      requesterId: requesterId,
+      patientAlias: patientAlias,
+      bloodType: bloodType,
+      component: component,
+      unitsNeeded: unitsNeeded,
+      hospital: hospital,
+      barangay: barangay,
+      urgency: urgency,
+      createdAt: DateTime.now(),
+      status: RequestStatus.pendingReview,
+      source: postToDonorNetwork ? source : RequestSource.bloodBank,
+      note: note,
+      documents: trimmedDocs,
+      scheduledFor: scheduledFor,
+      postToDonorNetwork: postToDonorNetwork,
+    );
+    _requests.insert(0, request);
+    _logActivity(
+      kind: ActivityKind.requestSubmitted,
+      actorId: requesterId,
+      subjectId: requesterId,
+      summary:
+          'Submitted request ${request.id} for ${request.patientAlias} '
+          '(${request.component.label.toLowerCase()})',
     );
     markActive(requesterId);
     _notify();
+    return request;
+  }
+
+  /// Staff verify a submitted request. Blood-bank requests may assign usable
+  /// units, which are held for the requester at verification time.
+  bool verifyRequest(
+    String requestId, {
+    required String actorId,
+    List<String> unitIds = const [],
+  }) {
+    final actor = userById(actorId);
+    final index = _requests.indexWhere((r) => r.id == requestId);
+    if (actor == null || index == -1) return false;
+    if (!actor.role.isAdminSide) return false;
+    final request = _requests[index];
+    if (request.status != RequestStatus.pendingReview) return false;
+
+    // Validate every assigned bag before touching any of them.
+    for (final barcode in unitIds) {
+      final unit = _firstOrNull(_units, (u) => u.barcode == barcode);
+      if (unit == null ||
+          !unit.isUsable ||
+          unit.reservedBy != null ||
+          unit.effectiveStatus(DateTime.now()) != UnitStatus.available) {
+        return false;
+      }
+    }
+    for (final barcode in unitIds) {
+      reserveUnit(
+        barcode: barcode,
+        userId: request.requesterId,
+        note: 'Blood-bank hold for ${request.id}',
+      );
+    }
+
+    _requests[index] = request.copyWith(
+      status: RequestStatus.open,
+      reviewedById: actorId,
+      assignedUnitIds: unitIds,
+      clearReviewNote: true,
+    );
+    _logActivity(
+      kind: ActivityKind.requestVerified,
+      actorId: actorId,
+      subjectId: request.requesterId,
+      summary:
+          'Verified request ${request.id} for ${request.patientAlias}'
+          '${unitIds.isEmpty ? '' : ' · ${unitIds.length} unit hold'}',
+    );
+    _notify();
+    return true;
+  }
+
+  /// Staff reject a submitted request with a reason the requester can read.
+  bool rejectRequest(
+    String requestId, {
+    required String actorId,
+    required String reason,
+  }) {
+    final actor = userById(actorId);
+    final index = _requests.indexWhere((r) => r.id == requestId);
+    if (actor == null || index == -1) return false;
+    if (!actor.role.isAdminSide) return false;
+    final trimmed = reason.trim();
+    if (trimmed.isEmpty) return false;
+    final request = _requests[index];
+    if (request.status != RequestStatus.pendingReview) return false;
+
+    _requests[index] = request.copyWith(
+      status: RequestStatus.rejected,
+      reviewedById: actorId,
+      reviewNote: trimmed,
+    );
+    _logActivity(
+      kind: ActivityKind.requestRejected,
+      actorId: actorId,
+      subjectId: request.requesterId,
+      summary: 'Rejected request ${request.id}: $trimmed',
+    );
+    _notify();
+    return true;
   }
 
   /// A donor offers to serve a request. This does not consume a unit and does
@@ -955,8 +1119,11 @@ class TabangRepository {
     return _firstOrNull(_requests, (r) => r.id == response.requestId);
   }
 
-  /// The requester (or staff/admin) selects a donor response. Selection creates
-  /// the coordination thread and, once enough donors are selected, moves the
+  /// The requester selects a donor response.
+  ///
+  /// Staff do not pick donors: they verify the request, and the requester
+  /// coordinates with the people who offered. Selection creates the
+  /// coordination thread and, once enough donors are selected, moves the
   /// request to `matched`. No unit is counted as fulfilled until staff record
   /// the donation.
   ChatThread? selectResponse({
@@ -970,11 +1137,7 @@ class TabangRepository {
 
     final actor = userById(selectedById);
     if (actor == null) return null;
-    final canSelect =
-        actor.id == request.requesterId ||
-        actor.role == UserRole.staff ||
-        actor.role == UserRole.admin;
-    if (!canSelect) return null;
+    if (actor.id != request.requesterId) return null;
     if (response.status != ResponseStatus.pending) return null;
 
     final donor = userById(response.donorId);
@@ -1190,6 +1353,25 @@ class TabangRepository {
     return true;
   }
 
+  /// Staff remove a bag from the ledger entirely, for example a discarded or
+  /// mislabelled unit that should no longer appear in any inventory view.
+  bool removeBloodUnit(String barcode, {required String actorId}) {
+    final actor = userById(actorId);
+    if (actor == null || !actor.role.isAdminSide) return false;
+    final index = _units.indexWhere((unit) => unit.barcode == barcode);
+    if (index == -1) return false;
+    final removed = _units.removeAt(index);
+    _logActivity(
+      kind: ActivityKind.inventory,
+      actorId: actorId,
+      summary:
+          'Removed unit ${removed.barcode} '
+          '(${removed.bloodType.label} ${removed.component.label.toLowerCase()})',
+    );
+    _notify();
+    return true;
+  }
+
   /// Component shelf lives used when a new bag is received, matching the seed
   /// data so inventory ages consistently.
   static const Map<BloodComponent, int> shelfLifeDays = {
@@ -1333,6 +1515,7 @@ class TabangRepository {
     final trimmed = firstMessage?.trim();
     if (trimmed != null && trimmed.isNotEmpty) {
       final sentAt = DateTime.now();
+      final classified = classifyMessage(trimmed);
       final index = _threads.indexWhere((t) => t.id == thread!.id);
       _threads[index] = thread.copyWith(
         participantAReadAt: sentAt,
@@ -1344,7 +1527,8 @@ class TabangRepository {
             senderAlias: initiator.alias,
             text: trimmed,
             sentAt: sentAt,
-            flag: _classify(trimmed),
+            flag: classified.flag,
+            flagReason: classified.reason,
           ),
         ],
       );
@@ -1467,13 +1651,15 @@ class TabangRepository {
 
     final sender = userById(senderId);
     final sentAt = DateTime.now();
+    final classified = classifyMessage(trimmed);
     final message = ChatMessage(
       id: 'MSG-${DateTime.now().microsecondsSinceEpoch}',
       senderId: senderId,
       senderAlias: sender?.alias ?? 'Unknown',
       text: trimmed,
       sentAt: sentAt,
-      flag: _classify(trimmed),
+      flag: classified.flag,
+      flagReason: classified.reason,
     );
 
     _threads[index] = thread.copyWith(
@@ -1864,24 +2050,53 @@ class TabangRepository {
     return DateTime(base.year, base.month, base.day, hour);
   }
 
-  /// Lightweight keyword classifier standing in for the moderation service.
-  /// Real deployments would route through a review queue; this keeps the
-  /// admin moderation surface demonstrable with simulated data.
-  static ModerationFlag _classify(String text) {
-    final lower = text.toLowerCase();
-    const spamMarkers = ['http://', 'https://', 'buy now', 'click this link'];
-    const inappropriateMarkers = [
+  /// Keyword classifier standing in for the moderation service.
+  ///
+  /// The lists are public so the Moderation console can show exactly what it
+  /// detects, and so staff can add or remove phrases without a code change.
+  static final Map<ModerationFlag, List<String>> moderationKeywords = {
+    ModerationFlag.spam: [
+      'http://',
+      'https://',
+      'buy now',
+      'click this link',
+      'free money',
+    ],
+    ModerationFlag.inappropriate: [
       'pay me',
       'cash upfront',
       'php upfront',
       'bribe',
-    ];
+      'payment first',
+    ],
+  };
 
-    if (spamMarkers.any(lower.contains)) return ModerationFlag.spam;
-    if (inappropriateMarkers.any(lower.contains)) {
-      return ModerationFlag.inappropriate;
+  /// Returns the flag and the phrase that triggered it, or a clean result with
+  /// no reason.
+  static ({ModerationFlag flag, String? reason}) classifyMessage(String text) {
+    final lower = text.toLowerCase();
+    for (final entry in moderationKeywords.entries) {
+      for (final marker in entry.value) {
+        if (lower.contains(marker)) {
+          return (flag: entry.key, reason: marker);
+        }
+      }
     }
-    return ModerationFlag.clean;
+    return (flag: ModerationFlag.clean, reason: null);
+  }
+
+  void addModerationKeyword(ModerationFlag flag, String keyword) {
+    final trimmed = keyword.trim();
+    if (trimmed.isEmpty) return;
+    final list = moderationKeywords[flag];
+    if (list == null || list.contains(trimmed.toLowerCase())) return;
+    list.add(trimmed.toLowerCase());
+    _notify();
+  }
+
+  void removeModerationKeyword(ModerationFlag flag, String keyword) {
+    moderationKeywords[flag]?.remove(keyword);
+    _notify();
   }
 
   void _seed() {
@@ -2797,7 +3012,45 @@ class TabangRepository {
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(days: 4)),
       ),
+      // One example still waiting for chapter verification, so staff can see
+      // the review queue on first sign-in.
+      BloodRequest(
+        id: 'REQ-011',
+        requesterId: 'USR-038',
+        patientAlias: 'Patient 055',
+        bloodType: BloodType.oPos,
+        component: BloodComponent.wholeBlood,
+        unitsNeeded: 1,
+        hospital: 'Digos Doctors Hospital',
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.routine,
+        createdAt: now.subtract(const Duration(hours: 4)),
+        documents: const [
+          RequestDocuments.doctorsForm,
+          RequestDocuments.transfusionSlip,
+          RequestDocuments.patientId,
+        ],
+        scheduledFor: bloodBankSlots(days: 3).first,
+        status: RequestStatus.pendingReview,
+      ),
     ]);
+
+    // Seeded requests already cleared chapter review: they carry the document
+    // checklist and a bookable slot so the demo starts in a realistic state.
+    final seededSlot = bloodBankSlots(days: 7).first;
+    const seededDocuments = <String>[
+      RequestDocuments.doctorsForm,
+      RequestDocuments.transfusionSlip,
+      RequestDocuments.patientId,
+    ];
+    for (var i = 0; i < _requests.length; i++) {
+      if (_requests[i].status == RequestStatus.pendingReview) continue;
+      _requests[i] = _requests[i].copyWith(
+        status: RequestStatus.open,
+        documents: seededDocuments,
+        scheduledFor: seededSlot,
+      );
+    }
 
     // A pending response demonstrates the selection step without marking the
     // request matched or counting an unperformed donation.

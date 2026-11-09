@@ -93,9 +93,12 @@ were bypassed.
   grid by component and blood type, then a *card list* of units (product,
   storage, expiry, status) that reflows one to three columns and highlights on
   hover. The full record — unit ID, storage, dates and who holds it — opens on
-  selection; the barcode graphic itself belongs to the staff inventory. Community
-  users can place or release a *hold* on a usable unit and book an
-  **appointment with blood** (blood type, patient name, donation type, patient
+  selection; the barcode graphic itself belongs to the staff inventory and the
+  holder of a reserved bag is only named to staff. Community members do not
+  place one-tap holds: **Request this unit** opens the documented request
+  dialog seeded with the unit's component and type, and staff attach the hold
+  when they verify the request. The page also books an **appointment with
+  blood** (blood type, patient name, donation type, patient
   hospital and ward, amount and slot). A hold is not a transfusion order:
   chapter staff still cross-match and confirm release.
 - **Find Donor** — the Digos City map: `flutter_map` renders OpenStreetMap
@@ -173,24 +176,31 @@ were bypassed.
   donor until staff verifies the card on site. Donors see a verification card
   with what chapter staff asked for, and keep one-tap access to requests and
   messages because donating and needing blood are not mutually exclusive.
-- **Requests** — anyone, including a donor, can post a blood request; the
-  dialog first checks participating-facility stock and explains what each
-  urgency level means (critical = now, urgent = 24–48 h, routine = planned). If
-  compatible stock exists, the request can go to the blood bank; otherwise it is
-  posted to the donor network. Donors get three tabs — **Requests** (open
-  donor-network requests their blood type and component can serve, with their own
-  posted request excluded), **Mine** (requests they posted, with donor responses
-  and fulfilment progress) and **Donate** (the drives they can join, their
-  eligibility window and what to bring). Every card has a **⋯ menu with View
-  details** for the full record, and the response dialog shares the donor's
+- **Requests** — anyone, including a donor, can post a blood request, but
+  submission is a documented workflow, not a button. The requester ticks the
+  document checklist (doctor's request form, transfusion slip, hospital
+  patient ID, optional typing result) and books one of the chapter's published
+  blood-bank slots (Mon–Fri 8–11 AM and 1–3 PM, Sat 8–11 AM); the dialog also
+  checks participating-facility stock and explains each urgency as a response
+  window (critical = same day, urgent = 24–48 h, routine = planned). The
+  request starts as **Awaiting verification** and is invisible to donors until
+  chapter staff verify it or reject it with a written reason the requester can
+  read. Donors get three tabs — **Requests** (open donor-network requests their
+  blood type and component can serve, with their own posted request excluded),
+  **Mine** (requests they posted, the review status and rejection reason, donor
+  responses and the booked slot) and **Donate** (the drives they can join,
+  their eligibility window and what to bring). Every card has a **⋯ menu with
+  View details** for the full record, and the response dialog shares the donor's
   anonymous **`Donor #<id>`** handle rather than their nickname. **Chat comes
   first:** the requester must exchange a real, reciprocal human message with a
-  donor before selection is enabled, and a system notice does not count.
-  Selection is also fair: a donor already selected for another open request is
-  flagged **coordinating**, stays visible in the response list, and cannot be
-  silently reserved twice until the first request closes.
+  donor before selection is enabled, and a system notice does not count. Only
+  the requester selects donors — staff verify and fulfil, but never choose the
+  donor. Selection is also fair: a donor already selected for another open
+  request is flagged **coordinating**, stays visible in the response list, and
+  cannot be silently reserved twice until the first request closes.
 - **Messages** — double-blind coordination threads, bilateral identity reveal
-  (request then accept), block/unblock with a 48-hour re-block cooldown,
+  (request then accept), a **Seen** marker on the newest own message the other
+  participant has read, block/unblock with a 48-hour re-block cooldown,
   persisted reports to staff with a required reason and an optional free-text
   explanation, and the **chapter support thread** created by the Help page's
   feedback form. Unread counters mark new chat activity in the rail, bottom bar
@@ -249,25 +259,32 @@ were bypassed.
   **open-request heat layer** and the **donor-density heatmap** the community
   map uses. Tapping a barangay scopes the side panel to eligible donors,
   pending registrations, open requests with responders, and donor applications
-  waiting for review. Staff can open request details, select a donor response
-  (still gated by the reciprocal-chat rule and the cross-request commitment
-  guard), mark a request fulfilled, and jump to user management.
-- **Inventory** — the second Operations view. Units are a tappable list;
-  selecting one opens the full record including the barcode graphic and the
-  name of the person holding it. Staff receive new stock with **Add unit**
-  (blood type, component, storage bay, collection date, optional barcode;
-  expiry is derived from the component shelf life), change unit status, release
-  a held bag back to available stock after screening, monitor effective expiry
-  pressure, confirm booked **appointments** in a dedicated queue, work the
-  request queue, and select donor responses when a requester is unavailable.
-  Only staff/admin can mark a request fulfilled.
+  waiting for review. The city-wide queue puts requests **Awaiting
+  verification** first: staff open the details, confirm the document checklist
+  and booked slot with **Verify and open** (blood-bank requests also attach the
+  compatible unit holds), or **Reject** with a written reason. Staff mark
+  requests fulfilled and jump to user management, but they do not select
+  donors — that stays with the requester.
+- **Inventory** — the second Operations view. Units are a compact list with a
+  **Details** button and a status-menu; the full record opens with the barcode
+  graphic, the holder's name (staff-only information) and a **Remove unit**
+  action for discarded or mislabelled bags. A one-line legend explains
+  Available, Reserved, Quarantined and Expired. Staff receive new stock with
+  **Add unit** (blood type, component, storage bay, collection date, optional
+  barcode; expiry is derived from the component shelf life), change unit
+  status, release a held bag back to available stock after screening, monitor
+  effective expiry pressure, confirm booked **appointments** in a dedicated
+  queue, and work the request queue. Only staff/admin can mark a request
+  fulfilled.
 - **Messages** — staff and admins use the community chat surface and can start
   a new conversation with another staff member or any community user; unread
   counters stay live across the console.
 - **Users** — create walk-in accounts with fixed-choice fields and a one-time
-  temporary password, verify blood cards, issue warnings, suspend and reinstate
-  donor and recipient accounts, and record a completed donation with its
-  component. Clicking a user opens a staff/admin-only record with contact
+  temporary password, verify blood cards, issue a warning with a recorded
+  reason (the count is capped at three, a third warning suspends automatically,
+  suspended accounts cannot be warned again, and reinstating an account clears
+  the count), suspend and reinstate donor and recipient accounts, and record a
+  completed donation with its component. Clicking a user opens a staff/admin-only record with contact
   details, standing, history and that account's recent activity; from there
   staff can message the user or correct the **donation window** after a
   transfusion without counting another donation. Staff cannot manage their own
@@ -597,7 +614,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**120 tests** cover:
+**126 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -612,9 +629,14 @@ flutter test
   blood type.
 - **Expiry handling** — effective status, exclusion from available stock, and
   prevention of reviving an expired bag as available.
+- **Request verification** — a submission without documents or outside the
+  published blood-bank schedule is refused; requests stay hidden from donors
+  until staff verify them; rejection carries a written reason; verifying a
+  blood-bank request holds the assigned units for the requester.
 - **Request lifecycle** — compatible/ineligible/duplicate responses, blood-bank
-  requests rejecting donor responses, chat-first selection (one-sided chat is
-  refused until both people send a message), selection authorization,
+  requests rejecting donor responses, requester-only selection, chat-first
+  selection (one-sided chat is refused until both people send a message),
+  selection authorization,
   selection-time eligibility rechecks, thread creation, leftover offers being
   declined, cross-request donor fairness (a committed donor cannot be reserved
   twice), staff-only fulfilment, and cancellation guards.
@@ -627,6 +649,9 @@ flutter test
   symmetric blocking, and the 48-hour re-block cooldown.
 - **Donation recording** — component capture, component-specific cooldown, and
   a staff donation-window correction that does not increment the donation count.
+- **Warnings and drives** — warnings cap at three, a third warning suspends,
+  suspended accounts cannot be warned again, reinstatement resets the count,
+  and only donor accounts can join a drive list.
 - **Chapter activity log** — the seeded feed covers transfusions and account
   changes; recorded donations, donation-window corrections and profile/avatar
   changes each append an entry, per-user filtering returns only that account's

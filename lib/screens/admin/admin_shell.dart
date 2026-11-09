@@ -65,6 +65,10 @@ class _AdminShellState extends State<AdminShell> {
   /// comes back on the first scroll up or tab change.
   bool _navHidden = false;
 
+  /// Downward travel accumulates before the bar hides, so tiny settling
+  /// deltas cannot toggle it.
+  double _navDownTravel = 0;
+
   /// Opens a destination that is not in the phone bottom bar.
   void _pushStandalone(int index) {
     Navigator.of(context).push(
@@ -164,35 +168,41 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   /// Slides the phone bottom bar away when the page scrolls toward its end
-  /// and brings it back on scroll up. The bar is also pinned automatically at
-  /// the top or the bottom of the page: once there is nowhere left to scroll,
-  /// hiding the navigation would strand the user.
+  /// and brings it back on scroll up. The bar is pinned automatically at the
+  /// top or the bottom, and it needs real room left to scroll before it will
+  /// hide again, so it never bounces up and down at the end of a list.
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
     final metrics = notification.metrics;
     final atTop = metrics.pixels <= metrics.minScrollExtent + 4;
     final atBottom = metrics.extentAfter <= 4;
+    final atEdge = atTop || atBottom;
+
+    void showBar() {
+      _navDownTravel = 0;
+      if (_navHidden) setState(() => _navHidden = false);
+    }
 
     if (notification is ScrollUpdateNotification) {
-      if (atTop || atBottom) {
-        if (_navHidden) setState(() => _navHidden = false);
+      if (atEdge) {
+        showBar();
         return false;
       }
       final delta = notification.scrollDelta ?? 0;
-      if (delta > 2 && !_navHidden) {
-        setState(() => _navHidden = true);
-      } else if (delta < -2 && _navHidden) {
-        setState(() => _navHidden = false);
+      if (delta > 0) {
+        _navDownTravel += delta;
+        if (_navDownTravel > 72 && metrics.extentAfter > 140 && !_navHidden) {
+          setState(() => _navHidden = true);
+          _navDownTravel = 0;
+        }
+      } else if (delta < -2) {
+        showBar();
       }
     } else if (notification is ScrollEndNotification) {
-      if (_navHidden && (atTop || atBottom)) {
-        setState(() => _navHidden = false);
-      }
+      if (atEdge) showBar();
+      _navDownTravel = 0;
     } else if (notification is OverscrollNotification) {
-      // A pull past the last item means the page cannot scroll further down.
-      if (_navHidden && notification.overscroll > 0) {
-        setState(() => _navHidden = false);
-      }
+      if (atEdge || notification.overscroll > 0) showBar();
     }
     return false;
   }

@@ -6,11 +6,13 @@ import '../theme.dart';
 
 /// Shared recipient request dialog.
 ///
-/// The paper's recipient flow (p.21) first checks participating facilities for
-/// compatible stock. This dialog shows the live component-aware stock count and
-/// lets the recipient either submit to the blood bank for processing or post to
-/// the donor network. Keeping the dialog in one place means the Blood Bank and
+/// Submission is a formal request, not an instant reservation: the requester
+/// declares the documents the chapter reviews, books one of the published
+/// blood-bank slots, and decides whether the request may also be posted to the
+/// donor network. Chapter staff then verify or reject it before any donor is
+/// asked to respond. Keeping the dialog in one place means the Blood Bank and
 /// Requests surfaces cannot drift apart.
+
 /// Plain-language meaning of each urgency level, shown under the selector.
 String _urgencyBlurb(RequestUrgency urgency) {
   switch (urgency) {
@@ -27,19 +29,37 @@ String _urgencyBlurb(RequestUrgency urgency) {
   }
 }
 
-Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
+Future<void> showBloodRequestDialog(
+  BuildContext context,
+  AppUser user, {
+  BloodComponent? initialComponent,
+  BloodType? initialBloodType,
+}) async {
   final repo = TabangRepository.instance;
   final formKey = GlobalKey<FormState>();
   final patientController = TextEditingController();
   final unitsController = TextEditingController(text: '1');
   final noteController = TextEditingController();
 
-  var bloodType = user.bloodType ?? BloodType.oPos;
-  var component = BloodComponent.packedRbc;
+  var bloodType = initialBloodType ?? user.bloodType ?? BloodType.oPos;
+  var component = initialComponent ?? BloodComponent.packedRbc;
   var urgency = RequestUrgency.urgent;
   var barangay =
       DigosBarangays.canonical(user.barangay) ?? DigosBarangays.all.first;
   var hospital = DigosFacilities.names.first;
+
+  // Required documents are pre-declared because the requester is submitting
+  // them to the chapter; staff confirm the physical copies at verification.
+  final documents = <String>{
+    RequestDocuments.doctorsForm,
+    RequestDocuments.transfusionSlip,
+    RequestDocuments.patientId,
+  };
+  var typingResultReady = false;
+  var postToDonors = true;
+
+  final slots = repo.bloodBankSlots(days: 14);
+  DateTime? scheduledFor = slots.isEmpty ? null : slots.first;
 
   await showDialog<void>(
     context: context,
@@ -51,9 +71,49 @@ Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
             .length;
         final hasStock = availableUnits > 0;
 
-        void submit(RequestSource source) {
+        final slotDays = <DateTime>[];
+        for (final slot in slots) {
+          final day = DateTime(slot.year, slot.month, slot.day);
+          if (!slotDays.any(
+            (existing) =>
+                existing.year == day.year &&
+                existing.month == day.month &&
+                existing.day == day.day,
+          )) {
+            slotDays.add(day);
+          }
+        }
+        final selectedDay = scheduledFor == null
+            ? null
+            : DateTime(
+                scheduledFor!.year,
+                scheduledFor!.month,
+                scheduledFor!.day,
+              );
+        final hours = slots
+            .where(
+              (slot) =>
+                  selectedDay != null &&
+                  slot.year == selectedDay.year &&
+                  slot.month == selectedDay.month &&
+                  slot.day == selectedDay.day,
+            )
+            .map((slot) => slot.hour)
+            .toList(growable: false);
+
+        final hasRequiredDocuments = RequestDocuments.required.every(
+          documents.contains,
+        );
+        final needsDonorNetwork = !hasStock;
+        final canSubmit =
+            hasRequiredDocuments &&
+            scheduledFor != null &&
+            (!needsDonorNetwork || postToDonors);
+
+        void submit() {
           if (!formKey.currentState!.validate()) return;
-          repo.addRequest(
+          if (!canSubmit) return;
+          final created = repo.addRequest(
             requesterId: user.id,
             patientAlias: patientController.text.trim(),
             bloodType: bloodType,
@@ -62,18 +122,36 @@ Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
             hospital: hospital,
             barangay: barangay,
             urgency: urgency,
-            source: source,
+            source: hasStock
+                ? RequestSource.bloodBank
+                : RequestSource.donorNetwork,
             note: noteController.text.trim().isEmpty
                 ? null
                 : noteController.text.trim(),
+            documents: [
+              ...documents,
+              if (typingResultReady) RequestDocuments.typingResult,
+            ],
+            scheduledFor: scheduledFor,
+            postToDonorNetwork: postToDonors,
           );
+          if (created == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'That submission is incomplete. Check the documents and the '
+                  'blood-bank slot.',
+                ),
+              ),
+            );
+            return;
+          }
           Navigator.pop(dialogContext);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                source == RequestSource.bloodBank
-                    ? 'Request submitted to the blood bank for processing.'
-                    : 'Request posted to the donor network.',
+                'Request ${created.id} submitted. Chapter staff will verify '
+                'the documents before it is posted.',
               ),
             ),
           );
@@ -230,7 +308,156 @@ Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
                       onChanged: (v) =>
                           setDialogState(() => barangay = v ?? barangay),
                     ),
-                    const SizedBox(height: TabangSpace.md),
+                    const SizedBox(height: TabangSpace.lg),
+                    Text(
+                      'Document checklist',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: dialogContext.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Chapter staff verify these before the request reaches '
+                      'the blood bank or the donor network.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.45,
+                        color: dialogContext.textMuted,
+                      ),
+                    ),
+                    for (final document in RequestDocuments.all)
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: document == RequestDocuments.typingResult
+                            ? typingResultReady
+                            : documents.contains(document),
+                        onChanged: (value) => setDialogState(() {
+                          if (document == RequestDocuments.typingResult) {
+                            typingResultReady = value ?? false;
+                          } else if (value ?? false) {
+                            documents.add(document);
+                          } else {
+                            documents.remove(document);
+                          }
+                        }),
+                        title: Text(
+                          document,
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                        subtitle: document == RequestDocuments.typingResult
+                            ? const Text(
+                                'Optional — only when the hospital asks for it',
+                                style: TextStyle(fontSize: 10.5),
+                              )
+                            : null,
+                      ),
+                    if (!hasRequiredDocuments)
+                      const Text(
+                        'All three required documents must be on hand before '
+                        'submitting.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: TabangColors.danger,
+                        ),
+                      ),
+                    const SizedBox(height: TabangSpace.lg),
+                    Text(
+                      'Blood-bank schedule',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: dialogContext.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Slots follow the chapter schedule: Mon–Fri '
+                      '8–11 AM and 1–3 PM, Sat 8–11 AM. Staff can adjust the '
+                      'slot when they verify the request.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.45,
+                        color: dialogContext.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: TabangSpace.sm),
+                    if (slotDays.isEmpty)
+                      const Text(
+                        'No published slots are open right now.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: TabangColors.danger,
+                        ),
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: DropdownButtonFormField<DateTime>(
+                              initialValue: selectedDay,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Day',
+                              ),
+                              items: slotDays
+                                  .map(
+                                    (day) => DropdownMenuItem(
+                                      value: day,
+                                      child: Text(
+                                        _formatSlotDay(day),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (day) => setDialogState(() {
+                                if (day == null) return;
+                                final firstHour = slots.firstWhere(
+                                  (slot) =>
+                                      slot.year == day.year &&
+                                      slot.month == day.month &&
+                                      slot.day == day.day,
+                                );
+                                scheduledFor = firstHour;
+                              }),
+                            ),
+                          ),
+                          const SizedBox(width: TabangSpace.md),
+                          Expanded(
+                            flex: 2,
+                            child: DropdownButtonFormField<int>(
+                              initialValue: scheduledFor?.hour,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Time',
+                              ),
+                              items: hours
+                                  .map(
+                                    (hour) => DropdownMenuItem(
+                                      value: hour,
+                                      child: Text(_formatSlotHour(hour)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (hour) => setDialogState(() {
+                                if (hour == null || selectedDay == null) return;
+                                scheduledFor = DateTime(
+                                  selectedDay.year,
+                                  selectedDay.month,
+                                  selectedDay.day,
+                                  hour,
+                                );
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: TabangSpace.lg),
                     Container(
                       padding: const EdgeInsets.all(TabangSpace.sm),
                       decoration: BoxDecoration(
@@ -258,13 +485,12 @@ Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
                                   ? '$availableUnits compatible '
                                         '${component.label.toLowerCase()} unit'
                                         '${availableUnits == 1 ? '' : 's'} '
-                                        'in stock. Submit to the blood bank for '
-                                        'processing, or post to the donor '
-                                        'network.'
+                                        'in stock. The blood bank can process '
+                                        'this request after verification.'
                                   : 'No compatible '
                                         '${component.label.toLowerCase()} stock '
-                                        'right now. Post to the donor network so '
-                                        'eligible donors can respond.',
+                                        'right now. The request must be posted '
+                                        'to the donor network.',
                               style: const TextStyle(
                                 fontSize: 11.5,
                                 height: 1.5,
@@ -278,13 +504,32 @@ Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
                       const SizedBox(height: TabangSpace.xs),
                       Text(
                         'Only $availableUnits of $unitsNeeded requested units '
-                        'are in stock.',
+                        'are in stock; the donor network can cover the rest.',
                         style: TextStyle(
                           fontSize: 10.5,
                           color: dialogContext.textMuted,
                         ),
                       ),
                     ],
+                    const SizedBox(height: TabangSpace.sm),
+                    CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: postToDonors,
+                      onChanged: (value) =>
+                          setDialogState(() => postToDonors = value ?? false),
+                      title: const Text(
+                        'Post to the donor network too',
+                        style: TextStyle(fontSize: 12.5),
+                      ),
+                      subtitle: const Text(
+                        'If the blood bank cannot cover it, eligible donors '
+                        'can offer to donate. Turn this off for a blood-bank '
+                        'request only.',
+                        style: TextStyle(fontSize: 10.5),
+                      ),
+                    ),
                     const SizedBox(height: TabangSpace.md),
                     TextFormField(
                       controller: noteController,
@@ -303,20 +548,39 @@ Future<void> showBloodRequestDialog(BuildContext context, AppUser user) async {
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
-            if (hasStock)
-              OutlinedButton(
-                onPressed: () => submit(RequestSource.donorNetwork),
-                child: const Text('Post to donors'),
-              ),
-            ElevatedButton(
-              onPressed: () => submit(
-                hasStock ? RequestSource.bloodBank : RequestSource.donorNetwork,
-              ),
-              child: Text(hasStock ? 'Submit to blood bank' : 'Post to donors'),
+            ElevatedButton.icon(
+              onPressed: canSubmit ? submit : null,
+              icon: const Icon(Icons.fact_check_outlined, size: 16),
+              label: const Text('Submit for verification'),
             ),
           ],
         );
       },
     ),
   );
+}
+
+String _formatSlotDay(DateTime day) {
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${weekdays[day.weekday - 1]}, ${months[day.month - 1]} ${day.day}';
+}
+
+String _formatSlotHour(int hour) {
+  final period = hour >= 12 ? 'PM' : 'AM';
+  final display = hour > 12 ? hour - 12 : hour;
+  return '$display:00 $period';
 }

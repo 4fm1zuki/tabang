@@ -73,6 +73,12 @@ class _DonorShellState extends State<DonorShell> {
   /// comes back on the first scroll up or tab change.
   bool _navHidden = false;
 
+  /// Horizontal rails and tiny settling deltas must not toggle the bar, so
+  /// downward travel accumulates before hiding. Combined with the
+  /// "must have room left to scroll" guard this stops the bar bouncing at the
+  /// end of a list.
+  double _navDownTravel = 0;
+
   /// True once the rail has finished sliding to its target width. Labels are
   /// only laid out then, so the "TABANG" wordmark and nav labels can never be
   /// squeezed into a narrow, wrapping column while the rail animates.
@@ -161,35 +167,45 @@ class _DonorShellState extends State<DonorShell> {
   }
 
   /// Slides the phone bottom bar away when the page scrolls toward its end
-  /// and brings it back on scroll up. The bar is also pinned automatically at
-  /// the top or the bottom of the page: once there is nowhere left to scroll,
-  /// hiding the navigation would strand the user.
+  /// and brings it back on scroll up. The bar is pinned automatically at the
+  /// top or the bottom, and it needs real room left to scroll before it will
+  /// hide again, so it never bounces up and down at the end of a list.
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
     final metrics = notification.metrics;
     final atTop = metrics.pixels <= metrics.minScrollExtent + 4;
     final atBottom = metrics.extentAfter <= 4;
+    final atEdge = atTop || atBottom;
+
+    void showBar() {
+      _navDownTravel = 0;
+      if (_navHidden) setState(() => _navHidden = false);
+    }
 
     if (notification is ScrollUpdateNotification) {
-      if (atTop || atBottom) {
-        if (_navHidden) setState(() => _navHidden = false);
+      if (atEdge) {
+        showBar();
         return false;
       }
       final delta = notification.scrollDelta ?? 0;
-      if (delta > 2 && !_navHidden) {
-        setState(() => _navHidden = true);
-      } else if (delta < -2 && _navHidden) {
-        setState(() => _navHidden = false);
+      if (delta > 0) {
+        _navDownTravel += delta;
+        // Hide only after a deliberate downward swipe with plenty of list
+        // left; a bar that disappears with 100 px to go is what made the
+        // page feel like it was fighting the user.
+        if (_navDownTravel > 72 && metrics.extentAfter > 140 && !_navHidden) {
+          setState(() => _navHidden = true);
+          _navDownTravel = 0;
+        }
+      } else if (delta < -2) {
+        showBar();
       }
     } else if (notification is ScrollEndNotification) {
-      if (_navHidden && (atTop || atBottom)) {
-        setState(() => _navHidden = false);
-      }
+      if (atEdge) showBar();
+      _navDownTravel = 0;
     } else if (notification is OverscrollNotification) {
       // A pull past the last item means the page cannot scroll further down.
-      if (_navHidden && notification.overscroll > 0) {
-        setState(() => _navHidden = false);
-      }
+      if (atEdge || notification.overscroll > 0) showBar();
     }
     return false;
   }

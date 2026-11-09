@@ -92,10 +92,16 @@ class _RequestsPageState extends State<RequestsPage> {
       RequestUrgency.routine: 2,
     };
 
+    int rank(BloodRequest request) => switch (request.status) {
+      RequestStatus.pendingReview => 0,
+      RequestStatus.open => 1,
+      RequestStatus.matched => 2,
+      _ => 3,
+    };
+
     return [...list]..sort((a, b) {
-      final aOpen = a.status == RequestStatus.open ? 0 : 1;
-      final bOpen = b.status == RequestStatus.open ? 0 : 1;
-      if (aOpen != bOpen) return aOpen.compareTo(bOpen);
+      final byRank = rank(a).compareTo(rank(b));
+      if (byRank != 0) return byRank;
       final ur = urgencyRank[a.urgency]!.compareTo(urgencyRank[b.urgency]!);
       if (ur != 0) return ur;
       return b.createdAt.compareTo(a.createdAt);
@@ -664,9 +670,45 @@ class _RequestsPageState extends State<RequestsPage> {
             runSpacing: 4,
             children: [
               _meta(context, Icons.place_outlined, request.barangay),
-              _meta(context, Icons.schedule, formatRelative(request.createdAt)),
+              if (request.scheduledFor != null)
+                _meta(
+                  context,
+                  Icons.event_available_outlined,
+                  'Slot ${formatDateTime(request.scheduledFor!)}',
+                )
+              else
+                _meta(
+                  context,
+                  Icons.schedule,
+                  formatRelative(request.createdAt),
+                ),
             ],
           ),
+
+          // The requester sees where the review stands: waiting for staff, or
+          // rejected with the reason staff entered.
+          if (isOwn && request.isAwaitingReview) ...[
+            const SizedBox(height: TabangSpace.md),
+            _reviewNotice(
+              context,
+              icon: Icons.pending_actions_outlined,
+              color: TabangColors.warning,
+              text:
+                  'Awaiting chapter verification. Staff are checking the '
+                  'documents and the booked slot before this request is '
+                  'posted or held from stock.',
+            ),
+          ] else if (isOwn && request.status == RequestStatus.rejected) ...[
+            const SizedBox(height: TabangSpace.md),
+            _reviewNotice(
+              context,
+              icon: Icons.assignment_late_outlined,
+              color: TabangColors.danger,
+              text:
+                  'Rejected by chapter staff: '
+                  '${request.reviewNote ?? 'No reason recorded.'}',
+            ),
+          ],
 
           if (request.note != null) ...[
             const SizedBox(height: TabangSpace.md),
@@ -815,6 +857,40 @@ class _RequestsPageState extends State<RequestsPage> {
     );
   }
 
+  Widget _reviewNotice(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(TabangSpace.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(TabangRadius.sm),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: TabangSpace.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.5,
+                color: context.textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Full record for one request, opened from the card's three-dot menu.
   void _showRequestDetails(
     BuildContext context,
@@ -835,8 +911,7 @@ class _RequestsPageState extends State<RequestsPage> {
     final canRespond =
         _isDonor &&
         !isOwn &&
-        request.status == RequestStatus.open &&
-        request.source == RequestSource.donorNetwork &&
+        request.acceptsDonorResponses &&
         _canRespond(request);
 
     showDialog<void>(
@@ -876,13 +951,54 @@ class _RequestsPageState extends State<RequestsPage> {
                 ),
                 _detail(dialogContext, 'Patient facility', request.hospital),
                 _detail(dialogContext, 'Barangay', request.barangay),
-                _detail(dialogContext, 'Urgency', request.urgency.label),
+                _detail(
+                  dialogContext,
+                  'Urgency',
+                  '${request.urgency.label} · ${request.urgency.detail}',
+                ),
                 _detail(dialogContext, 'Status', request.status.label),
+                if (request.scheduledFor != null)
+                  _detail(
+                    dialogContext,
+                    'Blood-bank slot',
+                    formatDateTime(request.scheduledFor!),
+                  ),
                 _detail(
                   dialogContext,
                   'Posted',
                   formatRelative(request.createdAt),
                 ),
+                if (request.documents.isNotEmpty)
+                  _detail(
+                    dialogContext,
+                    'Documents',
+                    request.documents.join(', '),
+                  ),
+                if (request.reviewNote != null &&
+                    request.reviewNote!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Chapter review note',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: dialogContext.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(TabangSpace.md),
+                    decoration: BoxDecoration(
+                      color: TabangColors.danger.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(TabangRadius.sm),
+                    ),
+                    child: Text(
+                      request.reviewNote!,
+                      style: const TextStyle(fontSize: 12.5, height: 1.5),
+                    ),
+                  ),
+                ],
                 _detail(
                   dialogContext,
                   'Channel',

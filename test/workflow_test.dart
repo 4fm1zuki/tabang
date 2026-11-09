@@ -4,6 +4,9 @@ import 'package:tabang/core/eligibility.dart';
 import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
 
+/// Creates a request through the full documented flow and verifies it as
+/// chapter staff, so lifecycle tests start from a live open request instead of
+/// bypassing the review step.
 BloodRequest addRequest(
   TabangRepository repo, {
   required String patientAlias,
@@ -12,7 +15,7 @@ BloodRequest addRequest(
   int unitsNeeded = 1,
   RequestSource source = RequestSource.donorNetwork,
 }) {
-  repo.addRequest(
+  final created = repo.addRequest(
     requesterId: 'USR-009',
     patientAlias: patientAlias,
     bloodType: bloodType,
@@ -22,8 +25,15 @@ BloodRequest addRequest(
     barangay: 'Zone 2',
     urgency: RequestUrgency.urgent,
     source: source,
-  );
-  return repo.requests.firstWhere((r) => r.patientAlias == patientAlias);
+    documents: const [
+      RequestDocuments.doctorsForm,
+      RequestDocuments.transfusionSlip,
+      RequestDocuments.patientId,
+    ],
+    scheduledFor: repo.bloodBankSlots(days: 7).first,
+  )!;
+  repo.verifyRequest(created.id, actorId: 'USR-010');
+  return repo.requests.firstWhere((r) => r.id == created.id);
 }
 
 void main() {
@@ -263,7 +273,7 @@ void main() {
       );
     });
 
-    test('only the requester or staff can select a response', () {
+    test('only the requester can select a response', () {
       final request = addRequest(repo, patientAlias: 'Lifecycle 4');
       final response = repo.respondToRequest(
         requestId: request.id,
@@ -272,6 +282,12 @@ void main() {
 
       expect(
         repo.selectResponse(responseId: response.id, selectedById: 'USR-001'),
+        isNull,
+      );
+      // Staff verify and fulfil; they do not choose the donor for the
+      // requester.
+      expect(
+        repo.selectResponse(responseId: response.id, selectedById: 'USR-010'),
         isNull,
       );
       expect(
@@ -553,9 +569,142 @@ void main() {
     });
   });
 
+  group('Request verification', () {
+    BloodRequest? submit({
+      RequestSource source = RequestSource.donorNetwork,
+      List<String> documents = const [
+        RequestDocuments.doctorsForm,
+        RequestDocuments.transfusionSlip,
+        RequestDocuments.patientId,
+      ],
+      DateTime? scheduledFor,
+      bool postToDonorNetwork = true,
+      BloodType bloodType = BloodType.oNeg,
+      BloodComponent component = BloodComponent.packedRbc,
+      int unitsNeeded = 1,
+    }) {
+      return repo.addRequest(
+        requesterId: 'USR-009',
+        patientAlias: 'Review ${DateTime.now().microsecondsSinceEpoch}',
+        bloodType: bloodType,
+        component: component,
+        unitsNeeded: unitsNeeded,
+        hospital: DigosFacilities.names.first,
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.urgent,
+        source: source,
+        documents: documents,
+        scheduledFor: scheduledFor ?? repo.bloodBankSlots(days: 7).first,
+        postToDonorNetwork: postToDonorNetwork,
+      );
+    }
+
+    test('a request stays hidden until staff verify it', () {
+      final created = submit()!;
+      expect(created.status, RequestStatus.pendingReview);
+      expect(
+        repo.donorNetworkRequests.map((r) => r.id),
+        isNot(contains(created.id)),
+      );
+      expect(
+        repo.respondToRequest(requestId: created.id, donorId: 'USR-012'),
+        isNull,
+      );
+
+      // Only staff or an admin can verify.
+      expect(repo.verifyRequest(created.id, actorId: 'USR-001'), isFalse);
+      expect(repo.verifyRequest(created.id, actorId: 'USR-010'), isTrue);
+      expect(
+        repo.requests.firstWhere((r) => r.id == created.id).status,
+        RequestStatus.open,
+      );
+      expect(
+        repo.respondToRequest(requestId: created.id, donorId: 'USR-012'),
+        isNotNull,
+      );
+    });
+
+    test('documents and a published slot are required', () {
+      expect(submit(documents: const []), isNull);
+      expect(
+        submit(scheduledFor: DateTime.now().add(const Duration(hours: 3))),
+        isNull,
+      );
+    });
+
+    test('staff reject a request with a reason the requester can read', () {
+      final created = submit()!;
+      expect(
+        repo.rejectRequest(created.id, actorId: 'USR-009', reason: 'nope'),
+        isFalse,
+      );
+      expect(
+        repo.rejectRequest(
+          created.id,
+          actorId: 'USR-010',
+          reason: 'No transfusion slip attached yet',
+        ),
+        isTrue,
+      );
+      final rejected = repo.requests.firstWhere((r) => r.id == created.id);
+      expect(rejected.status, RequestStatus.rejected);
+      expect(rejected.reviewNote, 'No transfusion slip attached yet');
+    });
+
+    test('verifying a blood-bank request holds the assigned units', () {
+      final created = submit(source: RequestSource.bloodBank)!;
+      final compatible = repo.compatibleUnitsFor(
+        recipientType: created.bloodType,
+        component: created.component,
+      );
+      expect(compatible, isNotEmpty);
+      expect(
+        repo.verifyRequest(
+          created.id,
+          actorId: 'USR-010',
+          unitIds: [compatible.first.barcode],
+        ),
+        isTrue,
+      );
+      final held = repo.units.firstWhere(
+        (unit) => unit.barcode == compatible.first.barcode,
+      );
+      expect(held.status, UnitStatus.reserved);
+      expect(held.reservedBy, 'USR-009');
+    });
+
+    test('warnings cap at three and reset on reinstatement', () {
+      repo.currentUser = repo.userById('USR-010');
+      addTearDown(() => repo.currentUser = null);
+
+      expect(repo.warnUser('USR-019', reason: 'First warning'), isTrue);
+      expect(repo.userById('USR-019')!.warningCount, 1);
+      repo.warnUser('USR-019', reason: 'Second warning');
+      repo.warnUser('USR-019', reason: 'Third warning');
+      expect(repo.userById('USR-019')!.warningCount, 3);
+      expect(repo.userById('USR-019')!.status, AccountStatus.suspended);
+      // A suspended account cannot be warned again.
+      expect(repo.warnUser('USR-019'), isFalse);
+
+      repo.setUserStatus('USR-019', AccountStatus.verified);
+      expect(repo.userById('USR-019')!.warningCount, 0);
+    });
+
+    test('only donors can join a drive', () {
+      expect(
+        repo.toggleDriveInterest('DRV-001', 'USR-038'), // community user
+        isFalse,
+      );
+      expect(
+        repo.toggleDriveInterest('DRV-001', 'USR-001'), // donor
+        isTrue,
+      );
+    });
+  });
+
   group('Donor request authoring and anonymity', () {
     test('a donor can post a request that other donors can serve', () {
-      repo.addRequest(
+      final created = repo.addRequest(
         requesterId: 'USR-001', // a donor
         patientAlias: 'Donor patient 01',
         bloodType: BloodType.aPos,
@@ -564,7 +713,14 @@ void main() {
         hospital: DigosFacilities.names.first,
         barangay: 'Zone 2',
         urgency: RequestUrgency.urgent,
-      );
+        documents: const [
+          RequestDocuments.doctorsForm,
+          RequestDocuments.transfusionSlip,
+          RequestDocuments.patientId,
+        ],
+        scheduledFor: repo.bloodBankSlots(days: 7).first,
+      )!;
+      repo.verifyRequest(created.id, actorId: 'USR-010');
       final request = repo.requests.firstWhere(
         (r) => r.patientAlias == 'Donor patient 01',
       );
