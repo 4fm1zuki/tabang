@@ -8,6 +8,8 @@
 /// from here.
 library;
 
+import 'dart:typed_data';
+
 /// ABO/Rh blood group.
 enum BloodType {
   oNeg('O-'),
@@ -194,7 +196,6 @@ enum UserRole {
 
   /// Staff and admin work the request queue and confirm appointments.
   bool get canFulfillRequests => isAdminSide;
-  bool get canConfirmAppointments => isAdminSide;
 
   /// Moderation is shared by the chapter console.
   bool get canModerate => isAdminSide;
@@ -461,13 +462,49 @@ class RequestDocuments {
     typingResult,
   ];
 
-  /// The two documents every request must carry. The typing result is only
+  /// The three documents every request must carry. The typing result is only
   /// required by some hospitals, so it is optional.
   static const List<String> required = [
     doctorsForm,
     transfusionSlip,
     patientId,
   ];
+}
+
+/// One file actually attached to a blood request.
+///
+/// A checkbox is not evidence: staff need the file the requester sent. [bytes]
+/// holds the uploaded payload for requests created in this session; seeded
+/// requests carry [fileName] only, representing documents already on file with
+/// the chapter.
+class RequestDocument {
+  const RequestDocument({
+    required this.kind,
+    required this.fileName,
+    this.bytes,
+    this.sizeBytes = 0,
+  });
+
+  /// One of the [RequestDocuments] constants, so the checklist and the file
+  /// are stored under the same label.
+  final String kind;
+  final String fileName;
+
+  /// Uploaded content, or null when the document is already on file at the
+  /// chapter (seed data).
+  final Uint8List? bytes;
+  final int sizeBytes;
+
+  bool get hasFile => bytes != null;
+
+  String get sizeLabel {
+    if (sizeBytes <= 0) return '';
+    if (sizeBytes < 1024) return '$sizeBytes B';
+    if (sizeBytes < 1024 * 1024) {
+      return '${(sizeBytes / 1024).toStringAsFixed(0)} KB';
+    }
+    return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
 }
 
 /// Where a request is being fulfilled from.
@@ -525,9 +562,8 @@ class BloodRequest {
   final RequestSource source;
   final String? note;
 
-  /// Document checklist collected at submission and confirmed by staff during
-  /// verification.
-  final List<String> documents;
+  /// Files uploaded at submission and checked by staff during verification.
+  final List<RequestDocument> documents;
 
   /// The blood-bank slot the requester booked. Always inside the chapter's
   /// published schedule; staff can still adjust it when verifying.
@@ -561,7 +597,7 @@ class BloodRequest {
     RequestStatus? status,
     int? unitsFulfilled,
     RequestSource? source,
-    List<String>? documents,
+    List<RequestDocument>? documents,
     DateTime? scheduledFor,
     bool? postToDonorNetwork,
     String? reviewNote,
@@ -1180,38 +1216,4 @@ class BarangayStat {
   final String barangay;
   final int donationCount;
   final int donorCount;
-}
-
-/// A request for a blood-bank appointment.
-///
-/// The checklist asks for an "appointment with blood" form covering the blood
-/// type, patient name, donation type, patient hospital/ward and amount. This
-/// record is deliberately a *booking request*: chapter staff confirm the slot
-/// and perform the clinical screening before any unit is allocated.
-class DonationAppointment {
-  const DonationAppointment({
-    required this.id,
-    required this.requesterId,
-    required this.patientName,
-    required this.bloodType,
-    required this.component,
-    required this.hospital,
-    required this.ward,
-    required this.units,
-    required this.scheduledAt,
-    this.status = 'Pending confirmation',
-    this.note,
-  });
-
-  final String id;
-  final String requesterId;
-  final String patientName;
-  final BloodType bloodType;
-  final BloodComponent component;
-  final String hospital;
-  final String ward;
-  final int units;
-  final DateTime scheduledAt;
-  final String status;
-  final String? note;
 }

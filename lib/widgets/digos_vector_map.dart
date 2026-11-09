@@ -19,24 +19,42 @@ import '../theme.dart';
 class DigosMapColors {
   const DigosMapColors._();
 
-  /// Paper matches the standalone map project exactly, so the inverse mask is
-  /// invisible against the surrounding surface.
-  static const Color paper = Color(0xFFF6F7F3);
-  static const Color paperDark = Color(0xFF171312);
+  /// The canvas under the raster tiles. Plain white: the earlier warm
+  /// off-white read as dirty and the sky-blue gradient that replaced it tinted
+  /// the whole base map blue, so the light canvas is deliberately neutral now.
+  static const LinearGradient paperGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
+  );
+  static const LinearGradient paperGradientDark = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF121A22), Color(0xFF080D13)],
+  );
 
-  /// Everything outside the city cutout. Deliberately a step darker than the
-  /// page paper so the Digos silhouette reads at a glance instead of blending
-  /// into the background.
-  static const Color outsideMask = Color(0xFFE1D9CC);
-  static const Color outsideMaskDark = Color(0xFF0C0A09);
+  /// Everything outside the city cutout. Also plain white; the heavy city
+  /// border and the barangay lines carry the silhouette without a coloured
+  /// band around Digos.
+  static const LinearGradient outsideGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
+  );
+  static const LinearGradient outsideGradientDark = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF0F1822), Color(0xFF05090E)],
+  );
+
   static const Color internalBorder = Color(0xFFD08A76);
   static const Color internalBorderDark = Color(0xFF8E5A4B);
   static const Color cityBorder = Color(0xFF5A1512);
   static const Color cityBorderDark = Color(0xFFFFDAD4);
   static const Color label = Color(0xFF2B211E);
   static const Color labelDark = Color(0xFFFBF5F2);
-  static const Color halo = Color(0xFFFBF7F4);
-  static const Color haloDark = Color(0xFF171312);
+  static const Color halo = Color(0xFFF8FAFC);
+  static const Color haloDark = Color(0xFF101418);
 
   /// Selected barangay: a subtle teal wash with a brand-teal outline, so it
   /// no longer competes with the warm donor ramp. (Polygon fills cannot take a
@@ -54,25 +72,25 @@ class DigosMapColors {
   static const Color chapterDark = Color(0xFFFFB4A8);
   static const Color attribution = Color(0xFF5A4F4B);
 
-  /// Base-map tint from the standalone map project: a warm, low-contrast
-  /// street template so roads, water, buildings and land use stay visible
-  /// under the barangay fills.
+  /// Light tiles are drawn untinted. Both earlier matrices changed the base
+  /// map's colour (warm beige, then cool blue); identity lets the standard
+  /// Humanitarian raster sit neutrally on the plain white canvas.
   static const List<double> lightTileFilter = <double>[
-    0.575,
-    0.422,
-    0.043,
+    1,
     0,
-    -6,
-    0.125,
-    0.872,
-    0.043,
     0,
-    -4,
-    0.125,
-    0.422,
-    0.493,
     0,
-    -8,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
     0.000,
     0.000,
     0.000,
@@ -83,10 +101,11 @@ class DigosMapColors {
   /// Inverted, hue-rotated tiles for the dark map style.
   ///
   /// This is the classic `invert(1) hue-rotate(180deg)` recipe folded into one
-  /// matrix and dimmed to 80%, so the result lands just above [paperDark]:
-  /// pale OSM land turns near-black, water stays blue, parks stay green and
-  /// roads read as dark lines. OSM place names drop to a muted grey instead of
-  /// glowing white, so TABANG's own halo labels stay the brightest text.
+  /// matrix and dimmed to 80%, so the result lands just above the dark canvas
+  /// gradient: pale OSM land turns near-black, water stays blue, parks stay
+  /// green and roads read as dark lines. OSM place names drop to a muted grey
+  /// instead of glowing white, so TABANG's own halo labels stay the brightest
+  /// text.
   static const List<double> darkTileFilter = <double>[
     0.459,
     -1.144,
@@ -454,6 +473,13 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   int? _hoveredId;
   double _zoom = 11;
 
+  /// The distance bar follows the live camera, not the coarser [_zoom] value
+  /// used for label and pin sizing. It is a notifier so a pinch or scroll
+  /// repaints only the small bar instead of rebuilding every map layer.
+  final ValueNotifier<MapScaleBarScale> _scaleNotifier = ValueNotifier(
+    mapScaleBarScale(zoom: 11, latitude: 6.84),
+  );
+
   /// Tile loading state, used only to explain a blank base map.
   int _tileFailures = 0;
   bool _tileWarned = false;
@@ -476,12 +502,20 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       if (!mounted) return;
       try {
         DigosVectorMap.fitCity(widget.controller);
+        _syncScale(widget.controller.camera);
       } catch (_) {
         // The camera may not exist on the very first frame; the next layout
         // will schedule another attempt.
         _didInitialFit = false;
       }
     });
+  }
+
+  void _syncScale(MapCamera camera) {
+    _scaleNotifier.value = mapScaleBarScale(
+      zoom: camera.zoom,
+      latitude: camera.center.latitude,
+    );
   }
 
   @override
@@ -502,6 +536,12 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       for (final feature in _features)
         feature.name: DigosBarangays.canonical(feature.name) ?? feature.name,
     };
+  }
+
+  @override
+  void dispose() {
+    _scaleNotifier.dispose();
+    super.dispose();
   }
 
   double _lerp(
@@ -552,239 +592,237 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
               bottom: -DigosVectorMap.baseMapMargin,
               // A pointing-hand cursor while a barangay is under the mouse makes
               // "click to select a region" discoverable; elsewhere the map shows
-              // the grab cursor that matches dragging.
-              child: MouseRegion(
-                cursor: _hoveredId != null
-                    ? SystemMouseCursors.click
-                    : SystemMouseCursors.grab,
-                child: FlutterMap(
-                  mapController: widget.controller,
-                  options: MapOptions(
-                    initialCenter: const LatLng(6.80, 125.34),
-                    initialZoom: 11,
-                    // Below 10.5 the whole city is barely a hundred pixels wide;
-                    // above 18 the raster base has no more detail to show. Both
-                    // zoom buttons use the same clamp.
-                    minZoom: 10.5,
-                    maxZoom: 18,
-                    cameraConstraint: CameraConstraint.containCenter(
-                      bounds: LatLngBounds(
-                        const LatLng(6.70, 125.23),
-                        const LatLng(7.01, 125.42),
-                      ),
-                    ),
-                    backgroundColor: dark
-                        ? DigosMapColors.paperDark
-                        : DigosMapColors.paper,
-                    initialCameraFit: CameraFit.bounds(
-                      // Same framing as the standalone map project, with the
-                      // canvas margin added so the visible inset stays 40 px.
-                      bounds: DigosVectorMap.cityBounds,
-                      padding: const EdgeInsets.all(
-                        40 + DigosVectorMap.baseMapMargin,
-                      ),
-                      maxZoom: 13,
-                    ),
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                    ),
-                    onPositionChanged: (camera, hasGesture) {
-                      if ((camera.zoom - _zoom).abs() > 0.05) {
-                        setState(() => _zoom = camera.zoom);
-                      }
-                    },
-                    // Gesture-start / gesture-end drive the panel fade, so the panels come
-                    // back as soon as the user stops moving the map instead of on a long
-                    // timer.
-                    onMapEvent: (event) {
-                      switch (event) {
-                        case MapEventMoveStart():
-                        case MapEventFlingAnimationStart():
-                          widget.onInteractionStart?.call();
-                        case MapEventMoveEnd():
-                        case MapEventFlingAnimationEnd():
-                        case MapEventDoubleTapZoomEnd():
-                          widget.onInteractionEnd?.call();
-                        default:
-                          break;
-                      }
-                    },
-                    onTap: (tapPosition, point) {
-                      widget.onInteractionStart?.call();
-                      widget.onInteractionEnd?.call();
-                      widget.onSelectBarangay(_canonicalAt(point));
-                    },
-                    onPointerHover: (event, point) {
-                      if (event.kind != PointerDeviceKind.mouse) return;
-                      final feature = _featureAt(point);
-                      final id = feature?.id;
-                      if (id != _hoveredId) setState(() => _hoveredId = id);
-                    },
-                  ),
-                  children: [
-                    if (DigosVectorMap.tilesEnabled)
-                      // Street base exactly as the standalone map project renders
-                      // it. The warm, low-contrast matrix keeps roads, water,
-                      // buildings and land use visible underneath the barangay
-                      // fills while muting the Carto style's farmland hatching and
-                      // baked-in place names, so TABANG's labels stay the names
-                      // that stand out.
-                      ColorFiltered(
-                        colorFilter: ColorFilter.matrix(
-                          dark
-                              ? DigosMapColors.darkTileFilter
-                              : DigosMapColors.lightTileFilter,
+              // the grab cursor that matches dragging. The plain white canvas
+              // sits under the transparent FlutterMap raster, so a tile gap
+              // reads as clean white instead of a tinted band.
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: dark
+                      ? DigosMapColors.paperGradientDark
+                      : DigosMapColors.paperGradient,
+                ),
+                child: MouseRegion(
+                  cursor: _hoveredId != null
+                      ? SystemMouseCursors.click
+                      : SystemMouseCursors.grab,
+                  child: FlutterMap(
+                    mapController: widget.controller,
+                    options: MapOptions(
+                      initialCenter: const LatLng(6.80, 125.34),
+                      initialZoom: 11,
+                      // Below 10.5 the whole city is barely a hundred pixels wide;
+                      // above 18 the raster base has no more detail to show. Both
+                      // zoom buttons use the same clamp.
+                      minZoom: 10.5,
+                      maxZoom: 18,
+                      cameraConstraint: CameraConstraint.containCenter(
+                        bounds: LatLngBounds(
+                          const LatLng(6.70, 125.23),
+                          const LatLng(7.01, 125.42),
                         ),
-                        child: TileLayer(
-                          // HOT (Humanitarian OpenStreetMap Team) tiles are
-                          // still OSM data, but the style draws no mountain
-                          // peak symbols or hill shading. The standard OSM
-                          // Carto style covers the Digos highlands - and the
-                          // screenshot problem was those brown triangles.
-                          urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-                          subdomains: const ['a', 'b', 'c'],
-                          userAgentPackageName: 'com.digos.barangay_map',
-                          maxNativeZoom: 19,
-                          // The offset is re-evaluated inside the tile builder so
-                          // it tracks the live camera during zoom animations.
-                          // Whole-tile shifts are fetched by the provider; only
-                          // the sub-tile remainder is translated here, which
-                          // keeps the oversized canvas above small even at
-                          // zoom 18. panBuffer keeps a preloaded ring so a short
-                          // pan does not reveal unloaded tiles.
-                          tileProvider: _tileProvider,
-                          panBuffer: 1,
-                          tileBuilder: (context, tileWidget, tile) =>
-                              Transform.translate(
-                                offset: DigosVectorMap.baseMapResidualFor(
-                                  MapCamera.of(context).zoom,
-                                  tile.coordinates.z,
+                      ),
+                      backgroundColor: Colors.transparent,
+                      initialCameraFit: CameraFit.bounds(
+                        // Same framing as the standalone map project, with the
+                        // canvas margin added so the visible inset stays 40 px.
+                        bounds: DigosVectorMap.cityBounds,
+                        padding: const EdgeInsets.all(
+                          40 + DigosVectorMap.baseMapMargin,
+                        ),
+                        maxZoom: 13,
+                      ),
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                      ),
+                      onPositionChanged: (camera, hasGesture) {
+                        // The bar uses the exact camera zoom on every frame;
+                        // the coarser value below still drives label and pin
+                        // scaling, where tiny increments would only rebuild
+                        // the whole layer stack for no visual gain.
+                        _syncScale(camera);
+                        if ((camera.zoom - _zoom).abs() > 0.05) {
+                          setState(() => _zoom = camera.zoom);
+                        }
+                      },
+                      // Gesture-start / gesture-end drive the panel fade, so the panels come
+                      // back as soon as the user stops moving the map instead of on a long
+                      // timer.
+                      onMapEvent: (event) {
+                        switch (event) {
+                          case MapEventMoveStart():
+                          case MapEventFlingAnimationStart():
+                            widget.onInteractionStart?.call();
+                          case MapEventMoveEnd():
+                          case MapEventFlingAnimationEnd():
+                          case MapEventDoubleTapZoomEnd():
+                            widget.onInteractionEnd?.call();
+                          default:
+                            break;
+                        }
+                      },
+                      onTap: (tapPosition, point) {
+                        widget.onInteractionStart?.call();
+                        widget.onInteractionEnd?.call();
+                        widget.onSelectBarangay(_canonicalAt(point));
+                      },
+                      onPointerHover: (event, point) {
+                        if (event.kind != PointerDeviceKind.mouse) return;
+                        final feature = _featureAt(point);
+                        final id = feature?.id;
+                        if (id != _hoveredId) setState(() => _hoveredId = id);
+                      },
+                    ),
+                    children: [
+                      if (DigosVectorMap.tilesEnabled)
+                        // Street base exactly as the standalone map project
+                        // renders it. Light mode keeps the raster as drawn —
+                        // no tint — so the base map cannot pick up a warm or
+                        // cool cast; only the dark theme transforms it.
+                        ColorFiltered(
+                          colorFilter: ColorFilter.matrix(
+                            dark
+                                ? DigosMapColors.darkTileFilter
+                                : DigosMapColors.lightTileFilter,
+                          ),
+                          child: TileLayer(
+                            // HOT (Humanitarian OpenStreetMap Team) tiles are
+                            // still OSM data, but the style draws no mountain
+                            // peak symbols or hill shading. The standard OSM
+                            // Carto style covers the Digos highlands - and the
+                            // screenshot problem was those brown triangles.
+                            urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                            subdomains: const ['a', 'b', 'c'],
+                            userAgentPackageName: 'com.digos.barangay_map',
+                            maxNativeZoom: 19,
+                            // The offset is re-evaluated inside the tile builder so
+                            // it tracks the live camera during zoom animations.
+                            // Whole-tile shifts are fetched by the provider; only
+                            // the sub-tile remainder is translated here, which
+                            // keeps the oversized canvas above small even at
+                            // zoom 18. panBuffer keeps a preloaded ring so a short
+                            // pan does not reveal unloaded tiles.
+                            tileProvider: _tileProvider,
+                            panBuffer: 1,
+                            tileBuilder: (context, tileWidget, tile) =>
+                                Transform.translate(
+                                  offset: DigosVectorMap.baseMapResidualFor(
+                                    MapCamera.of(context).zoom,
+                                    tile.coordinates.z,
+                                  ),
+                                  child: tileWidget,
                                 ),
-                                child: tileWidget,
-                              ),
-                          // No per-tile fade animation: with many tiles loading during a
-                          // drag the animation pass was visible as stutter.
-                          tileDisplay: const TileDisplay.instantaneous(),
-                          // Offline or rate-limited tiles must never break the map: the
-                          // local vector layers keep rendering over the paper background.
-                          // A few failures in a row also raise a small "base map offline"
-                          // note so a blank base is explained rather than mysterious.
-                          errorTileCallback: (tile, error, stackTrace) {
-                            _tileFailures++;
-                            if (!_tileWarned && _tileFailures >= 4 && mounted) {
-                              setState(() => _tileWarned = true);
-                            }
-                          },
+                            // No per-tile fade animation: with many tiles loading during a
+                            // drag the animation pass was visible as stutter.
+                            tileDisplay: const TileDisplay.instantaneous(),
+                            // Offline or rate-limited tiles must never break the map: the
+                            // local vector layers keep rendering over the paper background.
+                            // A few failures in a row also raise a small "base map offline"
+                            // note so a blank base is explained rather than mysterious.
+                            errorTileCallback: (tile, error, stackTrace) {
+                              _tileFailures++;
+                              if (!_tileWarned &&
+                                  _tileFailures >= 4 &&
+                                  mounted) {
+                                setState(() => _tileWarned = true);
+                              }
+                            },
+                          ),
                         ),
+
+                      // Inverse mask: hide every tile outside Digos City and
+                      // paint the surrounding canvas with the clean gradient.
+                      // `PolygonLayer` only fills with a solid colour, so the
+                      // inverse ring is drawn by a small custom map layer.
+                      _OutsideCityMask(cityRing: _cityRing, dark: dark),
+
+                      // Barangay fills: donor density, with hover and selection states.
+                      PolygonLayer(
+                        polygons: [
+                          for (final feature in _features)
+                            _barangayPolygon(feature, dark),
+                        ],
                       ),
 
-                    // Inverse mask: hide every tile outside Digos City. (Alt rendering
-                    // triangulates the polygon and showed visible seams across the city,
-                    // so the simplified ring does the heavy lifting instead.)
-                    PolygonLayer(
-                      polygons: [
-                        Polygon(
-                          points: const [
-                            LatLng(5.0, 123.0),
-                            LatLng(5.0, 127.0),
-                            LatLng(9.0, 127.0),
-                            LatLng(9.0, 123.0),
-                          ],
-                          holePointsList: [_cityRing],
-                          color: dark
-                              ? DigosMapColors.outsideMaskDark
-                              : DigosMapColors.outsideMask,
-                          borderStrokeWidth: 0,
-                        ),
-                      ],
-                    ),
+                      // Internal boundaries. Each ring is drawn once, so a shared
+                      // edge doubles up; the half-opacity stroke keeps the result a
+                      // soft hairline instead of a heavy wall between barangays.
+                      PolylineLayer(
+                        polylines: [
+                          for (final arc in _internalBorders)
+                            Polyline(
+                              points: arc,
+                              color:
+                                  (dark
+                                          ? DigosMapColors.internalBorderDark
+                                          : DigosMapColors.internalBorder)
+                                      .withValues(alpha: 0.55),
+                              strokeWidth: internalWidth,
+                              strokeCap: StrokeCap.round,
+                              strokeJoin: StrokeJoin.round,
+                            ),
+                        ],
+                      ),
 
-                    // Barangay fills: donor density, with hover and selection states.
-                    PolygonLayer(
-                      polygons: [
-                        for (final feature in _features)
-                          _barangayPolygon(feature, dark),
-                      ],
-                    ),
-
-                    // Internal boundaries. Each ring is drawn once, so a shared
-                    // edge doubles up; the half-opacity stroke keeps the result a
-                    // soft hairline instead of a heavy wall between barangays.
-                    PolylineLayer(
-                      polylines: [
-                        for (final arc in _internalBorders)
+                      // Heavy outer city border.
+                      PolylineLayer(
+                        polylines: [
                           Polyline(
-                            points: arc,
-                            color:
-                                (dark
-                                        ? DigosMapColors.internalBorderDark
-                                        : DigosMapColors.internalBorder)
-                                    .withValues(alpha: 0.55),
-                            strokeWidth: internalWidth,
+                            points: _cityRing,
+                            color: dark
+                                ? DigosMapColors.cityBorderDark
+                                : DigosMapColors.cityBorder,
+                            strokeWidth: outerWidth,
                             strokeCap: StrokeCap.round,
                             strokeJoin: StrokeJoin.round,
                           ),
-                      ],
-                    ),
+                        ],
+                      ),
 
-                    // Heavy outer city border.
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: _cityRing,
-                          color: dark
-                              ? DigosMapColors.cityBorderDark
-                              : DigosMapColors.cityBorder,
-                          strokeWidth: outerWidth,
-                          strokeCap: StrokeCap.round,
-                          strokeJoin: StrokeJoin.round,
-                        ),
-                      ],
-                    ),
+                      // Drive pins at their venues, above the fills and below the labels.
+                      // Two drives in the same barangay are nudged apart so both are
+                      // reachable.
+                      if (widget.drives.isNotEmpty)
+                        MarkerLayer(markers: _driveMarkers(dark, pinScale)),
 
-                    // Drive pins at their venues, above the fills and below the labels.
-                    // Two drives in the same barangay are nudged apart so both are
-                    // reachable.
-                    if (widget.drives.isNotEmpty)
-                      MarkerLayer(markers: _driveMarkers(dark, pinScale)),
-
-                    // Hospitals and the PRC chapter, above the fills. The
-                    // stored points are true OSM coordinates, so they are
-                    // rebased into the nudged map frame first.
-                    MarkerLayer(
-                      markers: [
-                        for (final pin in digosFacilityPins)
-                          Marker(
-                            point: DigosVectorMap.toMapFrame(pin.point),
-                            width: 30 * pinScale,
-                            height: 30 * pinScale,
-                            child: _FacilityPin(
-                              pin: pin,
-                              dark: dark,
-                              onTap: () => widget.onFacilityTap(pin),
-                              scale: pinScale,
+                      // Hospitals and the PRC chapter, above the fills. The
+                      // stored points are true OSM coordinates, so they are
+                      // rebased into the nudged map frame first.
+                      MarkerLayer(
+                        markers: [
+                          for (final pin in digosFacilityPins)
+                            Marker(
+                              point: DigosVectorMap.toMapFrame(pin.point),
+                              width: 30 * pinScale,
+                              height: 30 * pinScale,
+                              child: _FacilityPin(
+                                pin: pin,
+                                dark: dark,
+                                onTap: () => widget.onFacilityTap(pin),
+                                scale: pinScale,
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
+                        ],
+                      ),
 
-                    // Barangay names at their representative points; all 26 stay
-                    // on the map at every zoom, exactly like the standalone map.
-                    MarkerLayer(markers: _labelMarkers(labelSize)),
-                  ],
+                      // Barangay names at their representative points; all 26 stay
+                      // on the map at every zoom, exactly like the standalone map.
+                      MarkerLayer(markers: _labelMarkers(labelSize)),
+                    ],
+                  ),
                 ),
               ),
             ),
             // Distance scale (metric). On a short map pane the compact legend
             // and the attribution stack along the bottom, so the bar sits
-            // above both instead of on top of them.
+            // above both instead of on top of them. The notifier keeps the
+            // label and the drawn line locked to the live camera zoom.
             Positioned(
               right: 10,
               bottom: (_mapSize?.height ?? 500) < 430 ? 96 : 34,
-              child: _ScaleBar(
-                zoom: _zoom,
-                latitude: _cameraOrNull()?.center.latitude ?? 6.84,
-                dark: dark,
+              child: ValueListenableBuilder<MapScaleBarScale>(
+                valueListenable: _scaleNotifier,
+                builder: (context, scale, _) =>
+                    _ScaleBar(scale: scale, dark: dark),
               ),
             ),
             if (_tileWarned && DigosVectorMap.tilesEnabled)
@@ -975,6 +1013,77 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
 
   /// "Zone 2 (Pob.)" → "Zone 2", "Kapatagan (Rizal)" → "Kapatagan".
   String _shortName(String name) => DigosBarangays.canonical(name) ?? name;
+}
+
+/// Inverse city mask painted as a clean two-stop gradient.
+///
+/// `PolygonLayer` only supports a solid fill. The old flat beige mask was the
+/// "dirty" band around the city on tall phone maps, so the mask is drawn here
+/// with the same camera projection as the vector layers instead.
+class _OutsideCityMask extends StatelessWidget {
+  const _OutsideCityMask({required this.cityRing, required this.dark});
+
+  final List<LatLng> cityRing;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final camera = MapCamera.of(context);
+    return IgnorePointer(
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: _OutsideCityMaskPainter(
+          camera: camera,
+          cityRing: cityRing,
+          gradient: dark
+              ? DigosMapColors.outsideGradientDark
+              : DigosMapColors.outsideGradient,
+        ),
+      ),
+    );
+  }
+}
+
+class _OutsideCityMaskPainter extends CustomPainter {
+  const _OutsideCityMaskPainter({
+    required this.camera,
+    required this.cityRing,
+    required this.gradient,
+  });
+
+  final MapCamera camera;
+  final List<LatLng> cityRing;
+  final LinearGradient gradient;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final viewport = Offset.zero & size;
+    final city = ui.Path();
+    for (var i = 0; i < cityRing.length; i++) {
+      final point = camera.latLngToScreenPoint(cityRing[i]);
+      if (i == 0) {
+        city.moveTo(point.x, point.y);
+      } else {
+        city.lineTo(point.x, point.y);
+      }
+    }
+    city.close();
+
+    // Everything in the visible canvas except the city ring.
+    final mask = ui.Path.combine(
+      ui.PathOperation.difference,
+      ui.Path()..addRect(viewport),
+      city,
+    );
+    canvas.drawPath(mask, Paint()..shader = gradient.createShader(viewport));
+  }
+
+  @override
+  bool shouldRepaint(_OutsideCityMaskPainter oldDelegate) {
+    return oldDelegate.camera != camera ||
+        oldDelegate.cityRing != cityRing ||
+        oldDelegate.gradient != gradient;
+  }
 }
 
 /// OSM tile provider that fetches the tile grid shifted by whole tiles.
@@ -1204,47 +1313,75 @@ class _FacilityPin extends StatelessWidget {
   }
 }
 
-/// Metric scale bar: the distance that the drawn line covers on screen.
-class _ScaleBar extends StatelessWidget {
-  const _ScaleBar({
-    required this.zoom,
-    required this.latitude,
-    required this.dark,
+/// A round distance chosen for the metric scale bar and its on-screen width.
+class MapScaleBarScale {
+  const MapScaleBarScale({
+    required this.distanceMetres,
+    required this.width,
+    required this.label,
   });
 
-  final double zoom;
-  final double latitude;
+  final double distanceMetres;
+  final double width;
+  final String label;
+}
+
+/// Picks the largest round distance that still fits inside 96 logical pixels.
+///
+/// Kept public so a widget test can prove the bar never claims one distance
+/// while drawing another. The width is *not* clamped after choosing the
+/// distance: clamping was what previously let the label and line disagree.
+MapScaleBarScale mapScaleBarScale({
+  required double zoom,
+  required double latitude,
+}) {
+  // Fine-grained low-end candidates keep the bar honest at street-level zoom.
+  const candidates = <double>[
+    10,
+    20,
+    25,
+    50,
+    100,
+    200,
+    500,
+    1000,
+    2000,
+    5000,
+    10000,
+    20000,
+  ];
+  // Web-mercator metres per logical pixel at this latitude and zoom.
+  final metresPerPixel =
+      156543.03392 * math.cos(latitude * math.pi / 180) / math.pow(2, zoom);
+
+  var distance = candidates.first;
+  for (final candidate in candidates) {
+    if (candidate / metresPerPixel <= 96) {
+      distance = candidate;
+    } else {
+      break;
+    }
+  }
+  final width = distance / metresPerPixel;
+  final label = distance >= 1000
+      ? '${(distance / 1000).toStringAsFixed(distance % 1000 == 0 ? 0 : 1)} km'
+      : '${distance.toInt()} m';
+  return MapScaleBarScale(distanceMetres: distance, width: width, label: label);
+}
+
+/// Metric scale bar: the distance that the drawn line covers on screen.
+class _ScaleBar extends StatelessWidget {
+  const _ScaleBar({required this.scale, required this.dark});
+
+  final MapScaleBarScale scale;
   final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    const candidates = <double>[
-      50,
-      100,
-      200,
-      500,
-      1000,
-      2000,
-      5000,
-      10000,
-      20000,
-    ];
-    // Web-mercator metres per logical pixel at this latitude and zoom.
-    final metresPerPixel =
-        156543.03392 * math.cos(latitude * math.pi / 180) / math.pow(2, zoom);
-
-    var distance = candidates.first;
-    for (final candidate in candidates) {
-      if (candidate / metresPerPixel <= 96) distance = candidate;
-    }
-    final barWidth = (distance / metresPerPixel).clamp(24.0, 120.0);
-    final label = distance >= 1000
-        ? '${(distance / 1000).toStringAsFixed(distance % 1000 == 0 ? 0 : 1)} km'
-        : '${distance.toInt()} m';
-
     final color = dark ? const Color(0xFFD9CFC9) : const Color(0xFF3A2C28);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      key: const ValueKey('mapScaleBar'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: (dark ? const Color(0xFF241C1A) : const Color(0xFFFFFFFF))
             .withValues(alpha: 0.92),
@@ -1255,20 +1392,23 @@ class _ScaleBar extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Centred above the ruler, the way a printed map-scale label reads.
+          // The old inline label made the line look like a separate rule.
           Text(
-            label,
+            scale.label,
+            key: const ValueKey('mapScaleBarLabel'),
             style: TextStyle(
-              fontSize: 9.5,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
               color: color,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Container(
-            width: barWidth,
-            height: 6,
+            key: const ValueKey('mapScaleBarLine'),
+            width: scale.width,
+            height: 7,
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(color: color, width: 1.6),
@@ -1297,7 +1437,7 @@ class DigosMapAttribution extends StatelessWidget {
         border: Border.all(color: context.border),
       ),
       child: Text(
-        '© OpenStreetMap contributors · HOT style',
+        '© OpenStreetMap contributors',
         style: TextStyle(fontSize: 8.5, height: 1.1, color: context.textMuted),
       ),
     );

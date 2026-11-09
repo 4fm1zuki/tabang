@@ -4,6 +4,8 @@ import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
 import 'package:tabang/screens/admin/admin_overview.dart';
 import 'package:tabang/screens/admin/admin_shell.dart';
+import 'package:tabang/screens/admin/inventory_management.dart';
+import 'package:tabang/screens/auth/login_screen.dart';
 import 'package:tabang/screens/donor/blood_bank_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_shell.dart';
@@ -33,6 +35,54 @@ void main() {
       home: Scaffold(body: child),
     );
   }
+
+  testWidgets('login form scrolls on a phone without a stray scrollbar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: LoginScreen(
+          themeMode: ThemeMode.light,
+          onThemeModeChanged: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    // One slim, transient rail — not the persistent Material scrollbar that
+    // used to sit down the edge of the phone-sized window.
+    expect(find.byKey(const ValueKey('loginScrollbar')), findsOneWidget);
+    expect(find.byType(Scrollbar), findsOneWidget);
+    final scrollbar = tester.widget<Scrollbar>(
+      find.byKey(const ValueKey('loginScrollbar')),
+    );
+    expect(scrollbar.thickness, 4);
+    expect(scrollbar.interactive, isFalse);
+
+    // The form still scrolls all the way to the demo accounts.
+    await tester.drag(
+      find.byKey(const ValueKey('loginScrollView')),
+      const Offset(0, -420),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('SIMULATED DATA — DEMO ACCOUNTS'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('juan.delacruz@tabang.app'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('juan.delacruz@tabang.app'));
+    await tester.pumpAndSettle();
+    // Tapping the demo row fills the email field (the row label stays put, so
+    // the text itself now appears twice).
+    final email = tester.widget<EditableText>(find.byType(EditableText).first);
+    expect(email.controller.text, 'juan.delacruz@tabang.app');
+  });
 
   testWidgets('home rails and cards fit a 360 px phone', (tester) async {
     await usePhone(tester);
@@ -68,19 +118,37 @@ void main() {
     expect(find.text('1 unit selected'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    final book = find.text('Book appointment').first;
-    await tester.ensureVisible(book);
+    final request = find.text('Request blood').first;
+    await tester.ensureVisible(request);
     await tester.pumpAndSettle();
-    await tester.tap(book);
+    await tester.tap(request);
     await tester.pumpAndSettle();
 
     expect(
       find.descendant(
         of: find.byType(AlertDialog),
-        matching: find.text('Appointment with blood'),
+        matching: find.text('Post a blood request'),
       ),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inventory booked slots fit a 360 px phone', (tester) async {
+    await usePhone(tester);
+    final staff = repo.userById('USR-010')!;
+
+    await tester.pumpWidget(host(InventoryManagementPage(currentUser: staff)));
+    await tester.pumpAndSettle();
+
+    final booked = find.textContaining('Booked slots');
+    await tester.ensureVisible(booked);
+    await tester.pumpAndSettle();
+    await tester.tap(booked);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Awaiting verification'), findsWidgets);
+    expect(find.text('Verify slot'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -302,6 +370,62 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('pinning the phone bar keeps it visible on long swipes', (
+    tester,
+  ) async {
+    await usePhone(tester);
+    await tester.pumpWidget(
+      host(
+        DonorShell(
+          user: repo.userById('USR-001')!,
+          themeMode: ThemeMode.light,
+          onThemeModeChanged: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    double barHeight() =>
+        tester.getSize(find.byKey(const ValueKey('phoneNavigationBar'))).height;
+
+    final feed = find
+        .descendant(
+          of: find.byType(DiscoverPage),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
+        )
+        .first;
+    final pin = find.byKey(const ValueKey('phoneNavPinButton'));
+    expect(pin, findsOneWidget);
+
+    await tester.tap(pin);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Allow the bottom bar to hide'), findsOneWidget);
+
+    await tester.drag(feed, const Offset(0, -420));
+    await tester.pumpAndSettle();
+    expect(
+      barHeight(),
+      80,
+      reason: 'a pinned bar ignores the swipe-up hide gesture',
+    );
+
+    // Unpin, return to the top, and confirm the normal auto-hide is back.
+    await tester.tap(pin);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Keep the bottom bar visible'), findsOneWidget);
+
+    await tester.drag(feed, const Offset(0, 1200));
+    await tester.pumpAndSettle();
+    await tester.drag(feed, const Offset(0, -420));
+    await tester.pumpAndSettle();
+    expect(barHeight(), 0, reason: 'without the pin the bar hides again');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('settings switches update immediately', (tester) async {
     tester.view.physicalSize = const Size(1200, 900);

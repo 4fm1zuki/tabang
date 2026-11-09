@@ -7,6 +7,8 @@ import '../../widgets/layout.dart';
 import '../../widgets/barcode.dart';
 import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
+import '../../widgets/request_document_list.dart';
+import '../../widgets/request_review_dialogs.dart';
 
 /// Inventory and request management for chapter staff.
 ///
@@ -109,8 +111,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               _tabButton(
                 context,
                 2,
-                'Appointments',
-                _repo.pendingAppointments.length,
+                'Booked slots',
+                _repo.pendingScheduledRequests.length,
               ),
             ],
           ),
@@ -119,7 +121,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           switch (_tab) {
             0 => _buildUnitsTab(context),
             1 => _buildRequestsTab(context),
-            _ => _buildAppointmentsTab(context),
+            _ => _buildBookedSlotsTab(context),
           },
         ],
       ),
@@ -289,6 +291,76 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
         ? null
         : _repo.userById(unit.reservedBy!);
 
+    final timeLeft = Text(
+      unit.timeLeft(now),
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: expiring ? FontWeight.w700 : FontWeight.w600,
+        color: expiring ? TabangColors.danger : context.textMuted,
+      ),
+    );
+    final statusPill = StatusPill(
+      effective.label,
+      tone: toneForUnit(effective),
+      dense: true,
+    );
+    final details = TextButton(
+      onPressed: () => _showUnitDetails(context, unit, now),
+      child: const Text('Details', style: TextStyle(fontSize: 12)),
+    );
+    final menu = PopupMenuButton<UnitStatus>(
+      tooltip: 'Change status',
+      icon: Icon(Icons.more_horiz, size: 18, color: context.textMuted),
+      onSelected: (status) => _repo.setUnitStatus(
+        unit.barcode,
+        status,
+        actorId: widget.currentUser.id,
+      ),
+      itemBuilder: (context) => UnitStatus.values
+          .where(
+            (s) =>
+                s != effective &&
+                !(s == UnitStatus.available && unit.isExpiredAt(now)),
+          )
+          .map(
+            (s) => PopupMenuItem(
+              value: s,
+              child: Text(
+                'Mark ${s.label.toLowerCase()}',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+          )
+          .toList(),
+    );
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          unit.product,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: context.textColor,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'ID ${unit.barcode}'
+          '${holder == null ? '' : ' · held by ${holder.alias}'}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontFamily: 'monospace',
+            color: context.textMuted,
+          ),
+        ),
+      ],
+    );
+
     return DecoratedBox(
       decoration: BoxDecoration(
         border: first ? null : Border(top: BorderSide(color: context.border)),
@@ -300,94 +372,53 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             horizontal: TabangSpace.lg,
             vertical: TabangSpace.md,
           ),
-          child: Row(
-            children: [
-              BloodTypeChip(unit.bloodType, size: 32),
-              const SizedBox(width: TabangSpace.md),
-              Expanded(
-                child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // The single row cannot hold the chip, identity, expiry, status,
+              // Details and menu at phone width. Split it into two rows instead
+              // of hiding the staff actions.
+              if (constraints.maxWidth < 480) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      unit.product,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: context.textColor,
-                      ),
+                    Row(
+                      children: [
+                        BloodTypeChip(unit.bloodType, size: 32),
+                        const SizedBox(width: TabangSpace.md),
+                        Expanded(child: identity),
+                        menu,
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'ID ${unit.barcode}'
-                      '${holder == null ? '' : ' · held by ${holder.alias}'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        color: context.textMuted,
-                      ),
+                    const SizedBox(height: 6),
+                    // Wrap rather than Row: long expiry text, a wide status
+                    // pill and the Details button can run out of width even on
+                    // the second line, and losing a staff action is worse than
+                    // wrapping it politely.
+                    Wrap(
+                      spacing: TabangSpace.sm,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [timeLeft, statusPill, details],
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: TabangSpace.sm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                );
+              }
+              return Row(
                 children: [
-                  Text(
-                    unit.timeLeft(now),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: expiring ? FontWeight.w700 : FontWeight.w600,
-                      color: expiring ? TabangColors.danger : context.textMuted,
-                    ),
+                  BloodTypeChip(unit.bloodType, size: 32),
+                  const SizedBox(width: TabangSpace.md),
+                  Expanded(child: identity),
+                  const SizedBox(width: TabangSpace.sm),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [timeLeft, const SizedBox(height: 4), statusPill],
                   ),
-                  const SizedBox(height: 4),
-                  StatusPill(
-                    effective.label,
-                    tone: toneForUnit(effective),
-                    dense: true,
-                  ),
+                  const SizedBox(width: 4),
+                  details,
+                  menu,
                 ],
-              ),
-              const SizedBox(width: 4),
-              TextButton(
-                onPressed: () => _showUnitDetails(context, unit, now),
-                child: const Text('Details', style: TextStyle(fontSize: 12)),
-              ),
-              PopupMenuButton<UnitStatus>(
-                tooltip: 'Change status',
-                icon: Icon(
-                  Icons.more_horiz,
-                  size: 18,
-                  color: context.textMuted,
-                ),
-                onSelected: (status) => _repo.setUnitStatus(
-                  unit.barcode,
-                  status,
-                  actorId: widget.currentUser.id,
-                ),
-                itemBuilder: (context) => UnitStatus.values
-                    .where(
-                      (s) =>
-                          s != effective &&
-                          !(s == UnitStatus.available && unit.isExpiredAt(now)),
-                    )
-                    .map(
-                      (s) => PopupMenuItem(
-                        value: s,
-                        child: Text(
-                          'Mark ${s.label.toLowerCase()}',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -692,22 +723,6 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                           ],
                         ),
                       ),
-                      if (widget.currentUser.role.canFulfillRequests &&
-                          request.source == RequestSource.donorNetwork &&
-                          request.status == RequestStatus.open &&
-                          responses.any(
-                            (r) => r.status == ResponseStatus.pending,
-                          ))
-                        IconButton(
-                          tooltip: 'Select donor',
-                          visualDensity: VisualDensity.compact,
-                          icon: Icon(
-                            Icons.how_to_reg_outlined,
-                            size: 17,
-                            color: context.textMuted,
-                          ),
-                          onPressed: () => _showSelectDonor(context, request),
-                        ),
                       if (request.status == RequestStatus.open ||
                           request.status == RequestStatus.matched)
                         PopupMenuButton<RequestStatus>(
@@ -756,160 +771,138 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     );
   }
 
-  /// Confirm and track appointment-with-blood slots. This queue used to be
-  /// invisible on the staff side even though requesters could book.
-  Widget _buildAppointmentsTab(BuildContext context) {
-    final appointments = _repo.appointments;
-    if (appointments.isEmpty) {
+  /// Booked blood-bank slots now belong to requests.
+  ///
+  /// The old separate appointment queue duplicated the request record: both
+  /// described one scheduled blood need. This view reads the same requests and
+  /// confirms a slot when staff verify its request.
+  Widget _buildBookedSlotsTab(BuildContext context) {
+    final requests = _repo.scheduledRequests;
+    if (requests.isEmpty) {
       return const EmptyState(
-        art: TabangArt.inventory,
-        title: 'No appointments booked',
+        art: TabangArt.requests,
+        title: 'No booked slots',
+        message: 'Requester slots appear here once someone submits a request.',
       );
     }
-    return SurfaceCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          for (var i = 0; i < appointments.length; i++)
-            _buildAppointmentRow(context, appointments[i], first: i == 0),
-        ],
-      ),
+    final pending = _repo.pendingScheduledRequests.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          pending == 0
+              ? 'All booked slots are confirmed. Staff verify a request and '
+                    'its slot together.'
+              : '$pending booked slot${pending == 1 ? '' : 's'} still need '
+                    'verification. Opening a request confirms both its files '
+                    'and its slot.',
+          style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
+        ),
+        const SizedBox(height: TabangSpace.md),
+        for (final request in requests)
+          Padding(
+            padding: const EdgeInsets.only(bottom: TabangSpace.md),
+            child: _buildBookedSlotCard(context, request),
+          ),
+      ],
     );
   }
 
-  Widget _buildAppointmentRow(
-    BuildContext context,
-    DonationAppointment appointment, {
-    required bool first,
-  }) {
-    final requester = _repo.userById(appointment.requesterId);
-    final pending = appointment.status.toLowerCase().contains('pending');
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: first ? null : Border(top: BorderSide(color: context.border)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: TabangSpace.lg,
-          vertical: TabangSpace.md,
-        ),
-        child: Row(
-          children: [
-            BloodTypeChip(appointment.bloodType, size: 32),
-            const SizedBox(width: TabangSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    appointment.patientName,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: context.textColor,
-                    ),
-                  ),
-                  Text(
-                    '${appointment.hospital} · ${appointment.ward} · '
-                    '${appointment.component.label} · ${appointment.units} unit(s)',
-                    style: TextStyle(fontSize: 12, color: context.textMuted),
-                  ),
-                  Text(
-                    '${formatDateTime(appointment.scheduledAt)}'
-                    '${requester == null ? '' : ' · booked by ${requester.alias}'}',
-                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
-                  ),
-                ],
-              ),
-            ),
-            StatusPill(
-              appointment.status,
-              tone: pending ? Tone.warning : Tone.success,
-              dense: true,
-            ),
-            const SizedBox(width: TabangSpace.sm),
-            if (pending && widget.currentUser.role.canConfirmAppointments)
-              FilledButton(
-                onPressed: () {
-                  final ok = _repo.confirmAppointment(
-                    appointment.id,
-                    actorId: widget.currentUser.id,
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        ok
-                            ? '${appointment.id} confirmed.'
-                            : 'Could not confirm ${appointment.id}.',
+  Widget _buildBookedSlotCard(BuildContext context, BloodRequest request) {
+    final requester = _repo.userById(request.requesterId);
+    final pending = request.status == RequestStatus.pendingReview;
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              BloodTypeChip(request.bloodType, size: 34),
+              const SizedBox(width: TabangSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      request.patientAlias,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
                       ),
                     ),
-                  );
-                },
-                child: const Text('Confirm'),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSelectDonor(BuildContext context, BloodRequest request) {
-    final pending = _repo
-        .responsesFor(request.id)
-        .where((r) => r.status == ResponseStatus.pending)
-        .toList();
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Select a donor'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selection needs a reciprocal chat between the requester and '
-                'the donor, and re-checks eligibility at this moment.',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-              const SizedBox(height: TabangSpace.sm),
-              for (final response in pending)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(response.donorAlias),
-                  subtitle: Text(response.message ?? 'No message'),
-                  trailing: TextButton(
-                    onPressed: () {
-                      final thread = _repo.selectResponse(
-                        responseId: response.id,
-                        selectedById: widget.currentUser.id,
-                      );
-                      if (thread == null) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Not selectable yet — the requester and donor '
-                              'must both have sent a message first.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                      Navigator.pop(dialogContext);
-                    },
-                    child: const Text('Select'),
-                  ),
+                    Text(
+                      '${request.component.label} · '
+                      '${request.unitsNeeded} unit'
+                      '${request.unitsNeeded == 1 ? '' : 's'} · '
+                      '${request.hospital}',
+                      style: TextStyle(fontSize: 12, color: context.textMuted),
+                    ),
+                  ],
                 ),
+              ),
+              StatusPill(
+                pending ? 'Awaiting verification' : 'Slot confirmed',
+                tone: pending ? Tone.warning : Tone.success,
+                dense: true,
+              ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
+          const SizedBox(height: TabangSpace.sm),
+          Row(
+            children: [
+              const Icon(
+                Icons.event_available_outlined,
+                size: 15,
+                color: TabangColors.crimson,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  request.scheduledFor == null
+                      ? 'No slot booked'
+                      : formatDateTime(request.scheduledFor!),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+              Text(
+                '${request.id} · ${requester?.alias ?? 'unknown requester'}',
+                style: TextStyle(fontSize: 11, color: context.textMuted),
+              ),
+            ],
           ),
+          if (request.documents.isNotEmpty) ...[
+            const SizedBox(height: TabangSpace.sm),
+            RequestDocumentList(documents: request.documents, dense: true),
+          ],
+          if (pending && widget.currentUser.role.canFulfillRequests) ...[
+            const SizedBox(height: TabangSpace.sm),
+            Wrap(
+              spacing: TabangSpace.sm,
+              children: [
+                OutlinedButton(
+                  onPressed: () => showRejectRequestDialog(
+                    context,
+                    request,
+                    actor: widget.currentUser,
+                  ),
+                  child: const Text('Reject'),
+                ),
+                FilledButton(
+                  onPressed: () => showVerifyRequestDialog(
+                    context,
+                    request,
+                    actor: widget.currentUser,
+                  ),
+                  child: const Text('Verify slot'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

@@ -73,6 +73,19 @@ class _DonorShellState extends State<DonorShell> {
   /// comes back on the first scroll up or tab change.
   bool _navHidden = false;
 
+  /// Pins the phone bar open so a long downward swipe cannot hide it.
+  bool _navPinned = false;
+
+  void _toggleNavPin() {
+    setState(() {
+      _navPinned = !_navPinned;
+      if (_navPinned) {
+        _navHidden = false;
+        _navDownTravel = 0;
+      }
+    });
+  }
+
   /// Horizontal rails and tiny settling deltas must not toggle the bar, so
   /// downward travel accumulates before hiding. Combined with the
   /// "must have room left to scroll" guard this stops the bar bouncing at the
@@ -172,6 +185,7 @@ class _DonorShellState extends State<DonorShell> {
   /// hide again, so it never bounces up and down at the end of a list.
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    if (_navPinned) return false;
     final metrics = notification.metrics;
     final atTop = metrics.pixels <= metrics.minScrollExtent + 4;
     final atBottom = metrics.extentAfter <= 4;
@@ -318,6 +332,8 @@ class _DonorShellState extends State<DonorShell> {
                 _PhoneHeader(
                   user: widget.user,
                   unreadMessages: unreadMessages,
+                  navPinned: _navPinned,
+                  onToggleNavPin: _toggleNavPin,
                   onOpenProfile: () => _pushStandalone(6),
                   onOpenSettings: () => _pushStandalone(7),
                   onOpenHelp: () => _pushStandalone(8),
@@ -337,7 +353,7 @@ class _DonorShellState extends State<DonorShell> {
                     key: const ValueKey('phoneNavigationBar'),
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    height: _navHidden ? 0 : 80,
+                    height: _navHidden && !_navPinned ? 0 : 80,
                     child: OverflowBox(
                       alignment: Alignment.topCenter,
                       minHeight: 80,
@@ -518,6 +534,8 @@ class _PhoneHeader extends StatelessWidget {
   const _PhoneHeader({
     required this.user,
     required this.unreadMessages,
+    required this.navPinned,
+    required this.onToggleNavPin,
     required this.onOpenProfile,
     required this.onOpenSettings,
     required this.onOpenHelp,
@@ -526,6 +544,8 @@ class _PhoneHeader extends StatelessWidget {
 
   final AppUser user;
   final int unreadMessages;
+  final bool navPinned;
+  final VoidCallback onToggleNavPin;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenHelp;
@@ -577,6 +597,18 @@ class _PhoneHeader extends StatelessWidget {
             ],
           ),
           const Spacer(),
+          IconButton(
+            key: const ValueKey('phoneNavPinButton'),
+            tooltip: navPinned
+                ? 'Allow the bottom bar to hide'
+                : 'Keep the bottom bar visible',
+            visualDensity: VisualDensity.compact,
+            onPressed: onToggleNavPin,
+            icon: Icon(
+              navPinned ? Icons.push_pin : Icons.push_pin_outlined,
+              size: 19,
+            ),
+          ),
           IconButton(
             tooltip: 'Messages',
             onPressed: onOpenChat,

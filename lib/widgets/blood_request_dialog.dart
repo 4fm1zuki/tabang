@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -7,11 +8,12 @@ import '../theme.dart';
 /// Shared recipient request dialog.
 ///
 /// Submission is a formal request, not an instant reservation: the requester
-/// declares the documents the chapter reviews, books one of the published
+/// uploads the documents the chapter reviews, books one of the published
 /// blood-bank slots, and decides whether the request may also be posted to the
 /// donor network. Chapter staff then verify or reject it before any donor is
 /// asked to respond. Keeping the dialog in one place means the Blood Bank and
-/// Requests surfaces cannot drift apart.
+/// Requests surfaces cannot drift apart, and there is no separate appointment
+/// flow — the booked slot is part of this request.
 
 /// Plain-language meaning of each urgency level, shown under the selector.
 String _urgencyBlurb(RequestUrgency urgency) {
@@ -48,14 +50,10 @@ Future<void> showBloodRequestDialog(
       DigosBarangays.canonical(user.barangay) ?? DigosBarangays.all.first;
   var hospital = DigosFacilities.names.first;
 
-  // Required documents are pre-declared because the requester is submitting
-  // them to the chapter; staff confirm the physical copies at verification.
-  final documents = <String>{
-    RequestDocuments.doctorsForm,
-    RequestDocuments.transfusionSlip,
-    RequestDocuments.patientId,
-  };
-  var typingResultReady = false;
+  // Actual files attached by the requester, keyed by document kind. Nothing
+  // is pre-ticked: a checkbox is not evidence, so every required document
+  // starts empty and submission waits for the real upload.
+  final documents = <String, RequestDocument>{};
   var postToDonors = true;
 
   final slots = repo.bloodBankSlots(days: 14);
@@ -102,13 +100,54 @@ Future<void> showBloodRequestDialog(
             .toList(growable: false);
 
         final hasRequiredDocuments = RequestDocuments.required.every(
-          documents.contains,
+          (kind) => documents[kind]?.hasFile ?? false,
         );
         final needsDonorNetwork = !hasStock;
         final canSubmit =
             hasRequiredDocuments &&
             scheduledFor != null &&
             (!needsDonorNetwork || postToDonors);
+
+        /// Opens the platform file picker and stores the chosen file for
+        /// [kind]. Kept inside the builder so it can call [setDialogState].
+        Future<void> pickDocument(String kind) async {
+          try {
+            final file = await FilePicker.pickFile(
+              type: FileType.custom,
+              allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+            );
+            if (file == null) return;
+            final length = await file.length() ?? 0;
+            if (length > 8 * 1024 * 1024) {
+              if (!dialogContext.mounted) return;
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(
+                  content: Text('Attachments must be 8 MB or smaller.'),
+                ),
+              );
+              return;
+            }
+            final bytes = await file.readAsBytes();
+            if (!dialogContext.mounted) return;
+            setDialogState(() {
+              documents[kind] = RequestDocument(
+                kind: kind,
+                fileName: file.name,
+                bytes: bytes,
+                sizeBytes: bytes.length,
+              );
+            });
+          } catch (_) {
+            if (!dialogContext.mounted) return;
+            ScaffoldMessenger.of(dialogContext).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'The file picker could not be opened on this device.',
+                ),
+              ),
+            );
+          }
+        }
 
         void submit() {
           if (!formKey.currentState!.validate()) return;
@@ -128,10 +167,7 @@ Future<void> showBloodRequestDialog(
             note: noteController.text.trim().isEmpty
                 ? null
                 : noteController.text.trim(),
-            documents: [
-              ...documents,
-              if (typingResultReady) RequestDocuments.typingResult,
-            ],
+            documents: documents.values.toList(growable: false),
             scheduledFor: scheduledFor,
             postToDonorNetwork: postToDonors,
           );
@@ -310,7 +346,7 @@ Future<void> showBloodRequestDialog(
                     ),
                     const SizedBox(height: TabangSpace.lg),
                     Text(
-                      'Document checklist',
+                      'Required documents',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
@@ -319,46 +355,28 @@ Future<void> showBloodRequestDialog(
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Chapter staff verify these before the request reaches '
-                      'the blood bank or the donor network.',
+                      'Attach the actual files — PDF or photo, up to 8 MB each. '
+                      'Chapter staff check these before the request reaches the '
+                      'blood bank or the donor network.',
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.45,
                         color: dialogContext.textMuted,
                       ),
                     ),
+                    const SizedBox(height: TabangSpace.sm),
                     for (final document in RequestDocuments.all)
-                      CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        value: document == RequestDocuments.typingResult
-                            ? typingResultReady
-                            : documents.contains(document),
-                        onChanged: (value) => setDialogState(() {
-                          if (document == RequestDocuments.typingResult) {
-                            typingResultReady = value ?? false;
-                          } else if (value ?? false) {
-                            documents.add(document);
-                          } else {
-                            documents.remove(document);
-                          }
-                        }),
-                        title: Text(
-                          document,
-                          style: const TextStyle(fontSize: 12.5),
-                        ),
-                        subtitle: document == RequestDocuments.typingResult
-                            ? const Text(
-                                'Optional — only when the hospital asks for it',
-                                style: TextStyle(fontSize: 10.5),
-                              )
-                            : null,
+                      _DocumentUploadTile(
+                        kind: document,
+                        required: document != RequestDocuments.typingResult,
+                        document: documents[document],
+                        onPick: () => pickDocument(document),
+                        onRemove: () =>
+                            setDialogState(() => documents.remove(document)),
                       ),
                     if (!hasRequiredDocuments)
                       const Text(
-                        'All three required documents must be on hand before '
-                        'submitting.',
+                        'Attach all three required files before submitting.',
                         style: TextStyle(
                           fontSize: 11,
                           color: TabangColors.danger,
@@ -558,6 +576,134 @@ Future<void> showBloodRequestDialog(
       },
     ),
   );
+}
+
+/// One attachment row in the request dialog.
+///
+/// Shows the file actually chosen, not a checkbox: the requester can attach,
+/// replace or remove each document before submitting.
+class _DocumentUploadTile extends StatelessWidget {
+  const _DocumentUploadTile({
+    required this.kind,
+    required this.required,
+    required this.document,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final String kind;
+  final bool required;
+  final RequestDocument? document;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final document = this.document;
+    final attached = document?.hasFile ?? false;
+    final isImage = attached && _isImageName(document!.fileName);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: TabangSpace.xs),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TabangSpace.sm,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        color: attached
+            ? TabangColors.success.withValues(alpha: 0.06)
+            : Colors.transparent,
+        border: Border.all(
+          color: attached
+              ? TabangColors.success.withValues(alpha: 0.45)
+              : context.border,
+        ),
+        borderRadius: BorderRadius.circular(TabangRadius.xs),
+      ),
+      child: Row(
+        children: [
+          if (isImage)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.memory(
+                document.bytes!,
+                width: 34,
+                height: 34,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Icon(
+                  Icons.broken_image_outlined,
+                  size: 18,
+                  color: context.textMuted,
+                ),
+              ),
+            )
+          else
+            Icon(
+              attached
+                  ? Icons.description_outlined
+                  : Icons.upload_file_outlined,
+              size: 18,
+              color: attached ? TabangColors.success : context.textMuted,
+            ),
+          const SizedBox(width: TabangSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  kind,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  attached
+                      ? '${document!.fileName}'
+                            '${document.sizeLabel.isEmpty ? '' : ' · ${document.sizeLabel}'}'
+                      : required
+                      ? 'Required — attach a PDF or photo'
+                      : 'Optional — only when the hospital asks for it',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: attached ? TabangColors.success : context.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (attached)
+            IconButton(
+              tooltip: 'Remove attachment',
+              visualDensity: VisualDensity.compact,
+              onPressed: onRemove,
+              icon: const Icon(Icons.close, size: 16),
+            ),
+          TextButton(
+            onPressed: onPick,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: Text(
+              attached ? 'Replace' : 'Attach',
+              style: const TextStyle(fontSize: 11.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+bool _isImageName(String fileName) {
+  final lower = fileName.toLowerCase();
+  return lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.png');
 }
 
 String _formatSlotDay(DateTime day) {

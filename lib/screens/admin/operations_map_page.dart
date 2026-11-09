@@ -8,6 +8,8 @@ import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/digos_vector_map.dart';
 import '../../widgets/layout.dart';
+import '../../widgets/request_document_list.dart';
+import '../../widgets/request_review_dialogs.dart';
 
 /// Staff/admin operational map.
 ///
@@ -118,14 +120,35 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
         final panel = _buildPanel(context);
         return compact
             ? switch (_mapPane) {
-                // Full-height map on phones; the same button flips back.
+                // Full-height map on phones; the size menu flips back.
                 _MapPaneSize.full => Padding(padding: padding, child: map),
+                // List-only mode: the map pulls away entirely and a restore
+                // control sits above the queue. Keeping the control outside the
+                // scroll view means it cannot scroll off-screen after the map
+                // was pulled up from halfway down the page.
+                _MapPaneSize.hidden => Padding(
+                  padding: padding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const ValueKey('showMapButton'),
+                        onPressed: () =>
+                            setState(() => _mapPane = _MapPaneSize.strip),
+                        icon: const Icon(Icons.map_outlined, size: 16),
+                        label: const Text('Show map'),
+                      ),
+                      const SizedBox(height: TabangSpace.md),
+                      Expanded(child: SingleChildScrollView(child: panel)),
+                    ],
+                  ),
+                ),
                 // Half screen keeps the requests queue visible below.
                 _MapPaneSize.half => ListView(
                   padding: padding,
                   children: [
                     SizedBox(height: constraints.maxHeight * 0.5, child: map),
-                    const SizedBox(height: TabangSpace.lg),
+                    _pullUpControl(context),
                     panel,
                   ],
                 ),
@@ -133,7 +156,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                   padding: padding,
                   children: [
                     SizedBox(height: widget.embedded ? 340 : 380, child: map),
-                    const SizedBox(height: TabangSpace.lg),
+                    _pullUpControl(context),
                     panel,
                   ],
                 ),
@@ -156,6 +179,24 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 ),
               );
       },
+    );
+  }
+
+  /// Pull-up handle between the map and the queue on phones.
+  ///
+  /// Tapping it hides the map completely and leaves the list underneath; the
+  /// companion **Show map** button restores the strip.
+  Widget _pullUpControl(BuildContext context) {
+    return Center(
+      child: TextButton.icon(
+        key: const ValueKey('hideMapButton'),
+        onPressed: () => setState(() => _mapPane = _MapPaneSize.hidden),
+        icon: const Icon(Icons.keyboard_double_arrow_up, size: 16),
+        label: const Text(
+          'Pull up to hide the map',
+          style: TextStyle(fontSize: 11.5),
+        ),
+      ),
     );
   }
 
@@ -238,34 +279,16 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               ),
               if (_compact) ...[
                 const SizedBox(height: 4),
-                _mapButton(
-                  context,
-                  Icons.horizontal_split_outlined,
-                  () => setState(() {
-                    _mapPane = _mapPane == _MapPaneSize.half
-                        ? _MapPaneSize.strip
-                        : _MapPaneSize.half;
-                  }),
-                  tooltip: _mapPane == _MapPaneSize.half
-                      ? 'Collapse map'
-                      : 'Half-screen map · show queue',
-                  accent: _mapPane == _MapPaneSize.half,
-                ),
-                const SizedBox(height: 4),
-                _mapButton(
-                  context,
-                  _mapPane == _MapPaneSize.full
-                      ? Icons.close_fullscreen
-                      : Icons.open_in_full,
-                  () => setState(() {
-                    _mapPane = _mapPane == _MapPaneSize.full
-                        ? _MapPaneSize.strip
-                        : _MapPaneSize.full;
-                  }),
-                  tooltip: _mapPane == _MapPaneSize.full
-                      ? 'Collapse map'
-                      : 'Full-screen map',
-                ),
+                _mapSizeMenu(context),
+                if (_mapPane == _MapPaneSize.full) ...[
+                  const SizedBox(height: 4),
+                  _mapButton(
+                    context,
+                    Icons.keyboard_double_arrow_up,
+                    () => setState(() => _mapPane = _MapPaneSize.hidden),
+                    tooltip: 'Hide map · show list',
+                  ),
+                ],
               ],
             ],
           ),
@@ -430,6 +453,81 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
+  /// Map-size dropdown for phones.
+  ///
+  /// Replaces the pair of half/full-screen toggle buttons with one visible
+  /// selector. The menu also offers "List only", the same destination as the
+  /// pull-up control below the map.
+  Widget _mapSizeMenu(BuildContext context) {
+    final currentIcon = switch (_mapPane) {
+      _MapPaneSize.strip => Icons.view_agenda_outlined,
+      _MapPaneSize.half => Icons.horizontal_split_outlined,
+      _MapPaneSize.full => Icons.open_in_full,
+      _MapPaneSize.hidden => Icons.view_list_outlined,
+    };
+    return PopupMenuButton<_MapPaneSize>(
+      key: const ValueKey('mapSizeMenu'),
+      tooltip: 'Map size',
+      position: PopupMenuPosition.under,
+      onSelected: (size) => setState(() => _mapPane = size),
+      itemBuilder: (context) => [
+        _mapSizeItem(
+          _MapPaneSize.strip,
+          Icons.view_agenda_outlined,
+          'Strip + list',
+        ),
+        _mapSizeItem(
+          _MapPaneSize.half,
+          Icons.horizontal_split_outlined,
+          'Half map',
+        ),
+        _mapSizeItem(_MapPaneSize.full, Icons.open_in_full, 'Full map'),
+        _mapSizeItem(
+          _MapPaneSize.hidden,
+          Icons.view_list_outlined,
+          'List only',
+        ),
+      ],
+      child: Material(
+        color: context.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TabangRadius.sm),
+          side: BorderSide(color: context.border),
+        ),
+        child: SizedBox(
+          width: 62,
+          height: 34,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(currentIcon, size: 16, color: context.textColor),
+              const SizedBox(width: 2),
+              Icon(Icons.arrow_drop_down, size: 18, color: context.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<_MapPaneSize> _mapSizeItem(
+    _MapPaneSize value,
+    IconData icon,
+    String label,
+  ) {
+    return PopupMenuItem(
+      value: value,
+      height: 42,
+      child: Row(
+        children: [
+          Icon(icon, size: 17),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(fontSize: 12.5)),
+        ],
+      ),
+    );
+  }
+
   Widget _mapButton(
     BuildContext context,
     IconData icon,
@@ -540,8 +638,8 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             Expanded(
               child: _metricCard(
                 context,
-                'Appointments to confirm',
-                '${_repo.pendingAppointments.length}',
+                'Booked slots to verify',
+                '${_repo.pendingScheduledRequests.length}',
                 Icons.event_available_outlined,
                 TabangColors.crimson,
               ),
@@ -726,164 +824,13 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
-  /// Verification confirms the document checklist and, for a blood-bank
-  /// request, holds the compatible units the shelf can actually spare.
+  /// Verification shows the actual attachments and confirms the booked slot.
   void _verify(BuildContext context, BloodRequest request) {
-    final assignable = request.source == RequestSource.bloodBank
-        ? _repo
-              .compatibleUnitsFor(
-                recipientType: request.bloodType,
-                component: request.component,
-              )
-              .take(request.unitsNeeded)
-              .toList(growable: false)
-        : const <BloodUnit>[];
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Verify request ${request.id}'),
-        content: SizedBox(
-          width: 460,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Confirm the documents the requester declared, then open the '
-                'request. Donors are never asked before verification.',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  height: 1.5,
-                  color: dialogContext.textMuted,
-                ),
-              ),
-              const SizedBox(height: TabangSpace.md),
-              for (final document in request.documents)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        size: 15,
-                        color: TabangColors.success,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          document,
-                          style: const TextStyle(fontSize: 12.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              if (request.scheduledFor != null) ...[
-                const SizedBox(height: TabangSpace.sm),
-                Text(
-                  'Booked slot: ${formatDateTime(request.scheduledFor!)}',
-                  style: const TextStyle(fontSize: 12.5),
-                ),
-              ],
-              if (assignable.isNotEmpty) ...[
-                const SizedBox(height: TabangSpace.sm),
-                Text(
-                  'Holds attached on approval: '
-                  '${assignable.map((unit) => unit.barcode).join(', ')}',
-                  style: const TextStyle(fontSize: 12.5),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final ok = _repo.verifyRequest(
-                request.id,
-                actorId: widget.user.id,
-                unitIds: assignable.map((unit) => unit.barcode).toList(),
-              );
-              Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    ok
-                        ? 'Request ${request.id} verified and opened.'
-                        : 'Could not verify ${request.id}.',
-                  ),
-                ),
-              );
-            },
-            child: const Text('Verify and open'),
-          ),
-        ],
-      ),
-    );
+    showVerifyRequestDialog(context, request, actor: widget.user);
   }
 
   void _reject(BuildContext context, BloodRequest request) {
-    final reasonController = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Reject request ${request.id}'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'The requester sees this reason, so be specific about the '
-                'document or detail that needs fixing.',
-                style: TextStyle(fontSize: 12.5, height: 1.5),
-              ),
-              const SizedBox(height: TabangSpace.md),
-              TextField(
-                controller: reasonController,
-                autofocus: true,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Reason for rejection',
-                  hintText: 'e.g. No transfusion slip attached yet',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final ok = _repo.rejectRequest(
-                request.id,
-                actorId: widget.user.id,
-                reason: reasonController.text,
-              );
-              Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    ok
-                        ? 'Request ${request.id} rejected with a reason.'
-                        : 'Enter a reason before rejecting.',
-                  ),
-                ),
-              );
-            },
-            child: const Text('Reject request'),
-          ),
-        ],
-      ),
-    );
+    showRejectRequestDialog(context, request, actor: widget.user);
   }
 
   Widget _applicationCard(BuildContext context, DonorApplication application) {
@@ -950,8 +897,19 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               Text('Source: ${request.source.label}'),
               if (request.scheduledFor != null)
                 Text('Booked slot: ${formatDateTime(request.scheduledFor!)}'),
-              if (request.documents.isNotEmpty)
-                Text('Documents: ${request.documents.join(', ')}'),
+              if (request.documents.isNotEmpty) ...[
+                const SizedBox(height: TabangSpace.sm),
+                Text(
+                  'Documents',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: dialogContext.textColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                RequestDocumentList(documents: request.documents, dense: true),
+              ],
               if (request.assignedUnitIds.isNotEmpty)
                 Text('Held units: ${request.assignedUnitIds.join(', ')}'),
               if (request.reviewNote != null &&
@@ -1014,4 +972,7 @@ enum _MapPaneSize {
 
   /// The map alone, for reading the heat layers.
   full,
+
+  /// The queue alone; the map can be restored with **Show map**.
+  hidden,
 }

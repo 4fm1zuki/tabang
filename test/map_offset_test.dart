@@ -108,6 +108,53 @@ void main() {
     });
   });
 
+  group('metric scale bar', () {
+    // Metres covered by one logical pixel at Digos latitude.
+    double metresPerPixel(double zoom, double latitude) =>
+        156543.03392 * math.cos(latitude * math.pi / 180) / math.pow(2, zoom);
+
+    test('street-level zoom labels the distance it actually draws', () {
+      // Regression: at phone zoom the old bar ran out of candidate distances,
+      // drew a clamped 24 px line and still called it "50 m".
+      final scale = mapScaleBarScale(zoom: 18, latitude: 6.84);
+      expect(scale.label, '50 m');
+      expect(scale.distanceMetres, 50);
+      expect(scale.width, greaterThanOrEqualTo(30));
+      expect(scale.width, lessThanOrEqualTo(96));
+      expect(
+        scale.width,
+        closeTo(50 / metresPerPixel(18, 6.84), 0.01),
+        reason: 'the drawn line must match the stated distance',
+      );
+    });
+
+    test('every zoom keeps the label and line length consistent', () {
+      for (var zoom = 10.5; zoom <= 18.0; zoom += 0.1) {
+        final scale = mapScaleBarScale(zoom: zoom, latitude: 6.84);
+        expect(scale.width, inInclusiveRange(30, 96), reason: 'zoom $zoom');
+        expect(
+          scale.width,
+          closeTo(scale.distanceMetres / metresPerPixel(zoom, 6.84), 1e-9),
+          reason: 'zoom $zoom',
+        );
+        expect(
+          scale.label,
+          scale.distanceMetres >= 1000
+              ? '${(scale.distanceMetres / 1000).toStringAsFixed(scale.distanceMetres % 1000 == 0 ? 0 : 1)} km'
+              : '${scale.distanceMetres.toInt()} m',
+          reason: 'zoom $zoom',
+        );
+      }
+    });
+
+    test('zooming in shrinks the labelled distance', () {
+      final city = mapScaleBarScale(zoom: 12, latitude: 6.84);
+      final street = mapScaleBarScale(zoom: 18, latitude: 6.84);
+      expect(city.distanceMetres, greaterThan(street.distanceMetres));
+      expect(street.distanceMetres, lessThanOrEqualTo(50));
+    });
+  });
+
   group('map frame rebase', () {
     const metresPerDegree = 111319.49;
 

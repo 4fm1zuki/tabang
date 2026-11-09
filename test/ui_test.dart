@@ -85,13 +85,76 @@ void main() {
 
     expect(find.textContaining('Available donors'), findsOneWidget);
 
-    // The donor list collapses to a tap bar and comes back.
+    // The scale bar is tied to the live camera, not a cached zoom: its label
+    // and the number of pixels drawn must describe the same ground distance.
+    final map = tester.widget<DigosVectorMap>(find.byType(DigosVectorMap));
+    final scale = mapScaleBarScale(
+      zoom: map.controller.camera.zoom,
+      latitude: map.controller.camera.center.latitude,
+    );
+    final scaleLabel = tester.widget<Text>(
+      find.byKey(const ValueKey('mapScaleBarLabel')),
+    );
+    expect(scaleLabel.data, scale.label);
+    final scaleLine = tester.widget<Container>(
+      find.byKey(const ValueKey('mapScaleBarLine')),
+    );
+    expect(
+      scaleLine.constraints?.maxWidth,
+      closeTo(scale.width, 0.01),
+      reason: 'the drawn ruler must match its label',
+    );
+    expect(find.text('© OpenStreetMap contributors'), findsOneWidget);
+    expect(find.textContaining('HOT style'), findsNothing);
+
+    // One map-size button replaces the old half/full-screen pair and cycles
+    // through all four arrangements on each tap.
+    final mapModeButton = find.byKey(const ValueKey('findDonorMapModeButton'));
+    expect(mapModeButton, findsOneWidget);
+    expect(find.byKey(const ValueKey('showDonorMapButton')), findsNothing);
+    expect(
+      find.byTooltip('Map: Half screen · tap for Hide map'),
+      findsOneWidget,
+    );
+
+    // The donor pane's own collapse arrow still switches to "Map only": the
+    // map keeps the page and the directory steps out of the way.
     await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
     await tester.pumpAndSettle();
-    expect(find.text('Show list'), findsOneWidget);
-    await tester.tap(find.text('Show list'));
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(find.textContaining('Available donors'), findsNothing);
+
+    // Half screen restores the default split.
+    await tester.tap(mapModeButton);
     await tester.pumpAndSettle();
-    expect(find.text('Show list'), findsNothing);
+    expect(find.textContaining('Available donors'), findsOneWidget);
+
+    // The next tap hides the map; the restore control stays above the list.
+    await tester.tap(mapModeButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(DigosVectorMap), findsNothing);
+    expect(find.byKey(const ValueKey('showDonorMapButton')), findsOneWidget);
+    expect(find.textContaining('Available donors'), findsOneWidget);
+
+    // Show map restores the short strip, the mode after "Hide map".
+    await tester.tap(find.byKey(const ValueKey('showDonorMapButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(find.textContaining('Available donors'), findsOneWidget);
+    expect(
+      find.byTooltip('Map: Strip + list · tap for Map only'),
+      findsOneWidget,
+    );
+
+    // The cycle closes: strip → map only → half screen.
+    await tester.tap(mapModeButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(find.textContaining('Available donors'), findsNothing);
+
+    await tester.tap(mapModeButton);
+    await tester.pumpAndSettle();
+    expect(find.byType(DigosVectorMap), findsOneWidget);
     expect(find.textContaining('Available donors'), findsOneWidget);
   });
 
@@ -366,7 +429,100 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('inventory exposes add-stock and the appointment queue', (
+  testWidgets('phone operations map offers size menu, list-only and restore', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: OperationsMapPage(user: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(find.byKey(const ValueKey('mapSizeMenu')), findsOneWidget);
+    expect(find.byKey(const ValueKey('showMapButton')), findsNothing);
+
+    // The pull-up handle under the strip removes the map and leaves the
+    // queue; the companion button restores it.
+    await tester.ensureVisible(find.byKey(const ValueKey('hideMapButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('hideMapButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DigosVectorMap), findsNothing);
+    expect(find.byKey(const ValueKey('showMapButton')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('showMapButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(find.byKey(const ValueKey('showMapButton')), findsNothing);
+
+    // The size menu replaces the old full-screen toggle pair and also offers
+    // the same list-only destination directly.
+    await tester.tap(find.byKey(const ValueKey('mapSizeMenu')));
+    await tester.pumpAndSettle();
+
+    for (final label in ['Strip + list', 'Half map', 'Full map', 'List only']) {
+      expect(find.text(label), findsOneWidget);
+    }
+
+    await tester.tap(find.text('List only'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DigosVectorMap), findsNothing);
+    expect(find.byKey(const ValueKey('showMapButton')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('blood-type balance pills say more or short, not +N', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: const Scaffold(body: AdminOverviewPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final labelled = repo
+        .bloodTypeStats()
+        .where((stat) => stat.balance != 0)
+        .toList();
+    expect(labelled, isNotEmpty);
+    for (final stat in labelled) {
+      final label = stat.balance > 0
+          ? '${stat.balance} more'
+          : '${stat.balance.abs()} short';
+      expect(
+        find.text(label),
+        findsWidgets,
+        reason: '${stat.bloodType.label} must explain its balance',
+      );
+    }
+
+    // The old pill was a bare "+12"/"-3" with no unit or direction.
+    expect(find.textContaining(RegExp(r'^\+\d+$')), findsNothing);
+    expect(
+      find.textContaining('The pill is the balance'),
+      findsOneWidget,
+      reason: 'the card explains donations minus requests',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inventory exposes add-stock and the booked-slot queue', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 900);
@@ -384,10 +540,12 @@ void main() {
 
     expect(find.text('Add unit'), findsOneWidget);
 
-    await tester.tap(find.textContaining('Appointments'));
+    await tester.tap(find.textContaining('Booked slots'));
     await tester.pumpAndSettle();
-    // Seeded APT-001 starts pending, so the confirm control is reachable.
-    expect(find.text('Confirm'), findsWidgets);
+    // Seeded REQ-011 is still awaiting review, so its slot and the verify
+    // action are reachable. Slots now belong to requests, not appointments.
+    expect(find.text('Awaiting verification'), findsWidgets);
+    expect(find.text('Verify slot'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

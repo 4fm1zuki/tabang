@@ -128,7 +128,6 @@ class TabangRepository {
   final List<ActivityEvent> _activity = [];
   final List<BloodDrive> _drives = [];
   final List<ContentItem> _content = [];
-  final List<DonationAppointment> _appointments = [];
   final List<DonorApplication> _donorApplications = [];
 
   /// Admin-editable denominators for the readiness score. The score itself is
@@ -168,8 +167,6 @@ class TabangRepository {
   List<UserReport> get reports => List.unmodifiable(_reports);
   List<BloodDrive> get drives => List.unmodifiable(_drives);
   List<ContentItem> get content => List.unmodifiable(_content);
-  List<DonationAppointment> get appointments =>
-      List.unmodifiable(_appointments);
 
   AppUser? userById(String id) {
     for (final u in _users) {
@@ -372,19 +369,25 @@ class TabangRepository {
     return null;
   }
 
-  /// Appointments still waiting for chapter confirmation, soonest slot first.
-  List<DonationAppointment> get pendingAppointments =>
-      [..._appointments]
-          .where((a) => a.status.toLowerCase().contains('pending'))
+  /// Requests with a booked blood-bank slot, soonest first.
+  ///
+  /// This replaces the old separate "appointment with blood" queue: the slot is
+  /// part of the request, so staff confirm it when they verify the request.
+  List<BloodRequest> get scheduledRequests =>
+      _requests
+          .where(
+            (request) =>
+                request.scheduledFor != null &&
+                request.status != RequestStatus.cancelled &&
+                request.status != RequestStatus.rejected,
+          )
           .toList(growable: false)
-        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+        ..sort((a, b) => a.scheduledFor!.compareTo(b.scheduledFor!));
 
-  /// Appointments belonging to one requester, newest first.
-  List<DonationAppointment> appointmentsFor(String userId) =>
-      _appointments
-          .where((a) => a.requesterId == userId)
-          .toList(growable: false)
-        ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+  /// Slots still awaiting chapter verification.
+  List<BloodRequest> get pendingScheduledRequests => scheduledRequests
+      .where((request) => request.status == RequestStatus.pendingReview)
+      .toList(growable: false);
 
   /// Units currently on hold by [userId].
   List<BloodUnit> reservedUnitsFor(String userId) => _units
@@ -898,9 +901,10 @@ class TabangRepository {
   /// Submit a request for chapter verification.
   ///
   /// Nothing is posted to donors or held from stock at submission time: the
-  /// request first needs the document checklist and a slot inside the
-  /// blood-bank schedule, then staff verify or reject it. Returns null when
-  /// the submission is incomplete.
+  /// request first needs the three required documents as actual uploaded files
+  /// and a slot inside the blood-bank schedule, then staff verify or reject
+  /// it. Returns null when the submission is incomplete — a checklist tick
+  /// without a file is not enough.
   BloodRequest? addRequest({
     required String requesterId,
     required String patientAlias,
@@ -912,16 +916,21 @@ class TabangRepository {
     required RequestUrgency urgency,
     RequestSource source = RequestSource.donorNetwork,
     String? note,
-    List<String> documents = const [],
+    List<RequestDocument> documents = const [],
     DateTime? scheduledFor,
     bool postToDonorNetwork = true,
   }) {
-    final trimmedDocs = documents
-        .map((document) => document.trim())
-        .where((document) => document.isNotEmpty)
+    final uploaded = documents
+        .where((document) => document.fileName.trim().isNotEmpty)
         .toList(growable: false);
-    if (trimmedDocs.isEmpty) return null;
-    if (scheduledFor != null && !isWithinBloodBankSchedule(scheduledFor)) {
+    final kinds = uploaded.map((document) => document.kind).toSet();
+    final hasRequiredDocuments = RequestDocuments.required.every(
+      kinds.contains,
+    );
+    if (!hasRequiredDocuments) return null;
+    if (!uploaded.every((document) => document.hasFile)) return null;
+    if (unitsNeeded < 1 || unitsNeeded > 20) return null;
+    if (scheduledFor == null || !isWithinBloodBankSchedule(scheduledFor)) {
       return null;
     }
 
@@ -939,7 +948,7 @@ class TabangRepository {
       status: RequestStatus.pendingReview,
       source: postToDonorNetwork ? source : RequestSource.bloodBank,
       note: note,
-      documents: trimmedDocs,
+      documents: uploaded,
       scheduledFor: scheduledFor,
       postToDonorNetwork: postToDonorNetwork,
     );
@@ -1425,63 +1434,6 @@ class TabangRepository {
     markActive(actorId);
     _notify();
     return unit;
-  }
-
-  /// Book a blood-bank appointment. Staff confirm the slot; the record does not
-  /// allocate a unit by itself.
-  DonationAppointment? addAppointment({
-    required String requesterId,
-    required String patientName,
-    required BloodType bloodType,
-    required BloodComponent component,
-    required String hospital,
-    required String ward,
-    required int units,
-    required DateTime scheduledAt,
-    String? note,
-  }) {
-    final requester = userById(requesterId);
-    if (requester == null || !requester.role.canRequestBlood) return null;
-    if (units < 1 || units > 20) return null;
-    final appointment = DonationAppointment(
-      id: 'APT-${(_appointments.length + 1).toString().padLeft(3, '0')}',
-      requesterId: requesterId,
-      patientName: patientName.trim(),
-      bloodType: bloodType,
-      component: component,
-      hospital: hospital,
-      ward: ward.trim(),
-      units: units,
-      scheduledAt: scheduledAt,
-      note: note == null || note.trim().isEmpty ? null : note.trim(),
-    );
-    _appointments.insert(0, appointment);
-    _notify();
-    return appointment;
-  }
-
-  bool confirmAppointment(String appointmentId, {required String actorId}) {
-    final actor = userById(actorId);
-    if (actor == null || !actor.role.isAdminSide) return false;
-    final index = _appointments.indexWhere((a) => a.id == appointmentId);
-    if (index == -1) return false;
-    final current = _appointments[index];
-    if (current.status == 'Confirmed') return false;
-    _appointments[index] = DonationAppointment(
-      id: current.id,
-      requesterId: current.requesterId,
-      patientName: current.patientName,
-      bloodType: current.bloodType,
-      component: current.component,
-      hospital: current.hospital,
-      ward: current.ward,
-      units: current.units,
-      scheduledAt: current.scheduledAt,
-      status: 'Confirmed',
-      note: current.note,
-    );
-    _notify();
-    return true;
   }
 
   // ------------------------------------------------------------ messaging
@@ -2072,7 +2024,6 @@ class TabangRepository {
     _activity.clear();
     _drives.clear();
     _content.clear();
-    _appointments.clear();
     _blocks.clear();
     _unblockedAt.clear();
     // These two were the leak that let an earlier test's donor application or
@@ -3080,29 +3031,51 @@ class TabangRepository {
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(hours: 4)),
         documents: const [
-          RequestDocuments.doctorsForm,
-          RequestDocuments.transfusionSlip,
-          RequestDocuments.patientId,
+          RequestDocument(
+            kind: RequestDocuments.doctorsForm,
+            fileName: 'patient-055-doctor-request.pdf',
+          ),
+          RequestDocument(
+            kind: RequestDocuments.transfusionSlip,
+            fileName: 'patient-055-transfusion-slip.pdf',
+          ),
+          RequestDocument(
+            kind: RequestDocuments.patientId,
+            fileName: 'patient-055-hospital-id.jpg',
+          ),
         ],
         scheduledFor: bloodBankSlots(days: 3).first,
         status: RequestStatus.pendingReview,
       ),
     ]);
 
-    // Seeded requests already cleared chapter review: they carry the document
-    // checklist and a bookable slot so the demo starts in a realistic state.
-    final seededSlot = bloodBankSlots(days: 7).first;
-    const seededDocuments = <String>[
-      RequestDocuments.doctorsForm,
-      RequestDocuments.transfusionSlip,
-      RequestDocuments.patientId,
+    // Seeded requests already cleared chapter review: they carry document
+    // files on record and a bookable slot so the demo starts in a realistic
+    // state. Seed documents have no payload, meaning "already on file with the
+    // chapter"; uploads made in the app do carry the file bytes.
+    const seededDocuments = <RequestDocument>[
+      RequestDocument(
+        kind: RequestDocuments.doctorsForm,
+        fileName: 'doctor-request-form.pdf',
+      ),
+      RequestDocument(
+        kind: RequestDocuments.transfusionSlip,
+        fileName: 'blood-transfusion-slip.pdf',
+      ),
+      RequestDocument(
+        kind: RequestDocuments.patientId,
+        fileName: 'hospital-patient-id.jpg',
+      ),
     ];
+    final seededSlots = bloodBankSlots(days: 14);
     for (var i = 0; i < _requests.length; i++) {
       if (_requests[i].status == RequestStatus.pendingReview) continue;
       _requests[i] = _requests[i].copyWith(
         status: RequestStatus.open,
         documents: seededDocuments,
-        scheduledFor: seededSlot,
+        // Stagger the demo slots instead of parking every request on the
+        // same hour.
+        scheduledFor: seededSlots[i % seededSlots.length],
       );
     }
 
@@ -3425,34 +3398,6 @@ class TabangRepository {
         startsAt: _atHour(now, 11, 9),
         endsAt: _atHour(now, 11, 17),
         expectedDonors: 95,
-      ),
-    ]);
-
-    // ---- blood-bank appointments ---------------------------------------
-    _appointments.addAll([
-      DonationAppointment(
-        id: 'APT-001',
-        requesterId: 'USR-009',
-        patientName: 'Mercy Santos',
-        bloodType: BloodType.oNeg,
-        component: BloodComponent.packedRbc,
-        hospital: 'Digos Provincial Hospital',
-        ward: 'Obstetrics Ward 2',
-        units: 2,
-        scheduledAt: _atHour(now, 1, 9),
-        status: 'Confirmed',
-        note: 'Scheduled caesarean section.',
-      ),
-      DonationAppointment(
-        id: 'APT-002',
-        requesterId: 'USR-025',
-        patientName: 'Elias Cabrera',
-        bloodType: BloodType.bPos,
-        component: BloodComponent.wholeBlood,
-        hospital: 'Digos Doctors Hospital',
-        ward: 'Dialysis Unit',
-        units: 2,
-        scheduledAt: _atHour(now, 2, 10),
       ),
     ]);
 

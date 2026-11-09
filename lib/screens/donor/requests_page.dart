@@ -8,6 +8,7 @@ import '../../widgets/layout.dart';
 import '../../widgets/blood_request_dialog.dart';
 import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
+import '../../widgets/request_document_list.dart';
 
 /// Blood request board.
 ///
@@ -968,12 +969,22 @@ class _RequestsPageState extends State<RequestsPage> {
                   'Posted',
                   formatRelative(request.createdAt),
                 ),
-                if (request.documents.isNotEmpty)
-                  _detail(
-                    dialogContext,
+                if (request.documents.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
                     'Documents',
-                    request.documents.join(', '),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: dialogContext.textColor,
+                    ),
                   ),
+                  const SizedBox(height: 4),
+                  RequestDocumentList(
+                    documents: request.documents,
+                    dense: true,
+                  ),
+                ],
                 if (request.reviewNote != null &&
                     request.reviewNote!.isNotEmpty) ...[
                   const SizedBox(height: 8),

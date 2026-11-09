@@ -1344,7 +1344,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           Text(
             withDemand.isEmpty
                 ? 'No demand recorded yet.'
-                : '$covered of ${withDemand.length} blood types meet recorded demand.',
+                : '$covered of ${withDemand.length} blood types meet recorded '
+                      'demand. The pill is the balance: donations minus '
+                      'requests.',
             style: TextStyle(fontSize: 12.5, color: context.textMuted),
           ),
           const SizedBox(height: TabangSpace.lg),
@@ -1389,11 +1391,11 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                   ),
                   const SizedBox(width: TabangSpace.sm),
                   SizedBox(
-                    width: 46,
+                    width: 76,
                     child: StatusPill(
                       stat.balance >= 0
-                          ? '+${stat.balance}'
-                          : '${stat.balance}',
+                          ? '${stat.balance} more'
+                          : '${stat.balance.abs()} short',
                       tone: stat.balance >= 0 ? Tone.success : Tone.danger,
                       dense: true,
                     ),

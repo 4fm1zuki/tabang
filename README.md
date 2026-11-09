@@ -23,7 +23,8 @@ Requirements:
 - Flutter **3.47.0 or newer** (tested with Flutter 3.47.5)
 - Dart **3.13.0 or newer** (tested with Dart 3.13.4)
 - No map key: the barangay geometry and all photography are bundled. The
-  OpenStreetMap raster base (HOT style, no mountain-peak symbols) loads when a
+  OpenStreetMap raster base (the Humanitarian style, no mountain-peak symbols)
+  loads when a
   network is available, and the complete vector map still renders on the paper
   background without it
 
@@ -97,20 +98,26 @@ were bypassed.
   holder of a reserved bag is only named to staff. Community members do not
   place one-tap holds: **Request this unit** opens the documented request
   dialog seeded with the unit's component and type, and staff attach the hold
-  when they verify the request. The page also books an **appointment with
-  blood** (blood type, patient name, donation type, patient
-  hospital and ward, amount and slot). A hold is not a transfusion order:
-  chapter staff still cross-match and confirm release.
+  when they verify the request. The same dialog books one of the chapter's
+  published slots, so appointment booking and blood requesting are one
+  workflow: staff confirm the slot when they verify the uploaded documents. A
+  hold is not a transfusion order: chapter staff still cross-match and confirm
+  release.
 - **Find Donor** — the Digos City map: `flutter_map` renders OpenStreetMap
-  raster tiles (the HOT humanitarian style, chosen because the standard Carto
+  raster tiles (the Humanitarian style, chosen because the standard Carto
   style scatters brown mountain-peak triangles across the Digos highlands)
-  under an inverse mask that hides everything outside the city, and
-  the 26-barangay topology from the standalone `map/` project ships locally in
+  under an inverse mask that hides everything outside the city. The mask and
+  the canvas under the raster tiles use a clean two-stop gradient rather than
+  the old flat off-white and beige fills, so the wide margins around the city
+  read as map space instead of a dirty band. The 26-barangay topology from
+  the standalone `map/` project ships locally in
   `lib/core/digos_geodata.dart` (75 shared topological arcs that stitch into the
   barangays plus the city perimeter, so no mapping SDK or API key is involved).
-  The base keeps the standalone map project's warm, low-contrast street
-  template, so roads, water, buildings and land use show through while
-  farmland hatching and baked-in place names are muted. The
+  The base keeps the standalone map project's street detail, retuned to a
+  clean, cool, low-contrast template, so roads, water, buildings and land use
+  show through while farmland hatching and baked-in place names are muted. The
+  canvas and the inverse city mask use a simple sky-blue gradient — the old
+  off-white and beige fills made the wide margins look dirty. The
   raster template alone is nudged down-right (`DigosVectorMap.baseMapOffset`)
   so its streets sit better under the hand-traced cutouts; the vector layers
   never move. The nudge is calibrated at `baseMapOffsetZoom` and scales with
@@ -136,7 +143,12 @@ were bypassed.
   names. Drive and hospital pins scale down at wide views so the city does not
   drown in markers, and every seed pin is a representative point inside its own
   barangay, never outside the city outline.
-  A **metric scale bar** shows distance; one fit-city control (corner-bracket
+  A **metric scale bar** shows distance; it picks the largest round distance
+  that fits inside its cap and draws the line from the same metres-per-pixel
+  figure, with the label centred above the ruler. The bar follows the live
+  camera zoom — including the initial city fit and every pinch frame — instead
+  of a cached zoom level, so the number and the pixels always agree. One
+  fit-city control (corner-bracket
   icon) re-frames the whole city in the pane; `+`/`−` step the zoom within
   10.5–18; the map style follows the app theme, with a desktop-only toggle that
   overrides it for the visit. A **Live** pill and an unread badge flag new
@@ -155,10 +167,14 @@ were bypassed.
   a donor card moves the map to the barangay that donor is from (not just a
   highlight). Over the map the cursor switches to a pointing hand whenever a
   barangay is under the mouse, so "click a region to select it" is discoverable.
-  On phones the map itself carries **half-screen** and **full-screen** buttons:
-  half keeps the donor list under a usable map, full hands the pane to the map
-  (a donor bar at the bottom brings the list back). The map credit reads
-  `© OpenStreetMap contributors · HOT style`.
+  On phones one **map size** button replaces the old half/full-screen pair and
+  advances through all four arrangements on each tap: **Map only** → **Half
+  screen** (the default split) → **Hide map** → **Strip + list** → **Map
+  only**. Hiding the map leaves the donor directory in place with a **Show
+  map** button above it, and that button restores the short strip. The donor
+  pane's own collapse arrow switches to **Map only**, and the cycle button is
+  always in the map's control stack. The map credit reads
+  `© OpenStreetMap contributors`.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Availability is managed two
   ways: the manual **Directory availability** switch hides a donor on demand,
@@ -180,15 +196,17 @@ were bypassed.
   with what chapter staff asked for, and keep one-tap access to requests and
   messages because donating and needing blood are not mutually exclusive.
 - **Requests** — anyone, including a donor, can post a blood request, but
-  submission is a documented workflow, not a button. The requester ticks the
-  document checklist (doctor's request form, transfusion slip, hospital
-  patient ID, optional typing result) and books one of the chapter's published
-  blood-bank slots (Mon–Fri 8–11 AM and 1–3 PM, Sat 8–11 AM); the dialog also
+  submission is a documented workflow, not a button. The requester **uploads the
+  actual files** — doctor's request form, transfusion slip and hospital patient
+  ID are required, and a typing result is optional — as PDF, JPG or PNG images
+  up to 8 MB each. In the same dialog they book one of the chapter's published
+  blood-bank slots (Mon–Fri 8–11 AM and 1–3 PM, Sat 8–11 AM), and the dialog also
   checks participating-facility stock and explains each urgency as a response
   window (critical = same day, urgent = 24–48 h, routine = planned). The
   request starts as **Awaiting verification** and is invisible to donors until
-  chapter staff verify it or reject it with a written reason the requester can
-  read. Donors get three tabs — **Requests** (open donor-network requests their
+  chapter staff inspect the uploaded files, confirm the booked slot and verify
+  it — or reject it with a written reason the requester can read. Donors get
+  three tabs — **Requests** (open donor-network requests their
   blood type and component can serve, with their own posted request excluded),
   **Mine** (requests they posted, the review status and rejection reason, donor
   responses and the booked slot) and **Donate** (the drives they can join,
@@ -266,17 +284,19 @@ were bypassed.
   wide windows, and a segmented control does the same on narrow ones. The map
   is the same Digos template with a legend switch between the amber
   **open-request heat layer** and the **donor-density heatmap** the community
-  map uses. On phones the map offers three sizes — the default strip with the
-  queue below, a **half-screen** size that keeps the queue visible, and a
-  **full-screen** size for reading the layers — and the city cutout is clearly
-  darker than the page. Tapping a barangay scopes the side panel to eligible
-  donors, pending registrations, open requests with responders, and donor
-  applications waiting for review. The city-wide queue puts requests **Awaiting
-  verification** first: staff open the details, confirm the document checklist
-  and booked slot with **Verify and open** (blood-bank requests also attach the
-  compatible unit holds), or **Reject** with a written reason. Staff mark
-  requests fulfilled and jump to user management, but they do not select
-  donors — that stays with the requester.
+  map uses. On phones a compact **map size** dropdown replaces the old
+  half/full-screen toggle pair and offers *Strip + list*, *Half map*, *Full map*
+  and *List only*; a **Pull up to hide the map** handle sits directly under the
+  map and leaves the queue alone, with **Show map** restoring it. The city
+  cutout is clearly darker than the page. Tapping a barangay scopes the side
+  panel to eligible donors, pending registrations, open requests with
+  responders, and donor applications waiting for review. The city-wide queue
+  puts requests **Awaiting verification** first: staff open the details, inspect
+  the uploaded request documents, confirm the booked slot with **Verify and
+  open** (blood-bank requests also attach the compatible unit holds), or
+  **Reject** with a written reason. Staff mark requests fulfilled and jump to
+  user management, but they do not select donors — that stays with the
+  requester.
 - **Inventory** — the second Operations view. Units are a compact list with a
   **Details** button and a status-menu; the full record opens with the barcode
   graphic, the holder's name (staff-only information) and a **Remove unit**
@@ -285,8 +305,9 @@ were bypassed.
   **Add unit** (blood type, component, storage bay, collection date, optional
   barcode; expiry is derived from the component shelf life), change unit
   status, release a held bag back to available stock after screening, monitor
-  effective expiry pressure, confirm booked **appointments** in a dedicated
-  queue, and work the request queue. Only staff/admin can mark a request
+  effective expiry pressure, confirm **booked slots** — derived from requests,
+  with each requester's uploaded documents one tap away — in a dedicated queue,
+  and work the request queue. Only staff/admin can mark a request
   fulfilled.
 - **Messages** — staff and admins use the community chat surface and can start
   a new conversation with another staff member or any community user; unread
@@ -326,7 +347,7 @@ were bypassed.
 | Registration fields (p.22) | A three-step community-account wizard collects full name, unique nickname, email, contact number, birth date, blood type, weight and barangay. Everything is persisted; the nickname is the only public identity. Donor status is a separate opt-in upgrade in Donor Hub. |
 | Email credential authentication (p.28) | Salted SHA-256 credential store, session routing by role, and no self-service admin/staff registration. |
 | Request lifecycle and staff-only fulfilment | Donor-network: open → matched (after chat-first selection) → fulfilled (staff/admin only). A donor already committed to one active request cannot be selected for another until it closes. Blood-bank: staff process the request and fulfil it directly. Cancellation is guarded; fulfilled/cancelled requests cannot be re-opened or fulfilled twice. |
-| Appointment with blood | `DonationAppointment` records patient name, blood type, component, hospital, ward, units and slot. Requesters book; staff confirm. A slot does not allocate a specific bag. |
+| Appointment with blood | Appointment booking is merged into the blood request: the requester uploads the required documents and books a published slot in the same dialog, and staff confirm the slot when they verify the request. A slot does not allocate a specific bag. |
 | Image attribution | Every bundled file has its own entry in `lib/core/image_credits.dart`, a visible caption under the image and a hover/detail credit with title, author, licence and source URL. |
 | SUS / SEIPS evaluation (external) | The app supplies the workflow and criteria; the SUS/SEIPS surveys are conducted externally and are not embedded. |
 | Simulated data only, no live PRC/EHR integration | The repository is in-memory synthetic data. No live integration exists. |
@@ -355,7 +376,7 @@ lib/
 ├── main.dart                  # root; routes on session state, wraps navigator in SafeArea
 ├── theme.dart                 # M3 schemes, gradients, component themes
 ├── core/
-│   ├── models.dart            # domain models, expiry, holds, appointments
+│   ├── models.dart            # domain models, expiry, holds, request documents
 │   ├── eligibility.dart       # component compatibility + cooldown engine
 │   ├── repository.dart        # in-memory store, seed data, lifecycle, analytics
 │   ├── auth.dart              # credential auth, role gating, donor upgrade
@@ -365,7 +386,9 @@ lib/
 │   ├── common.dart            # shared UI kit, HelpTip, progress bars
 │   ├── photo.dart             # TabangPhoto + visible PhotoCredit
 │   ├── digos_vector_map.dart  # OSM base, heat fills, pins, labels, controls
-│   └── blood_request_dialog.dart # stock-first request flow
+│   ├── blood_request_dialog.dart # stock-first request flow + document uploads
+│   ├── request_document_list.dart # shared uploaded-file previews
+│   └── request_review_dialogs.dart # shared staff verify/reject prompts
 └── screens/
     ├── auth/                  # login, community registration
     ├── donor/                 # DonorShell + Home, Blood Bank, Map,
@@ -431,9 +454,11 @@ unpinning, and the classic side-by-side splits. On phones the bottom bar slides
 down out of the way while the page scrolls toward its end and returns on any
 scroll up or tab change, and it pins itself at the top or the bottom of the page
 so navigation is never stranded at the end of a list; when the destinations do
-not fit, the bar scrolls horizontally instead of overflowing. Settings adds a
-**slim navigation rails** switch, **off by default** (turning it on drops
-bottom-bar labels and keeps the side rail at icon width). The desktop rail is
+not fit, the bar scrolls horizontally instead of overflowing. Either phone
+header also carries a **pin** button that keeps the bar visible through long
+swipes until it is unpinned. Settings adds a **slim navigation rails** switch,
+**off by default** (turning it on drops bottom-bar labels and keeps the side
+rail at icon width). The desktop rail is
 controlled by the **pin in its header**: pinning reopens the full labelled rail
 and leaves slim mode, while turning slim mode on unpins the sidebar, so the two
 never contradict each other. The Settings switch mirrors its value locally so it
@@ -480,10 +505,10 @@ The About tab renders the full registry with source links. There is no generic
 **The map has one visual language.** A sequential warm-crimson ramp encodes
 available donors, with a legend; selection uses deep brand tones plus a
 contrasting outline, never the blue that previously meant both "selected" and
-"water". The OpenStreetMap base (HOT style) is pushed through the standalone map
-project's warm template, so streets, water, buildings and land use stay revealed
-while its baked-in names are muted and the standard style's mountain-peak
-triangles never appear; TABANG's own
+"water". The OpenStreetMap base is pushed through a clean, cool version of the
+standalone map project's street template, so streets, water, buildings and land
+use stay revealed while its baked-in names are muted and the standard style's
+mountain-peak triangles never appear; TABANG's own
 labels all sit on their barangay's representative point and never disappear as
 the view widens. The base now follows the
 active theme — the same `invert + hue-rotate` dark recipe keeps water blue and
@@ -566,9 +591,9 @@ deployment, replace the embedded data with PSA or LGU boundary data.
 
 No mapping SDK and no API key are involved. Find Donor's geometry comes from
 `lib/core/digos_geodata.dart`, and the OpenStreetMap raster tiles used as the
-base layer (served in the HOT humanitarian style, which draws no peak symbols)
+base layer (served in the Humanitarian style, which draws no peak symbols)
 need no key, account or referrer restriction; the required credit
-(`© OpenStreetMap contributors · HOT style`) is drawn on the map. For a fully offline
+(`© OpenStreetMap contributors`) is drawn on the map. For a fully offline
 deployment the tile layer can be switched
 off with one flag (`DigosVectorMap.tilesEnabled`), which leaves the complete
 vector map running on the paper background. The only deployment signing caveat
@@ -628,7 +653,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**130 tests** cover:
+**141 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -643,10 +668,12 @@ flutter test
   blood type.
 - **Expiry handling** — effective status, exclusion from available stock, and
   prevention of reviving an expired bag as available.
-- **Request verification** — a submission without documents or outside the
-  published blood-bank schedule is refused; requests stay hidden from donors
-  until staff verify them; rejection carries a written reason; verifying a
-  blood-bank request holds the assigned units for the requester.
+- **Request verification** — a submission without every required uploaded file
+  or outside the published blood-bank schedule is refused; a checklist entry
+  without bytes does not count; uploaded files are stored with the request and
+  previewed by staff; requests stay hidden from donors until staff verify them;
+  rejection carries a written reason; verifying a blood-bank request holds the
+  assigned units for the requester.
 - **Request lifecycle** — compatible/ineligible/duplicate responses, blood-bank
   requests rejecting donor responses, requester-only selection, chat-first
   selection (one-sided chat is refused until both people send a message),
@@ -654,10 +681,10 @@ flutter test
   selection-time eligibility rechecks, thread creation, leftover offers being
   declined, cross-request donor fairness (a committed donor cannot be reserved
   twice), staff-only fulfilment, and cancellation guards.
-- **Inventory holds and appointments** — a unit can be held once, a second
-  person cannot claim it, only its holder can release it, appointments start
-  pending, requesters cannot confirm their own slot, and staff confirmation
-  works.
+- **Inventory holds and booked slots** — a unit can be held once, a second
+  person cannot claim it, only its holder can release it, request slots start
+  pending, verifying the request confirms the slot, and cancelling the request
+  removes it from the staff queue.
 - **Privacy and safety** — bilateral reveal accept/decline, persisted reports
   with a trimmed free-text explanation, per-participant unread/read markers,
   symmetric blocking, and the 48-hour re-block cooldown.
@@ -719,12 +746,17 @@ flutter test
   bundled Red Cross emblem, Settings switches mirror their values immediately
   (enabling slim rails unpins the sidebar), and the sidebar pin reopens the
   full rail from slim mode.
-  Inventory exposes Add unit plus the appointment queue, and the phone bottom
-  bar pins itself at the end of a scroll instead of staying hidden.
-- **Narrow-screen layout** — Home, Blood Bank (including unit selection and
-  the appointment dialog) and Overview render at a 360 × 780 phone viewport
-  without overflow; the unit list reflows to one column and the appointment
-  dialog stacks its fields.
+  Inventory exposes Add unit plus the booked-slot queue; the phone Find Donor
+  and Operations maps cycle or switch between strip, half, full and list-only
+  arrangements, hide and restore the map with the pull-up/**Show map** controls,
+  the metric scale bar keeps its label and line length consistent and follows
+  the live camera, and the bottom-bar pin keeps the bar visible through a long
+  swipe.
+- **Narrow-screen layout** — Home, Blood Bank (including unit selection and the
+  blood request dialog), the staff booked-slot list, Overview and the login form
+  render at a 360 × 780 phone viewport without overflow; the unit list reflows
+  to one column, the request dialog stacks its fields, and the login form scrolls
+  under a slim transient rail instead of a persistent edge scrollbar.
 - **Sidebar** — the Settings pin collapses or reopens the desktop rail, each
   rail item's icon stays dead-centre in its pill (the regression that left the
   selection accent bar pushing icons off-centre), and the compact pin control

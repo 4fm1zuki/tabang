@@ -15,6 +15,19 @@ import '../../widgets/illustrations.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/photo.dart';
 
+/// How the map and donor directory share a phone screen.
+///
+/// The enum order is the order the single map-size button cycles through; the
+/// default is [half].
+///
+/// * [mapOnly] — the map fills the page; the directory is out of the way.
+/// * [half] — the default split: map above, directory below (side by side on
+///   desktop).
+/// * [hidden] — the map is out of the way and the directory fills the page.
+/// * [strip] — a short map strip above the directory, leaving most of the page
+///   for donor cards. This is also the mode **Show map** restores.
+enum _DonorMapMode { mapOnly, half, hidden, strip }
+
 /// Find Donor: Digos City vector map plus the donor directory.
 ///
 /// The map itself is the standalone `digos_barangay_map` implementation
@@ -65,7 +78,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
   BloodType? _bloodType;
   String? _selectedBarangay;
   String _query = '';
-  bool _donorsCollapsed = false;
+  _DonorMapMode _mapMode = _DonorMapMode.half;
 
   /// The map style follows the app's effective theme, so it darkens with the
   /// system as soon as the theme does. The style button sets a per-visit
@@ -133,7 +146,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
   void _focusDonor(AppUser donor) {
     setState(() {
       _selectedBarangay = donor.barangay;
-      _donorsCollapsed = false;
+      _mapMode = _DonorMapMode.half;
     });
     _focusBarangay(donor.barangay);
   }
@@ -534,30 +547,40 @@ class _FindDonorPageState extends State<FindDonorPage> {
         final height = constraints.maxHeight;
 
         if (narrow) {
-          final mapHeight = _donorsCollapsed
-              ? math.max(200.0, height - 46)
-              : math.max(220.0, height * 0.52);
-          return Column(
-            children: [
-              SizedBox(
-                height: mapHeight,
+          switch (_mapMode) {
+            case _DonorMapMode.mapOnly:
+              return SizedBox(
                 width: width,
+                height: height,
                 child: _buildMapPane(context, compact: true),
-              ),
-              if (_donorsCollapsed)
-                _buildCollapsedDonorBar(context)
-              else ...[
-                Divider(height: 1, color: context.border),
-                Expanded(child: _buildDonorPane(context, compact: true)),
-              ],
-            ],
-          );
+              );
+            case _DonorMapMode.hidden:
+              return _buildDonorOnlyPane(context, compact: true);
+            case _DonorMapMode.half:
+              return _stackedMap(
+                context,
+                width: width,
+                mapHeight: math.max(220.0, height * 0.52),
+              );
+            case _DonorMapMode.strip:
+              // A deliberately shorter strip: the map stays useful for a quick
+              // location check while most of the page belongs to the list.
+              return _stackedMap(
+                context,
+                width: width,
+                mapHeight: (height * 0.38).clamp(200.0, 300.0).toDouble(),
+              );
+          }
         }
 
-        return Row(
-          children: [
-            Expanded(child: _buildMapPane(context, compact: false)),
-            if (!_donorsCollapsed)
+        return switch (_mapMode) {
+          _DonorMapMode.mapOnly => _buildMapPane(context, compact: false),
+          _DonorMapMode.hidden => _buildDonorOnlyPane(context, compact: false),
+          // The strip is a phone arrangement. On a wide window both visible
+          // modes keep the side-by-side map and directory.
+          _DonorMapMode.half || _DonorMapMode.strip => Row(
+            children: [
+              Expanded(child: _buildMapPane(context, compact: false)),
               Container(
                 width: 330,
                 decoration: BoxDecoration(
@@ -566,79 +589,135 @@ class _FindDonorPageState extends State<FindDonorPage> {
                 ),
                 child: _buildDonorPane(context, compact: false),
               ),
-          ],
-        );
+            ],
+          ),
+        };
       },
     );
   }
 
-  /// Tap bar that brings the donor list back on a phone.
-  Widget _buildCollapsedDonorBar(BuildContext context) {
-    final donors = _visibleDonors;
-    return Material(
-      color: context.surface,
-      child: InkWell(
-        onTap: () => setState(() => _donorsCollapsed = false),
-        child: Container(
-          height: 46,
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: TabangSpace.lg),
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: context.border)),
+  /// The two stacked phone arrangements (half split and short strip).
+  Widget _stackedMap(
+    BuildContext context, {
+    required double width,
+    required double mapHeight,
+  }) {
+    return Column(
+      children: [
+        SizedBox(
+          height: mapHeight,
+          width: width,
+          child: _buildMapPane(context, compact: true),
+        ),
+        Divider(height: 1, color: context.border),
+        Expanded(child: _buildDonorPane(context, compact: true)),
+      ],
+    );
+  }
+
+  /// The directory with no map above it. The restore control stays outside the
+  /// scroll view so it cannot be lost after the map has been hidden.
+  Widget _buildDonorOnlyPane(BuildContext context, {required bool compact}) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TabangSpace.lg,
+            TabangSpace.md,
+            TabangSpace.lg,
+            0,
           ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const ValueKey('showDonorMapButton'),
+              // Restore the short strip, matching the mode that follows
+              // "Hide map" in the cycle and the staff Operations control.
+              onPressed: () => setState(() => _mapMode = _DonorMapMode.strip),
+              icon: const Icon(Icons.map_outlined, size: 16),
+              label: const Text('Show map'),
+            ),
+          ),
+        ),
+        Expanded(child: _buildDonorPane(context, compact: compact)),
+      ],
+    );
+  }
+
+  /// Map-size dropdown, shown in the donor list header.
+  ///
+  /// One button expands the four staff Operations vocabulary entries — Map
+  /// only, Half screen, Hide map and Strip + list — instead of cycling through
+  /// them silently on every tap, and it lives with the list it rearranges.
+  Widget _mapModeMenu(BuildContext context) {
+    final currentIcon = switch (_mapMode) {
+      _DonorMapMode.mapOnly => Icons.open_in_full,
+      _DonorMapMode.half => Icons.horizontal_split_outlined,
+      _DonorMapMode.hidden => Icons.view_list_outlined,
+      _DonorMapMode.strip => Icons.view_agenda_outlined,
+    };
+    return PopupMenuButton<_DonorMapMode>(
+      key: const ValueKey('findDonorMapModeMenu'),
+      tooltip: 'Map size',
+      position: PopupMenuPosition.under,
+      onSelected: (mode) => setState(() => _mapMode = mode),
+      itemBuilder: (context) => [
+        _mapModeItem(_DonorMapMode.mapOnly, Icons.open_in_full, 'Map only'),
+        _mapModeItem(
+          _DonorMapMode.half,
+          Icons.horizontal_split_outlined,
+          'Half screen',
+        ),
+        _mapModeItem(
+          _DonorMapMode.hidden,
+          Icons.view_list_outlined,
+          'Hide map',
+        ),
+        _mapModeItem(
+          _DonorMapMode.strip,
+          Icons.view_agenda_outlined,
+          'Strip + list',
+        ),
+      ],
+      child: Material(
+        color: context.surface.withValues(alpha: 0.96),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TabangRadius.sm),
+          side: BorderSide(color: context.border),
+        ),
+        child: SizedBox(
+          width: 44,
+          height: 28,
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.people_outline,
+              Icon(currentIcon, size: 14, color: context.textColor),
+              Icon(
+                Icons.keyboard_arrow_down,
                 size: 16,
-                color: TabangColors.crimson,
-              ),
-              const SizedBox(width: 8),
-              // Flexible label: at 320–390 px, or when the platform falls back
-              // to a wider font, the title ellipsizes instead of pushing the
-              // "Show list" affordance off the bar.
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Available donors',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: context.textColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    StatusPill(
-                      '${donors.length}',
-                      tone: Tone.brand,
-                      dense: true,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Show list',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: context.textMuted,
-                ),
-              ),
-              const SizedBox(width: 2),
-              const Icon(
-                Icons.keyboard_arrow_up,
-                size: 22,
-                color: TabangColors.crimson,
+                color: context.textMuted,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  PopupMenuItem<_DonorMapMode> _mapModeItem(
+    _DonorMapMode value,
+    IconData icon,
+    String label,
+  ) {
+    return PopupMenuItem(
+      value: value,
+      height: 42,
+      child: Row(
+        children: [
+          Icon(icon, size: 17),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(fontSize: 12.5)),
+        ],
       ),
     );
   }
@@ -903,42 +982,26 @@ class _FindDonorPageState extends State<FindDonorPage> {
                       const SizedBox(height: 12),
                       _mapButton(
                         context,
-                        _donorsCollapsed
+                        _mapMode == _DonorMapMode.mapOnly
                             ? Icons.chevron_left
                             : Icons.chevron_right,
                         () => setState(
-                          () => _donorsCollapsed = !_donorsCollapsed,
+                          () => _mapMode = _mapMode == _DonorMapMode.mapOnly
+                              ? _DonorMapMode.half
+                              : _DonorMapMode.mapOnly,
                         ),
-                        tooltip: _donorsCollapsed
+                        tooltip: _mapMode == _DonorMapMode.mapOnly
                             ? 'Show donor list'
                             : 'Hide donor list',
                       ),
                     ],
-                    // Phone sizing: half screen keeps the donor list under a
-                    // still-usable map, full screen hands the whole pane to
-                    // the map (the donor bar at the bottom brings the list
-                    // back). Desktop already has the side-by-side split.
+                    // Phone sizing: one tap advances through Map only → Half
+                    // screen → Hide map → Strip + list, using the same four
+                    // arrangements as the staff Operations map. The restore
+                    // control for "Hide map" lives above the donor list.
                     if (compact) ...[
                       const SizedBox(height: 4),
-                      _mapButton(
-                        context,
-                        Icons.horizontal_split_outlined,
-                        () => setState(() => _donorsCollapsed = false),
-                        tooltip: 'Half-screen map · show donors',
-                        accent: !_donorsCollapsed,
-                        size: 30,
-                      ),
-                      const SizedBox(height: 4),
-                      _mapButton(
-                        context,
-                        _donorsCollapsed
-                            ? Icons.close_fullscreen
-                            : Icons.open_in_full,
-                        () => setState(() => _donorsCollapsed = true),
-                        tooltip: 'Full-screen map',
-                        accent: _donorsCollapsed,
-                        size: 30,
-                      ),
+                      _mapModeCycleButton(context),
                     ],
                   ],
                 ),
@@ -1301,21 +1364,23 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     ),
                     const SizedBox(width: 2),
                   ],
-                  Tooltip(
-                    message: 'Hide this panel',
-                    child: InkWell(
-                      onTap: () => setState(() => _donorsCollapsed = true),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(
-                          Icons.keyboard_arrow_down,
-                          size: 18,
-                          color: context.textMuted,
+                  if (_mapMode != _DonorMapMode.hidden)
+                    Tooltip(
+                      message: 'Hide donor list',
+                      child: InkWell(
+                        onTap: () =>
+                            setState(() => _mapMode = _DonorMapMode.mapOnly),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 18,
+                            color: context.textMuted,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
               if (_paneTab == 0) ...[

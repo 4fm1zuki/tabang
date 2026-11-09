@@ -65,9 +65,22 @@ class _AdminShellState extends State<AdminShell> {
   /// comes back on the first scroll up or tab change.
   bool _navHidden = false;
 
+  /// Staff can pin the phone bar open when they swipe through long lists.
+  bool _navPinned = false;
+
   /// Downward travel accumulates before the bar hides, so tiny settling
   /// deltas cannot toggle it.
   double _navDownTravel = 0;
+
+  void _toggleNavPin() {
+    setState(() {
+      _navPinned = !_navPinned;
+      if (_navPinned) {
+        _navHidden = false;
+        _navDownTravel = 0;
+      }
+    });
+  }
 
   /// Opens a destination that is not in the phone bottom bar.
   void _pushStandalone(int index) {
@@ -173,6 +186,7 @@ class _AdminShellState extends State<AdminShell> {
   /// hide again, so it never bounces up and down at the end of a list.
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    if (_navPinned) return false;
     final metrics = notification.metrics;
     final atTop = metrics.pixels <= metrics.minScrollExtent + 4;
     final atBottom = metrics.extentAfter <= 4;
@@ -253,6 +267,8 @@ class _AdminShellState extends State<AdminShell> {
               children: [
                 _AdminPhoneHeader(
                   user: widget.user,
+                  navPinned: _navPinned,
+                  onToggleNavPin: _toggleNavPin,
                   onOpenProfile: () => _pushStandalone(5),
                   onOpenSettings: () => _pushStandalone(6),
                   onOpenHelp: () => _pushStandalone(7),
@@ -271,7 +287,7 @@ class _AdminShellState extends State<AdminShell> {
                     key: const ValueKey('phoneNavigationBar'),
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    height: _navHidden ? 0 : 80,
+                    height: _navHidden && !_navPinned ? 0 : 80,
                     child: OverflowBox(
                       alignment: Alignment.topCenter,
                       minHeight: 80,
@@ -487,12 +503,16 @@ class _UnreadBadge extends StatelessWidget {
 class _AdminPhoneHeader extends StatelessWidget {
   const _AdminPhoneHeader({
     required this.user,
+    required this.navPinned,
+    required this.onToggleNavPin,
     required this.onOpenProfile,
     required this.onOpenSettings,
     required this.onOpenHelp,
   });
 
   final AppUser user;
+  final bool navPinned;
+  final VoidCallback onToggleNavPin;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenHelp;
@@ -550,6 +570,18 @@ class _AdminPhoneHeader extends StatelessWidget {
             ],
           ),
           const Spacer(),
+          IconButton(
+            key: const ValueKey('phoneNavPinButton'),
+            tooltip: navPinned
+                ? 'Allow the bottom bar to hide'
+                : 'Keep the bottom bar visible',
+            visualDensity: VisualDensity.compact,
+            onPressed: onToggleNavPin,
+            icon: Icon(
+              navPinned ? Icons.push_pin : Icons.push_pin_outlined,
+              size: 19,
+            ),
+          ),
           PopupMenuButton<String>(
             tooltip: 'Account',
             position: PopupMenuPosition.under,

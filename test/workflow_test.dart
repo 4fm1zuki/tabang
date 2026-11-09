@@ -1,8 +1,32 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tabang/core/auth.dart';
 import 'package:tabang/core/eligibility.dart';
 import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
+
+/// Three required uploads with real bytes, as the request dialog supplies.
+List<RequestDocument> uploadedDocuments() => [
+  RequestDocument(
+    kind: RequestDocuments.doctorsForm,
+    fileName: 'doctor-request-form.pdf',
+    bytes: Uint8List.fromList(const [1, 2, 3, 4]),
+    sizeBytes: 4,
+  ),
+  RequestDocument(
+    kind: RequestDocuments.transfusionSlip,
+    fileName: 'transfusion-slip.jpg',
+    bytes: Uint8List.fromList(const [5, 6, 7, 8]),
+    sizeBytes: 4,
+  ),
+  RequestDocument(
+    kind: RequestDocuments.patientId,
+    fileName: 'patient-id.png',
+    bytes: Uint8List.fromList(const [9, 10, 11, 12]),
+    sizeBytes: 4,
+  ),
+];
 
 /// Creates a request through the full documented flow and verifies it as
 /// chapter staff, so lifecycle tests start from a live open request instead of
@@ -25,11 +49,7 @@ BloodRequest addRequest(
     barangay: 'Zone 2',
     urgency: RequestUrgency.urgent,
     source: source,
-    documents: const [
-      RequestDocuments.doctorsForm,
-      RequestDocuments.transfusionSlip,
-      RequestDocuments.patientId,
-    ],
+    documents: uploadedDocuments(),
     scheduledFor: repo.bloodBankSlots(days: 7).first,
   )!;
   repo.verifyRequest(created.id, actorId: 'USR-010');
@@ -572,12 +592,9 @@ void main() {
   group('Request verification', () {
     BloodRequest? submit({
       RequestSource source = RequestSource.donorNetwork,
-      List<String> documents = const [
-        RequestDocuments.doctorsForm,
-        RequestDocuments.transfusionSlip,
-        RequestDocuments.patientId,
-      ],
+      List<RequestDocument>? documents,
       DateTime? scheduledFor,
+      bool withoutSlot = false,
       bool postToDonorNetwork = true,
       BloodType bloodType = BloodType.oNeg,
       BloodComponent component = BloodComponent.packedRbc,
@@ -593,8 +610,10 @@ void main() {
         barangay: 'Zone 2',
         urgency: RequestUrgency.urgent,
         source: source,
-        documents: documents,
-        scheduledFor: scheduledFor ?? repo.bloodBankSlots(days: 7).first,
+        documents: documents ?? uploadedDocuments(),
+        scheduledFor: withoutSlot
+            ? null
+            : scheduledFor ?? repo.bloodBankSlots(days: 7).first,
         postToDonorNetwork: postToDonorNetwork,
       );
     }
@@ -624,12 +643,41 @@ void main() {
       );
     });
 
-    test('documents and a published slot are required', () {
+    test('documents, a published slot and 1–20 units are required', () {
       expect(submit(documents: const []), isNull);
-      expect(
-        submit(scheduledFor: DateTime.now().add(const Duration(hours: 3))),
-        isNull,
+      expect(submit(withoutSlot: true), isNull);
+
+      // Pick a Sunday even if the suite happens to run on a Sunday, so the
+      // slot is deterministically outside the Mon–Sat blood-bank schedule.
+      final now = DateTime.now();
+      final daysToSunday = (DateTime.sunday - now.weekday) % 7;
+      final nextSunday = DateTime(
+        now.year,
+        now.month,
+        now.day + (daysToSunday == 0 ? 7 : daysToSunday),
+        9,
       );
+      expect(submit(scheduledFor: nextSunday), isNull);
+      expect(submit(unitsNeeded: 0), isNull);
+      expect(submit(unitsNeeded: 21), isNull);
+    });
+
+    test('a checklist tick without an uploaded file is rejected', () {
+      final files = uploadedDocuments();
+      final onFileOnly = [
+        const RequestDocument(
+          kind: RequestDocuments.doctorsForm,
+          fileName: 'doctor-form.pdf',
+        ),
+        ...files.skip(1),
+      ];
+      expect(submit(documents: onFileOnly), isNull);
+    });
+
+    test('uploaded files are stored with the request', () {
+      final created = submit()!;
+      expect(created.documents, hasLength(3));
+      expect(created.documents.every((document) => document.hasFile), isTrue);
     });
 
     test('staff reject a request with a reason the requester can read', () {
@@ -762,11 +810,7 @@ void main() {
         hospital: DigosFacilities.names.first,
         barangay: 'Zone 2',
         urgency: RequestUrgency.urgent,
-        documents: const [
-          RequestDocuments.doctorsForm,
-          RequestDocuments.transfusionSlip,
-          RequestDocuments.patientId,
-        ],
+        documents: uploadedDocuments(),
         scheduledFor: repo.bloodBankSlots(days: 7).first,
       )!;
       repo.verifyRequest(created.id, actorId: 'USR-010');
@@ -1155,7 +1199,7 @@ void main() {
     });
   });
 
-  group('Inventory holds and appointments', () {
+  group('Inventory holds and booked slots', () {
     test('a usable unit can be held once and released by its holder', () {
       final unit = repo.availableUnits.first;
       expect(
@@ -1187,42 +1231,59 @@ void main() {
       expect(repo.reservedUnitsFor('USR-038'), isEmpty);
     });
 
-    test('appointment-with-blood starts pending and staff confirm it', () {
-      final appointment = repo.addAppointment(
+    test('request slots merge into the staff booked-slot queue', () {
+      final created = repo.addRequest(
         requesterId: 'USR-009',
-        patientName: 'Patient 118',
+        patientAlias: 'Patient 118',
         bloodType: BloodType.oNeg,
         component: BloodComponent.packedRbc,
+        unitsNeeded: 2,
         hospital: DigosFacilities.names.first,
-        ward: 'Ward 3',
-        units: 2,
-        scheduledAt: DateTime.now().add(const Duration(days: 1)),
-      );
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.urgent,
+        documents: uploadedDocuments(),
+        scheduledFor: repo.bloodBankSlots(days: 7)[1],
+      )!;
 
-      expect(appointment, isNotNull);
-      expect(appointment!.status, 'Pending confirmation');
-      // Look the appointment up by id: the seeded APT-001 can sort ahead of it
-      // depending on the wall-clock time the suite runs at, so "first" is not
-      // a stable way to find the appointment just created.
+      expect(repo.scheduledRequests.map((r) => r.id), contains(created.id));
       expect(
-        repo.appointmentsFor('USR-009').map((a) => a.id),
-        contains(appointment.id),
+        repo.pendingScheduledRequests.map((r) => r.id),
+        contains(created.id),
       );
       expect(
-        repo.confirmAppointment(appointment.id, actorId: 'USR-009'),
+        repo.verifyRequest(created.id, actorId: 'USR-009'),
         isFalse,
-        reason: 'requesters cannot confirm their own appointment',
+        reason: 'requesters cannot verify their own request',
       );
-      expect(
-        repo.confirmAppointment(appointment.id, actorId: 'USR-010'),
-        isTrue,
+      expect(repo.verifyRequest(created.id, actorId: 'USR-010'), isTrue);
+
+      final confirmed = repo.scheduledRequests.firstWhere(
+        (request) => request.id == created.id,
       );
+      expect(confirmed.scheduledFor, created.scheduledFor);
       expect(
-        repo
-            .appointmentsFor('USR-009')
-            .firstWhere((a) => a.id == appointment.id)
-            .status,
-        'Confirmed',
+        repo.pendingScheduledRequests.map((r) => r.id),
+        isNot(contains(created.id)),
+      );
+    });
+
+    test('cancelled requests leave the booked-slot queue', () {
+      final created = repo.addRequest(
+        requesterId: 'USR-009',
+        patientAlias: 'Patient 119',
+        bloodType: BloodType.oNeg,
+        component: BloodComponent.packedRbc,
+        unitsNeeded: 1,
+        hospital: DigosFacilities.names.first,
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.routine,
+        documents: uploadedDocuments(),
+        scheduledFor: repo.bloodBankSlots(days: 7)[2],
+      )!;
+      expect(repo.cancelRequest(created.id, actorId: 'USR-009'), isTrue);
+      expect(
+        repo.scheduledRequests.map((request) => request.id),
+        isNot(contains(created.id)),
       );
     });
   });

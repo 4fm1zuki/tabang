@@ -28,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _scrollController = ScrollController();
 
   bool _obscure = true;
   bool _busy = false;
@@ -37,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -91,138 +93,164 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Container(
               color: context.surface,
               child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(TabangSpace.xxl),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 380),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildHeader(context),
-                          const SizedBox(height: TabangSpace.xl),
-                          if (_error != null) ...[
-                            _buildError(context, _error!),
-                            const SizedBox(height: TabangSpace.lg),
-                          ],
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            autofillHints: const [AutofillHints.email],
-                            decoration: const InputDecoration(
-                              labelText: 'Email address',
-                              prefixIcon: Icon(Icons.alternate_email, size: 18),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Enter your email address';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: TabangSpace.md),
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscure,
-                            autofillHints: const [AutofillHints.password],
-                            onFieldSubmitted: (_) => _submit(),
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(
-                                Icons.lock_outline,
-                                size: 18,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  size: 18,
-                                ),
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
-                              ),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Enter your password';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: TabangSpace.xl),
-                          SizedBox(
-                            height: 46,
-                            child: ElevatedButton(
-                              onPressed: _busy ? null : _submit,
-                              child: _busy
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Sign in'),
-                            ),
-                          ),
-                          const SizedBox(height: TabangSpace.md),
-                          Row(
+                child: ScrollConfiguration(
+                  // The app-wide Material scroll behaviour adds a persistent
+                  // browser-style scrollbar on desktop web, which turns the
+                  // phone login into a narrow strip with a stray rail down the
+                  // edge. Use a transient, slim thumb instead.
+                  behavior: const _LoginScrollBehavior(),
+                  child: Scrollbar(
+                    key: const ValueKey('loginScrollbar'),
+                    controller: _scrollController,
+                    thickness: 4,
+                    radius: const Radius.circular(TabangRadius.pill),
+                    interactive: false,
+                    child: SingleChildScrollView(
+                      key: const ValueKey('loginScrollView'),
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(TabangSpace.xxl),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 380),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Expanded(child: Divider()),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: TabangSpace.md,
-                                ),
-                                child: Text(
-                                  'or',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: context.textMuted,
+                              _buildHeader(context),
+                              const SizedBox(height: TabangSpace.xl),
+                              if (_error != null) ...[
+                                _buildError(context, _error!),
+                                const SizedBox(height: TabangSpace.lg),
+                              ],
+                              TextFormField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [AutofillHints.email],
+                                decoration: const InputDecoration(
+                                  labelText: 'Email address',
+                                  prefixIcon: Icon(
+                                    Icons.alternate_email,
+                                    size: 18,
                                   ),
                                 ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Enter your email address';
+                                  }
+                                  return null;
+                                },
                               ),
-                              const Expanded(child: Divider()),
-                            ],
-                          ),
-                          const SizedBox(height: TabangSpace.md),
-                          SizedBox(
-                            height: 46,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _showOAuthNotice(context),
-                              icon: const Icon(Icons.g_mobiledata, size: 22),
-                              label: const Text('Continue with Google'),
-                            ),
-                          ),
-                          const SizedBox(height: TabangSpace.xl),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'No account yet?',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: context.textMuted,
+                              const SizedBox(height: TabangSpace.md),
+                              TextFormField(
+                                controller: _passwordController,
+                                obscureText: _obscure,
+                                autofillHints: const [AutofillHints.password],
+                                onFieldSubmitted: (_) => _submit(),
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  prefixIcon: const Icon(
+                                    Icons.lock_outline,
+                                    size: 18,
+                                  ),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscure
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      size: 18,
+                                    ),
+                                    onPressed: () =>
+                                        setState(() => _obscure = !_obscure),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Enter your password';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: TabangSpace.xl),
+                              SizedBox(
+                                height: 46,
+                                child: ElevatedButton(
+                                  onPressed: _busy ? null : _submit,
+                                  child: _busy
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text('Sign in'),
                                 ),
                               ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const RegisterScreen(),
+                              const SizedBox(height: TabangSpace.md),
+                              Row(
+                                children: [
+                                  const Expanded(child: Divider()),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: TabangSpace.md,
                                     ),
-                                  );
-                                },
-                                child: const Text('Create one'),
+                                    child: Text(
+                                      'or',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: context.textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                  const Expanded(child: Divider()),
+                                ],
                               ),
+                              const SizedBox(height: TabangSpace.md),
+                              SizedBox(
+                                height: 46,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _showOAuthNotice(context),
+                                  icon: const Icon(
+                                    Icons.g_mobiledata,
+                                    size: 22,
+                                  ),
+                                  label: const Text('Continue with Google'),
+                                ),
+                              ),
+                              const SizedBox(height: TabangSpace.xl),
+                              // Wraps instead of overflowing when the phone
+                              // window leaves only ~296 px for the form.
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'No account yet?',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: context.textMuted,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              const RegisterScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Create one'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: TabangSpace.lg),
+                              _buildDemoAccounts(context),
                             ],
                           ),
-                          const SizedBox(height: TabangSpace.lg),
-                          _buildDemoAccounts(context),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -331,13 +359,15 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Icon(Icons.science_outlined, size: 13, color: context.textMuted),
               const SizedBox(width: 6),
-              Text(
-                'SIMULATED DATA — DEMO ACCOUNTS',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
-                  color: context.textMuted,
+              Expanded(
+                child: Text(
+                  'SIMULATED DATA — DEMO ACCOUNTS',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: context.textMuted,
+                  ),
                 ),
               ),
             ],
@@ -429,6 +459,24 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
+  }
+}
+
+/// Suppresses the persistent Material scrollbar for the login form.
+///
+/// The form still scrolls normally (wheel, drag and the transient [Scrollbar]
+/// around the view), but desktop-web builds no longer reserve a visible rail
+/// down the right edge when the window is phone-sized.
+class _LoginScrollBehavior extends MaterialScrollBehavior {
+  const _LoginScrollBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }
 
