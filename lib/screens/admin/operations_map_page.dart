@@ -54,10 +54,11 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   /// from Find Donor.
   bool _showDonorDensity = false;
 
-  /// Phone layout state: compact is set during build, and the expand toggle
-  /// lets the map take the whole workspace instead of the 340 px strip.
+  /// Phone layout state: compact is set during build. The map offers three
+  /// sizes so staff can keep the queue visible (strip), see both the map and
+  /// the queue (half), or give the map the whole workspace (full).
   bool _compact = false;
-  bool _mapExpanded = false;
+  _MapPaneSize _mapPane = _MapPaneSize.strip;
 
   @override
   void initState() {
@@ -116,20 +117,27 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
         final map = _buildMap(context);
         final panel = _buildPanel(context);
         return compact
-            ? (_mapExpanded
-                  // Full-height map on phones; the expand button flips back.
-                  ? Padding(padding: padding, child: map)
-                  : ListView(
-                      padding: padding,
-                      children: [
-                        SizedBox(
-                          height: widget.embedded ? 340 : 380,
-                          child: map,
-                        ),
-                        const SizedBox(height: TabangSpace.lg),
-                        panel,
-                      ],
-                    ))
+            ? switch (_mapPane) {
+                // Full-height map on phones; the same button flips back.
+                _MapPaneSize.full => Padding(padding: padding, child: map),
+                // Half screen keeps the requests queue visible below.
+                _MapPaneSize.half => ListView(
+                  padding: padding,
+                  children: [
+                    SizedBox(height: constraints.maxHeight * 0.5, child: map),
+                    const SizedBox(height: TabangSpace.lg),
+                    panel,
+                  ],
+                ),
+                _MapPaneSize.strip => ListView(
+                  padding: padding,
+                  children: [
+                    SizedBox(height: widget.embedded ? 340 : 380, child: map),
+                    const SizedBox(height: TabangSpace.lg),
+                    panel,
+                  ],
+                ),
+              }
             : Padding(
                 padding: padding,
                 child: Row(
@@ -232,9 +240,31 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 const SizedBox(height: 4),
                 _mapButton(
                   context,
-                  _mapExpanded ? Icons.close_fullscreen : Icons.open_in_full,
-                  () => setState(() => _mapExpanded = !_mapExpanded),
-                  tooltip: _mapExpanded ? 'Collapse map' : 'Expand map',
+                  Icons.horizontal_split_outlined,
+                  () => setState(() {
+                    _mapPane = _mapPane == _MapPaneSize.half
+                        ? _MapPaneSize.strip
+                        : _MapPaneSize.half;
+                  }),
+                  tooltip: _mapPane == _MapPaneSize.half
+                      ? 'Collapse map'
+                      : 'Half-screen map · show queue',
+                  accent: _mapPane == _MapPaneSize.half,
+                ),
+                const SizedBox(height: 4),
+                _mapButton(
+                  context,
+                  _mapPane == _MapPaneSize.full
+                      ? Icons.close_fullscreen
+                      : Icons.open_in_full,
+                  () => setState(() {
+                    _mapPane = _mapPane == _MapPaneSize.full
+                        ? _MapPaneSize.strip
+                        : _MapPaneSize.full;
+                  }),
+                  tooltip: _mapPane == _MapPaneSize.full
+                      ? 'Collapse map'
+                      : 'Full-screen map',
                 ),
               ],
             ],
@@ -972,4 +1002,16 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
       ),
     );
   }
+}
+
+/// Phone map sizes for the Operations workspace.
+enum _MapPaneSize {
+  /// The default 340 px strip with the queue below.
+  strip,
+
+  /// Half the screen, with the queue still visible underneath.
+  half,
+
+  /// The map alone, for reading the heat layers.
+  full,
 }

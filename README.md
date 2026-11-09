@@ -155,7 +155,10 @@ were bypassed.
   a donor card moves the map to the barangay that donor is from (not just a
   highlight). Over the map the cursor switches to a pointing hand whenever a
   barangay is under the mouse, so "click a region to select it" is discoverable.
-  The map credit reads `© OpenStreetMap contributors · HOT style`.
+  On phones the map itself carries **half-screen** and **full-screen** buttons:
+  half keeps the donor list under a usable map, full hands the pane to the map
+  (a donor bar at the bottom brings the list back). The map credit reads
+  `© OpenStreetMap contributors · HOT style`.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Availability is managed two
   ways: the manual **Directory availability** switch hides a donor on demand,
@@ -257,9 +260,12 @@ were bypassed.
   wide windows, and a segmented control does the same on narrow ones. The map
   is the same Digos template with a legend switch between the amber
   **open-request heat layer** and the **donor-density heatmap** the community
-  map uses. Tapping a barangay scopes the side panel to eligible donors,
-  pending registrations, open requests with responders, and donor applications
-  waiting for review. The city-wide queue puts requests **Awaiting
+  map uses. On phones the map offers three sizes — the default strip with the
+  queue below, a **half-screen** size that keeps the queue visible, and a
+  **full-screen** size for reading the layers — and the city cutout is clearly
+  darker than the page. Tapping a barangay scopes the side panel to eligible
+  donors, pending registrations, open requests with responders, and donor
+  applications waiting for review. The city-wide queue puts requests **Awaiting
   verification** first: staff open the details, confirm the document checklist
   and booked slot with **Verify and open** (blood-bank requests also attach the
   compatible unit holds), or **Reject** with a written reason. Staff mark

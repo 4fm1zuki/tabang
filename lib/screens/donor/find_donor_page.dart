@@ -914,6 +914,32 @@ class _FindDonorPageState extends State<FindDonorPage> {
                             : 'Hide donor list',
                       ),
                     ],
+                    // Phone sizing: half screen keeps the donor list under a
+                    // still-usable map, full screen hands the whole pane to
+                    // the map (the donor bar at the bottom brings the list
+                    // back). Desktop already has the side-by-side split.
+                    if (compact) ...[
+                      const SizedBox(height: 4),
+                      _mapButton(
+                        context,
+                        Icons.horizontal_split_outlined,
+                        () => setState(() => _donorsCollapsed = false),
+                        tooltip: 'Half-screen map · show donors',
+                        accent: !_donorsCollapsed,
+                        size: 30,
+                      ),
+                      const SizedBox(height: 4),
+                      _mapButton(
+                        context,
+                        _donorsCollapsed
+                            ? Icons.close_fullscreen
+                            : Icons.open_in_full,
+                        () => setState(() => _donorsCollapsed = true),
+                        tooltip: 'Full-screen map',
+                        accent: _donorsCollapsed,
+                        size: 30,
+                      ),
+                    ],
                   ],
                 ),
               ),
