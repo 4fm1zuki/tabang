@@ -471,10 +471,44 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
+  /// Tab label with its own count, so the queue size reads on the tab instead
+  /// of floating beside the heading where it looked like a Collapse badge.
+  Widget _tabLabel(String label, int count) {
+    // scaleDown: the equal-width segments can be narrower than the label at
+    // the panel's 330 px cap (and in tests, whose font is much wider), so the
+    // label shrinks instead of overflowing.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, softWrap: false),
+          const SizedBox(width: 6),
+          // A bare count, not a StatusPill: the pill's padding pushed
+          // "Registrations" past the edge of the 330 px side panel.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: context.surfaceAlt,
+              borderRadius: BorderRadius.circular(TabangRadius.pill),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: TabangColors.crimson,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPanel(BuildContext context, {required bool compact}) {
     final requests = _visibleRequests;
     final applications = _visibleApplications;
-    final count = _paneTab == 0 ? requests.length : applications.length;
     final heading = _paneTab == 0
         ? (_selected == null ? 'Open requests' : 'Requests in $_selected')
         : (_selected == null
@@ -509,7 +543,6 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  StatusPill('$count', tone: Tone.brand, dense: true),
                   if (_selected != null)
                     Tooltip(
                       message: 'Clear barangay filter',
@@ -561,14 +594,14 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 // Text-only segments, exactly like Find Donor: with icons the
                 // labels wrap in a 330 px side panel.
                 child: SegmentedButton<int>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: 0,
-                      label: Text('Requests', softWrap: false),
+                      label: _tabLabel('Requests', requests.length),
                     ),
                     ButtonSegment(
                       value: 1,
-                      label: Text('Registrations', softWrap: false),
+                      label: _tabLabel('Registrations', applications.length),
                     ),
                   ],
                   selected: {_paneTab},
@@ -641,10 +674,6 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   // -------------------------------------------------------------- card bodies
 
   Widget _requestCard(BuildContext context, BloodRequest request) {
-    final responders = _repo.responsesFor(request.id);
-    final selectedCount = responders
-        .where((r) => r.status == ResponseStatus.selected)
-        .length;
     return SurfaceCard(
       padding: const EdgeInsets.all(TabangSpace.md),
       child: Column(
@@ -692,39 +721,11 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             ),
           ),
           const SizedBox(height: 2),
+          // One glanceable line; hospital, units, responder counts and the
+          // requester all live behind Details so the card stays a queue row.
           Text(
-            '${request.hospital} · ${request.unitsNeeded} unit(s) · '
-            '$selectedCount selected · ${responders.length} response(s)',
+            '${request.hospital} · ${request.unitsNeeded} unit(s)',
             style: TextStyle(fontSize: 11, color: context.textMuted),
-          ),
-          const SizedBox(height: 2),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 4,
-            runSpacing: 2,
-            children: [
-              Text(
-                'Requested by',
-                style: TextStyle(fontSize: 11, color: context.textMuted),
-              ),
-              UserMention(
-                userId: request.requesterId,
-                style: TextStyle(fontSize: 11, color: context.textMuted),
-              ),
-              if (responders.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '· Responders:',
-                  style: TextStyle(fontSize: 11, color: context.textMuted),
-                ),
-                for (final response in responders)
-                  UserMention(
-                    userId: response.donorId,
-                    fallback: response.donorAlias,
-                    style: TextStyle(fontSize: 11, color: context.textMuted),
-                  ),
-              ],
-            ],
           ),
           const SizedBox(height: 6),
           Wrap(
@@ -817,6 +818,10 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   }
 
   void _showRequestDetails(BuildContext context, BloodRequest request) {
+    final responders = _repo.responsesFor(request.id);
+    final selectedCount = responders
+        .where((r) => r.status == ResponseStatus.selected)
+        .length;
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -836,9 +841,34 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 'Urgency: ${request.urgency.label} · ${request.urgency.detail}',
               ),
               Text('Status: ${request.status.label}'),
+              Text(
+                'Responses: $selectedCount selected · '
+                '${responders.length} response(s)',
+              ),
               Text('Hospital: ${request.hospital}'),
               Text('Barangay: ${request.barangay}'),
               Text('Source: ${request.source.label}'),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: [
+                    const Text('Requested by'),
+                    UserMention(userId: request.requesterId),
+                    if (responders.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      const Text('· Responders:'),
+                      for (final response in responders)
+                        UserMention(
+                          userId: response.donorId,
+                          fallback: response.donorAlias,
+                        ),
+                    ],
+                  ],
+                ),
+              ),
               if (request.scheduledFor != null)
                 Text('Booked slot: ${formatDateTime(request.scheduledFor!)}'),
               if (request.documents.isNotEmpty) ...[

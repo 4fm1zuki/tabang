@@ -694,16 +694,20 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                                 : DigosMapColors.lightTileFilter,
                           ),
                           child: TileLayer(
-                            // OSM France's "osmfr" style is plain OSM data
-                            // without hill shading or mountain-peak symbols,
-                            // which is what the old HOT tiles used to give.
-                            // HOT moved to a retired endpoint (404); the fr
-                            // host needs an a/b/c subdomain - the bare host
-                            // also 404s. CARTO's keyless style is unusable
-                            // here because its CDN now requires an API key.
+                            // OpenStreetMap France's Carto fork: plain OSM
+                            // data with no hill shading or mountain-peak
+                            // symbols, which is what the old HOT tiles used to
+                            // give before HOT retired that endpoint (404).
+                            // Served from the Bretagne (bzh) mirror rather
+                            // than {s}.tile.openstreetmap.fr/osmfr: the main
+                            // osmfr host answers 403 to a localhost Referer,
+                            // so the base map would be blank in a local web
+                            // build. CARTO's keyless style is unusable now
+                            // (its CDN returns "API KEY REQUIRED"), and the
+                            // standard OSM/ Esri styles draw terrain shading
+                            // over the Digos highlands.
                             urlTemplate:
-                                'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-                            subdomains: const ['a', 'b', 'c'],
+                                'https://tile.openstreetmap.bzh/br/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.digos.barangay_map',
                             maxNativeZoom: 19,
                             // The offset is re-evaluated inside the tile builder so

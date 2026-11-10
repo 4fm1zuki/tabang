@@ -23,7 +23,8 @@ Requirements:
 - Flutter **3.47.0 or newer** (tested with Flutter 3.47.5)
 - Dart **3.13.0 or newer** (tested with Dart 3.13.4)
 - No map key: the barangay geometry and all photography are bundled. The
-  OpenStreetMap raster base (the Humanitarian style, no mountain-peak symbols)
+  OpenStreetMap raster base (the OSM France Carto style, served from the
+  Bretagne mirror, which draws no mountain-peak symbols or hill shading)
   loads when a
   network is available, and the complete vector map still renders on the paper
   background without it
@@ -144,7 +145,9 @@ were bypassed.
   barangay, never outside the city outline.
   A **metric scale bar** shows distance; it picks the largest round distance
   that fits inside its cap and draws the line from the same metres-per-pixel
-  figure, with the label centred above the ruler. The bar follows the live
+  figure, with the label centred above the ruler. It is deliberately small and
+  pinned low in the bottom-right corner, so it stays a map convention rather
+  than competing with the chrome. The bar follows the live
   camera zoom — including the initial city fit and every pinch frame — instead
   of a cached zoom level, so the number and the pixels always agree. One
   fit-city control (corner-bracket
@@ -177,7 +180,8 @@ were bypassed.
   with **Show donor list**. The blood-type chip row carries a thin scroll
   indicator so the off-screen types are discoverable, and tapping a barangay
   selects it immediately (double-tap zoom is off so its gesture recognizer
-  cannot delay the tap). The map credit reads `© OpenStreetMap contributors`.
+  cannot delay the tap). The map credit reads `© OpenStreetMap contributors` and
+  sits on the very bottom edge under the scale bar, out of the way.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Availability is managed two
   ways: the manual **Directory availability** switch hides a donor on demand,
@@ -294,8 +298,9 @@ were bypassed.
   documents or not accepted. On phones and small tablets the staff console uses
   the same bottom-bar shell as the community app; the icon rail is desktop-only.
 - **Operations** — one destination for the operational work that used to be
-  split between Map and Inventory. A collapsible inner sidebar switches views on
-  wide windows, and a segmented control does the same on narrow ones. The map is
+  split between Map and Inventory. A single **Map / Inventory** segmented control
+  sits above the content at every width; there is no desktop-only inner sidebar.
+  The map is
   deliberately the **same surface as community Find Donor** — identical title
   card, blood-type chips, zoom/fit/style/layers stack and side-panel anatomy —
   with the amber **open-request heat layer** instead of donor density. The one
@@ -399,6 +404,7 @@ lib/
 │   └── image_credits.dart     # per-asset provenance registry
 ├── widgets/
 │   ├── common.dart            # shared UI kit, HelpTip, progress bars
+│   ├── filter_bar.dart        # shared search + even filter grid (Blood Bank, Inventory, Users)
 │   ├── photo.dart             # TabangPhoto + visible PhotoCredit
 │   ├── digos_vector_map.dart  # OSM base, heat fills, pins, labels, controls
 │   ├── blood_request_dialog.dart # stock-first request flow + document uploads
@@ -531,6 +537,12 @@ parks green instead of collapsing the raster to black — and the desktop style
 button can still hold a manual override for the visit. The zoom buttons,
 scale bar and collapsible donor pane are explicit controls rather than gestures.
 
+**One filter toolbar.** Blood Bank, Inventory and User management share
+`TabangFilterBar`, so their search box and dropdowns form the same layout: the
+search spans its own row, the filters divide the remaining width evenly in a
+165–220 px grid, and a **Clear** action appears once a filter is set. The old
+per-screen `Wrap` of fixed-width fields left ragged rows and stranded filters.
+
 ### Performance and reliability
 
 **No maps SDK, so no platform view.** The original build used
@@ -607,8 +619,9 @@ deployment, replace the embedded data with PSA or LGU boundary data.
 
 No mapping SDK and no API key are involved. Find Donor's geometry comes from
 `lib/core/digos_geodata.dart`, and the OpenStreetMap raster tiles used as the
-base layer (served in the Humanitarian style, which draws no peak symbols)
-need no key, account or referrer restriction; the required credit
+base layer (the OSM France Carto style, served from the Bretagne mirror, which
+draws no peak symbols or hill shading)
+need no key or account; the required credit
 (`© OpenStreetMap contributors`) is drawn on the map. For a fully offline
 deployment the tile layer can be switched
 off with one flag (`DigosVectorMap.tilesEnabled`), which leaves the complete
@@ -770,7 +783,8 @@ flutter test
   action, the staff Operations map reuses the community map chrome (title card,
   blood-type chips, request legend and the same side-panel anatomy) and filters
   its request list from those chips, the Operations workspace moves
-  between its Map and Inventory views and collapses its inner sidebar, staff
+  between its Map and Inventory views through the top segmented control with no
+  desktop inner sidebar, staff
   chat starts a new conversation from search, a user record opens its
   staff-only details and donation-window editor, the readiness score states its
   100% maximum with per-bar targets and a **Details** dialog, an admin can open

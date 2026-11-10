@@ -90,7 +90,7 @@ class TabangFilterBar extends StatelessWidget {
                 children: [
                   if (search != null) Expanded(child: search!),
                   if (search != null && trailing != null)
-                    SizedBox(width: TabangSpace.sm),
+                    const SizedBox(width: TabangSpace.sm),
                   if (trailing != null) trailing!,
                 ],
               ),

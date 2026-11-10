@@ -92,11 +92,20 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PageHeader(
-            title: 'Settings',
-            subtitle:
-                'Appearance, notifications, privacy and account controls.',
-            actions: [
+          // The help button is a single compact control, so it rides on the
+          // title row at every width instead of dropping under the title on a
+          // phone the way a full action row would.
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: PageHeader(
+                  title: 'Settings',
+                  subtitle:
+                      'Appearance, notifications, privacy and account controls.',
+                ),
+              ),
+              SizedBox(width: TabangSpace.sm),
               HelpTip(
                 title: 'About these settings',
                 message:
