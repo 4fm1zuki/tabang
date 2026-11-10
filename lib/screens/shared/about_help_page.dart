@@ -376,11 +376,16 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PageHeader(
-            title: 'Guides & Help',
-            subtitle:
-                'Task walkthroughs, quick answers and the story behind TABANG.',
-            actions: [
+          // The help "?" sits beside the title on every width; the generic
+          // PageHeader stacks actions under the title on phones.
+          const Row(
+            children: [
+              Expanded(
+                child: PageHeader(
+                  title: 'Guides & Help',
+                  subtitle: 'Task walkthroughs, quick answers and the story behind TABANG.',
+                ),
+              ),
               HelpTip(
                 title: 'How to use this page',
                 message:

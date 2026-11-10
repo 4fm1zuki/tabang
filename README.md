@@ -150,9 +150,9 @@ were bypassed.
   fit-city control (corner-bracket
   icon) re-frames the whole city in the pane; `+`/`−` step the zoom within
   10.5–18; the map style follows the app theme, with a desktop-only toggle that
-  overrides it for the visit. A **Live** pill and an unread badge flag new
-  activity, and a donor already coordinating an active request stays visible
-  with a **coordinating** badge rather than disappearing from the map. The map
+  overrides it for the visit. A donor already coordinating an active request
+  stays visible with a **coordinating** badge rather than disappearing from the
+  map. The map
   opens framed to the whole city
   instead of falling back to street level. Map panels fade while the map is
   being touched and return when the gesture ends; a layers button hides them for
@@ -166,12 +166,18 @@ were bypassed.
   a donor card moves the map to the barangay that donor is from (not just a
   highlight). Over the map the cursor switches to a pointing hand whenever a
   barangay is under the mouse, so "click a region to select it" is discoverable.
-  The map is a simple on/off switch: **Hide map** in the donor list header
-  leaves the directory full-page with a **Show map** button above it, and that
-  button restores exactly the default half split. The donor pane's own collapse
-  arrow switches to **Map only** independently, where a **Show donor list**
-  chevron in the map stack brings the list back. The map credit reads
-  `© OpenStreetMap contributors`.
+  The map is a simple on/off switch in the panel header: **Expand** (arrow up)
+  leaves the directory full-page and swaps to **Collapse** (arrow down), which
+  restores exactly the default half split. Both switches animate the map height
+  (phone) or the panel width (wide) over 280 ms instead of swapping layouts, so
+  the map resizes rather than snapping. The switch stays on every tab,
+  including **Facilities** and **Drives**. The donor pane's own collapse arrow
+  switches to **Map only** independently, where a compact restore bar at the
+  bottom of the map names the hidden list, shows its count and brings it back
+  with **Show donor list**. The blood-type chip row carries a thin scroll
+  indicator so the off-screen types are discoverable, and tapping a barangay
+  selects it immediately (double-tap zoom is off so its gesture recognizer
+  cannot delay the tap). The map credit reads `© OpenStreetMap contributors`.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Availability is managed two
   ways: the manual **Directory availability** switch hides a donor on demand,
@@ -221,7 +227,12 @@ were bypassed.
   participant has read, block/unblock with a 48-hour re-block cooldown,
   persisted reports to staff with a required reason and an optional free-text
   explanation, and the **chapter support thread** created by the Help page's
-  feedback form. Unread counters mark new chat activity in the rail, bottom bar
+  feedback form. Staff and admins also get a **Staff room** group conversation:
+  members appear as their own account with a **Staff**/**Admin** role label,
+  never as the Red Cross, and each member has their own read marker. Direct
+  staff-to-staff threads use personal aliases; when a staff member contacts a
+  community user the composer defaults to the **PRC chapter identity** with a
+  switch to send as their own account instead. Unread counters mark new chat activity in the rail, bottom bar
   and Find Donor; opening a thread clears it immediately. The chapter thread is an organization identity, not
   a person: it shows the Philippine Red Cross — Davao del Sur Chapter name, a
   blue verified tick and an info card, and it never exposes a staff member's
@@ -284,22 +295,18 @@ were bypassed.
   the same bottom-bar shell as the community app; the icon rail is desktop-only.
 - **Operations** — one destination for the operational work that used to be
   split between Map and Inventory. A collapsible inner sidebar switches views on
-  wide windows, and a segmented control does the same on narrow ones. The map
-  is the same Digos template with a legend switch between the amber
-  **open-request heat layer** and the **donor-density heatmap** the community
-  map uses. On phones a compact **map size** dropdown replaces the old
-  half/full-screen toggle pair and offers *Strip + list*, *Half map*, *Full map*
-  and *List only*; a **Pull up to hide the map** handle sits directly under the
-  map and leaves the queue alone, with **Show map** restoring it. The city
-  cutout is clearly darker than the page. Tapping a barangay scopes the side
-  panel to eligible donors, pending registrations, open requests with
-  responders, and donor applications waiting for review. The city-wide queue
-  puts requests **Awaiting verification** first: staff open the details, inspect
-  the uploaded request documents, confirm the booked slot with **Verify and
-  open** (blood-bank requests also attach the compatible unit holds), or
-  **Reject** with a written reason. Staff mark requests fulfilled and jump to
-  user management, but they do not select donors — that stays with the
-  requester.
+  wide windows, and a segmented control does the same on narrow ones. The map is
+  deliberately the **same surface as community Find Donor** — identical title
+  card, blood-type chips, zoom/fit/style/layers stack and side-panel anatomy —
+  with the amber **open-request heat layer** instead of donor density. The one
+  map switch is **Expand** / **Collapse**, and the panel chevron collapses to
+  map-only exactly like the donor list. The panel tabs hold **Requests** and
+  **Registrations**; tapping a barangay scopes both lists. Requests put
+  **Awaiting verification** first: staff open the details, inspect the uploaded
+  request documents, confirm the booked slot with **Verify and open**
+  (blood-bank requests also attach the compatible unit holds), or **Reject**
+  with a written reason. Staff mark requests fulfilled and jump to user
+  management, but they do not select donors — that stays with the requester.
 - **Inventory** — the second Operations view. Units are a compact list with a
   **Details** button and a status-menu; the full record opens with the barcode
   graphic, the holder's name (staff-only information) and a **Remove unit**
@@ -462,7 +469,8 @@ unpinning, and the classic side-by-side splits. On phones the bottom bar slides
 down out of the way while the page scrolls toward its end and returns on any
 scroll up or tab change, and it pins itself at the top or the bottom of the page
 so navigation is never stranded at the end of a list; when the destinations do
-not fit, the bar scrolls horizontally instead of overflowing. Either phone
+not fit, the bar scrolls horizontally instead of overflowing and shows a thin
+scroll indicator along its top edge. Either phone
 header also carries a **pin** button that keeps the bar visible through long
 swipes until it is unpinned. Settings adds a **slim navigation rails** switch,
 **off by default** (turning it on drops bottom-bar labels and keeps the side
@@ -554,8 +562,9 @@ density, and adds no download weight. `EmptyState` uses it wherever a full
 illustration helps; dense admin tables keep the compact icon variant. Photos are
 used only where they add context: the login brand panel, the Home hero,
 article and drive cards, their dialogs, and the identity headers. Every one is
-credited individually; the 48 profile portraits and seven educational
-illustrations are original TABANG artwork.
+credited individually; the 48 profile portraits are original TABANG artwork.
+Educational vector graphics are no longer bundled — article cards use real
+photographs instead.
 
 ---
 
@@ -621,10 +630,10 @@ off and there is no third-party image host to configure or pay for.
 | Hydration and nutrition articles | `content_hydration.jpg`, `content_nutrition.jpg` |
 | Recovery, screening and drive articles | `content_recovery.jpg`, `content_screening.jpg`, `content_drive.jpg` |
 | Privacy, tattoo and donation-day articles | `content_privacy.jpg`, `content_tattoo.jpg`, `content_donation_day.jpg` |
+| Community article | `content_community.jpg` |
 | Recovery article (aftercare) | `content_aftercare.jpg` |
 | Recipient story | `content_story.jpg` |
 | Donor spotlight and drive cards | `drive_community.jpg`, `content_drive.jpg` |
-| Educational illustrations (still used where vector art reads better) | `assets/images/educational/edu_*.png` (7 originals) |
 | Profile portraits | `assets/images/avatars/avatar_001.png` … `avatar_048.png` |
 | App icon / PWA icons | `assets/branding/app_icon.png` |
 | Chapter emblem | `assets/branding/prc_logo.png` (Philippine Red Cross; public domain/PD-ineligible, symbol use regulated by the Geneva Conventions) |
@@ -650,8 +659,7 @@ launcher icons with:
 python tools/make_media_assets.py
 ```
 
-Profile portraits and educational art are regenerated with
-`tools/make_avatars.py` and `tools/make_edu_art.py`. The photographs are illustrative:
+Profile portraits are regenerated with `tools/make_avatars.py`. The photographs are illustrative:
 they do not depict TABANG users or patients, and the people shown have no
 connection to the simulated records.
 
@@ -663,7 +671,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**149 tests** cover:
+**153 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -706,6 +714,11 @@ flutter test
 - **Tab activity dots** — unseen request, inventory, verification and
   moderation activity lights the matching shell destination until the tab is
   visited, and a new event lights it again.
+- **Staff communications** — the staff room contains exactly the staff/admin
+  accounts and is invisible to community users; staff-to-staff posts keep the
+  personal alias, staff can address a community user as the chapter or as
+  themselves (the personal option clears the chapter flag), and reading the
+  staff room clears the badge only for that member.
 - **Privacy and safety** — bilateral reveal accept/decline, persisted reports
   with a trimmed free-text explanation, per-participant unread/read markers,
   symmetric blocking, and the 48-hour re-block cooldown.
@@ -754,8 +767,9 @@ flutter test
   the wide desktop layout including the fit-city button, shrinks the phone
   control stack, and selects a barangay on tap. The Donor Hub additionally
   renders the automatic-away notice and clears it through the **I'm active**
-  action, the staff Operations map renders its request layer and switches to
-  the donor-density heatmap from the legend, the Operations workspace moves
+  action, the staff Operations map reuses the community map chrome (title card,
+  blood-type chips, request legend and the same side-panel anatomy) and filters
+  its request list from those chips, the Operations workspace moves
   between its Map and Inventory views and collapses its inner sidebar, staff
   chat starts a new conversation from search, a user record opens its
   staff-only details and donation-window editor, the readiness score states its
@@ -767,10 +781,9 @@ flutter test
   bundled Red Cross emblem, Settings switches mirror their values immediately
   (enabling slim rails unpins the sidebar), and the sidebar pin reopens the
   full rail from slim mode.
-  Inventory exposes Add unit plus the booked-slot queue; the phone Find Donor
-  map hides and restores with one switch while its donor list collapses
-  independently, the Operations map picks strip, half, full and list-only from
-  its size menu and hides with the pull-up/**Show map** controls, the metric
+  Inventory exposes Add unit plus the booked-slot queue; both Find Donor and the
+  staff Operations map hide and restore with one **Expand**/**Collapse** switch
+  while their side list collapses independently, the metric
   scale bar keeps its label and line length consistent and follows the live
   camera, and the bottom-bar pin keeps the bar visible through a long swipe.
 - **Narrow-screen layout** — Home, Blood Bank (including unit selection and the

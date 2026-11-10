@@ -170,6 +170,10 @@ class TabangRepository {
   List<ContentItem> get content => List.unmodifiable(_content);
 
   AppUser? userById(String id) {
+    // The chapter is a standalone organization account, deliberately not one
+    // of the staff members' personal accounts; it is not part of [_users] so
+    // it can never leak into staff lists or the staff room.
+    if (id == chapterAccountId) return chapterAccount;
     for (final u in _users) {
       if (u.id == id) return u;
     }
@@ -357,9 +361,8 @@ class TabangRepository {
     return null;
   }
 
-  List<ChatThread> threadsFor(String userId) => _threads
-      .where((t) => t.participantAId == userId || t.participantBId == userId)
-      .toList(growable: false);
+  List<ChatThread> threadsFor(String userId) =>
+      _threads.where((t) => t.includes(userId)).toList(growable: false);
 
   ChatThread? threadBetween(String a, String b) {
     for (final t in _threads) {
@@ -1579,6 +1582,9 @@ class TabangRepository {
             sentAt: sentAt,
             flag: classified.flag,
             flagReason: classified.reason,
+            // A welcome opened from the chapter account is an official
+            // notice, even though the staff member's account carries the id.
+            sentAsChapter: initiatorId == chapterAccountId,
           ),
         ],
       );
@@ -1589,9 +1595,10 @@ class TabangRepository {
   }
 
   /// Official chapter account that receives support messages and donor
-  /// registrations. Its display identity is [chapterName], never the staff
-  /// member's alias.
-  static const String chapterAccountId = 'USR-010';
+  /// registrations. Its display identity is [chapterName], never a staff
+  /// member's alias, and it is separate from every personal staff account so
+  /// staff can also message each other as themselves.
+  static const String chapterAccountId = 'USR-CHAPTER';
 
   /// Backwards-compatible alias used by older call sites.
   static const String staffAccountId = chapterAccountId;
@@ -1599,18 +1606,43 @@ class TabangRepository {
   /// Official organization name shown on every chapter thread and profile.
   static const String chapterName =
       'Philippine Red Cross — Davao del Sur Chapter';
+
+  /// The organization account behind [chapterAccountId]. It is resolved by
+  /// [userById] without being part of the user list.
+  static final AppUser chapterAccount = AppUser(
+    id: chapterAccountId,
+    fullName: chapterName,
+    alias: chapterName,
+    email: 'bloodservices@tabang.app',
+    phone: '+63 82 000 0000',
+    barangay: 'Zone 1',
+    role: UserRole.staff,
+    registeredOn: DateTime(2020, 1, 1),
+    status: AccountStatus.verified,
+  );
   static const String chapterSubtitle =
       'Official chapter account · Quezon Avenue, Digos City';
 
   bool isChapterAccount(String? userId) => userId == chapterAccountId;
 
   bool isChapterThread(ChatThread thread) =>
-      thread.participantAId == chapterAccountId ||
-      thread.participantBId == chapterAccountId;
+      !thread.isGroup &&
+      (thread.participantAId == chapterAccountId ||
+          thread.participantBId == chapterAccountId);
+
+  /// Internal room for chapter staff and admins.
+  ///
+  /// Everyone posts as their own account with a Staff/Admin role; the room is
+  /// never listed for community users and carries no Red Cross branding.
+  static const String staffRoomId = 'STAFF-ROOM';
+
+  ChatThread? get staffRoom =>
+      _firstOrNull(_threads, (thread) => thread.id == staffRoomId);
 
   /// The name a chat list or header should show for [thread]. The chapter is
   /// always branded as the organization, not as the staff member's alias.
   String displayNameFor(ChatThread thread, String? selfId) {
+    if (thread.isGroup) return thread.groupName ?? 'Group';
     if (isChapterThread(thread)) return chapterName;
     final otherId = thread.participantAId == selfId
         ? thread.participantBId
@@ -1638,7 +1670,7 @@ class TabangRepository {
   void postChapterNotice(String userId, String text) {
     final thread = ensureChapterThread(userId);
     if (thread == null) return;
-    sendMessage(thread.id, chapterAccountId, text);
+    sendMessage(thread.id, chapterAccountId, text, asChapter: true);
   }
 
   /// Send a system question, data correction or feedback to the chapter.
@@ -1664,6 +1696,7 @@ class TabangRepository {
       'Thanks — your ${category.toLowerCase()} was received. Chapter staff '
       'review messages during office hours (Mon–Sat, 8:00 AM – 5:00 PM) and '
       'will reply in this thread.',
+      asChapter: true,
     );
     return threadBetween(userId, chapterAccountId);
   }
@@ -1682,7 +1715,18 @@ class TabangRepository {
     return fromA && fromB;
   }
 
-  void sendMessage(String threadId, String senderId, String text) {
+  /// Posts [text] into [threadId].
+  ///
+  /// [asChapter] lets a staff or admin sender post as the official chapter
+  /// identity in a one-to-one thread, so they can contact a community user
+  /// without exposing their personal alias. It is ignored in group rooms and
+  /// in the chapter thread itself (which is always the chapter).
+  void sendMessage(
+    String threadId,
+    String senderId,
+    String text, {
+    bool asChapter = false,
+  }) {
     final index = _threads.indexWhere((t) => t.id == threadId);
     if (index == -1) return;
     final thread = _threads[index];
@@ -1690,38 +1734,47 @@ class TabangRepository {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
 
-    final isParticipant =
-        thread.participantAId == senderId || thread.participantBId == senderId;
-    if (!isParticipant) return;
+    if (!thread.includes(senderId)) return;
 
-    final otherId = thread.participantAId == senderId
-        ? thread.participantBId
-        : thread.participantAId;
-    if (isBlockedBetween(senderId, otherId)) return;
+    if (!thread.isGroup) {
+      final otherId = thread.participantAId == senderId
+          ? thread.participantBId
+          : thread.participantAId;
+      if (isBlockedBetween(senderId, otherId)) return;
+    }
 
     final sender = userById(senderId);
+    final sendAsChapter =
+        asChapter && !thread.isGroup && (sender?.role.isAdminSide ?? false);
     final sentAt = DateTime.now();
     final classified = classifyMessage(trimmed);
     final message = ChatMessage(
       id: 'MSG-${DateTime.now().microsecondsSinceEpoch}',
-      senderId: senderId,
-      senderAlias: sender?.alias ?? 'Unknown',
+      senderId: sendAsChapter ? chapterAccountId : senderId,
+      senderAlias: sendAsChapter ? chapterName : (sender?.alias ?? 'Unknown'),
       text: trimmed,
       sentAt: sentAt,
       flag: classified.flag,
       flagReason: classified.reason,
+      sentAsChapter: sendAsChapter,
     );
 
-    _threads[index] = thread.copyWith(
-      messages: [...thread.messages, message],
-      // Sending a message implies you have seen the thread up to that point.
-      participantAReadAt: thread.participantAId == senderId
-          ? sentAt
-          : thread.participantAReadAt,
-      participantBReadAt: thread.participantBId == senderId
-          ? sentAt
-          : thread.participantBReadAt,
-    );
+    _threads[index] = thread.isGroup
+        ? thread.copyWith(
+            messages: [...thread.messages, message],
+            memberReadAt: {...thread.memberReadAt, senderId: sentAt},
+          )
+        : thread.copyWith(
+            messages: [...thread.messages, message],
+            // Sending a message implies you have seen the thread up to that
+            // point.
+            participantAReadAt: thread.participantAId == senderId
+                ? sentAt
+                : thread.participantAReadAt,
+            participantBReadAt: thread.participantBId == senderId
+                ? sentAt
+                : thread.participantBReadAt,
+          );
     markActive(senderId);
     _notify();
   }
@@ -1737,14 +1790,16 @@ class TabangRepository {
       return false;
     }
     final now = DateTime.now();
-    _threads[index] = thread.copyWith(
-      participantAReadAt: thread.participantAId == userId
-          ? now
-          : thread.participantAReadAt,
-      participantBReadAt: thread.participantBId == userId
-          ? now
-          : thread.participantBReadAt,
-    );
+    _threads[index] = thread.isGroup
+        ? thread.copyWith(memberReadAt: {...thread.memberReadAt, userId: now})
+        : thread.copyWith(
+            participantAReadAt: thread.participantAId == userId
+                ? now
+                : thread.participantAReadAt,
+            participantBReadAt: thread.participantBId == userId
+                ? now
+                : thread.participantBReadAt,
+          );
     _notify();
     return true;
   }
@@ -3510,6 +3565,49 @@ class TabangRepository {
       ),
     ]);
 
+    // ---- staff room ----------------------------------------------------
+    // Internal channel for staff and admins only. Messages carry each
+    // member's own alias, and the UI labels the role (Staff/Admin) instead of
+    // dressing the conversation as the Red Cross.
+    final staffMembers = _users
+        .where((user) => user.role.isAdminSide)
+        .map((user) => user.id)
+        .toList(growable: false);
+    if (staffMembers.isNotEmpty) {
+      _threads.insert(
+        0,
+        ChatThread(
+          id: staffRoomId,
+          participantAId: 'staff-room',
+          participantAAlias: 'Staff room',
+          participantBId: 'staff-room',
+          participantBAlias: 'Staff room',
+          groupName: 'Staff room',
+          memberIds: staffMembers,
+          messages: [
+            ChatMessage(
+              id: 'MSG-STF-001',
+              senderId: 'USR-010',
+              senderAlias: 'Staff Marco',
+              text:
+                  'Staff room — use this for shift swaps, verification '
+                  'hand-offs and anything the community thread should not see.',
+              sentAt: now.subtract(const Duration(hours: 6)),
+            ),
+            ChatMessage(
+              id: 'MSG-STF-002',
+              senderId: 'USR-011',
+              senderAlias: 'Admin',
+              text:
+                  'Noted. Keep request verification and slot confirmation '
+                  'before 5 PM so donors have time to confirm.',
+              sentAt: now.subtract(const Duration(hours: 5, minutes: 20)),
+            ),
+          ],
+        ),
+      );
+    }
+
     // ---- drives --------------------------------------------------------
     // Venue coordinates are the real OpenStreetMap points for each site.
     // DigosVectorMap.toMapFrame rebases them into the hand-traced map frame
@@ -3723,7 +3821,7 @@ class TabangRepository {
             'Regular donors make planned care possible.',
         tag: 'WHY DONATE',
         category: ContentCategory.explore,
-        imageAsset: 'assets/images/educational/edu_benefits.png',
+        imageAsset: 'assets/images/content_community.jpg',
       ),
       ContentItem(
         id: 'CNT-013',

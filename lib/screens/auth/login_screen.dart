@@ -361,7 +361,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'SIMULATED DATA — DEMO ACCOUNTS',
+                  'DEMO ACCOUNTS',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,

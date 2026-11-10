@@ -73,7 +73,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('SIMULATED DATA — DEMO ACCOUNTS'), findsOneWidget);
+    expect(find.text('DEMO ACCOUNTS'), findsOneWidget);
 
     await tester.ensureVisible(find.text('juan.delacruz@tabang.app'));
     await tester.pumpAndSettle();
@@ -171,9 +171,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    // The single map switch: Hide map swaps for Show map above the list, and
-    // only one of the two ever exists.
+    // The blood-type row is wider than a phone; a visible scrollbar is the
+    // only cue that more chips sit off-screen.
+    expect(find.byKey(const ValueKey('mapChipScrollbar')), findsOneWidget);
+
+    // The map switch belongs to the panel header, not the Donors tab: it must
+    // stay available on Facilities and Drives too.
     final hideMap = find.byKey(const ValueKey('hideDonorMapButton'));
+    final donationTabs = find.byType(SegmentedButton<int>);
+    await tester.tap(
+      find.descendant(of: donationTabs, matching: find.text('Facilities')),
+    );
+    await tester.pumpAndSettle();
+    expect(hideMap, findsOneWidget);
+    await tester.tap(
+      find.descendant(of: donationTabs, matching: find.text('Drives')),
+    );
+    await tester.pumpAndSettle();
+    expect(hideMap, findsOneWidget);
+    await tester.tap(
+      find.descendant(of: donationTabs, matching: find.text('Donors')),
+    );
+    await tester.pumpAndSettle();
+
+    // The single map switch: Hide map swaps for Show map in the list header,
+    // and only one of the two ever exists.
     await tester.ensureVisible(hideMap);
     await tester.pumpAndSettle();
     await tester.tap(hideMap);
@@ -318,6 +340,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('staff phone bar scrolls with a visible indicator', (
+    tester,
+  ) async {
+    await usePhone(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: AdminShell(
+          user: repo.userById('USR-011')!,
+          themeMode: ThemeMode.light,
+          onThemeModeChanged: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Five 84 px slots need more than a 360 px screen, so the staff bar
+    // scrolls and shows the same top-edge indicator as the donor bar.
+    expect(
+      find.byKey(const ValueKey('adminPhoneNavScrollbar')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('slim rails setting hides the bottom-bar labels', (tester) async {
     await usePhone(tester);
     await tester.pumpWidget(
@@ -411,6 +458,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      // The six destinations need more than 360 px, so the bar scrolls and
+      // carries a scrollbar at its top edge.
+      expect(
+        find.byKey(const ValueKey('donorPhoneNavScrollbar')),
+        findsOneWidget,
+      );
 
       double barHeight() => tester
           .getSize(find.byKey(const ValueKey('phoneNavigationBar')))

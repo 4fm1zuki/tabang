@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/digos_map_pane.dart';
 import '../../widgets/digos_vector_map.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/layout.dart';
@@ -82,58 +82,19 @@ class _FindDonorPageState extends State<FindDonorPage> {
   bool _mapDark = false;
   bool? _mapDarkOverride;
 
-  /// Overlay visibility. Panels fade while the map is being touched and can be
-  /// hidden entirely with the layers button, so the map can be read without
-  /// chrome in the way.
-  bool _overlaysHidden = false;
-
-  /// Gesture state lives in a notifier, not page state: rebuilding the page on
-  /// every pan frame also rebuilt the map itself, which is what made the fade
-  /// stutter.
-  final ValueNotifier<bool> _interactingNotifier = ValueNotifier<bool>(false);
-  Timer? _interactionTimer;
-
   /// Donor pane tab: 0 donors, 1 facilities, 2 drives.
   int _paneTab = 0;
-
-  static const Duration _fadeDuration = Duration(milliseconds: 380);
-
-  double _opacityFor(bool interacting, {required bool control}) {
-    if (_overlaysHidden) return 0;
-    return interacting ? (control ? 0.7 : 0.15) : 1;
-  }
-
-  void _startMapInteraction() {
-    _interactionTimer?.cancel();
-    _interactingNotifier.value = true;
-  }
-
-  /// Panels return almost immediately after the gesture ends — the old
-  /// three-second timer made the map feel stuck in focus mode.
-  void _endMapInteraction() {
-    _interactionTimer?.cancel();
-    _interactionTimer = Timer(const Duration(milliseconds: 350), () {
-      if (mounted) _interactingNotifier.value = false;
-    });
-  }
-
-  void _notifyMapInteraction() {
-    _startMapInteraction();
-    _endMapInteraction();
-  }
 
   void _focusFacility(DigosFacilityPin pin) {
     // The pin is drawn in the map frame, so the camera must target the same
     // rebased point or "show on map" would centre half a kilometre away.
     _mapController.move(DigosVectorMap.toMapFrame(pin.point), 15);
-    _notifyMapInteraction();
   }
 
   void _focusBarangay(String canonical) {
     final point = DigosVectorMap.centroidOf(canonical);
     if (point == null) return;
     _mapController.move(point, 13.5);
-    _notifyMapInteraction();
   }
 
   /// Tapping a donor card takes the map to the barangay that donor is from,
@@ -163,8 +124,6 @@ class _FindDonorPageState extends State<FindDonorPage> {
   @override
   void dispose() {
     _repo.removeListener(_refresh);
-    _interactionTimer?.cancel();
-    _interactingNotifier.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -482,23 +441,6 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
-  /// Zoom by whole steps around the current camera centre.
-  void _zoomBy(double delta) {
-    final camera = _mapController.camera;
-    // Same limits as the map widget: 10.5 frames the whole city and 18 is as
-    // far as the OSM base has detail worth showing.
-    _mapController.move(camera.center, (camera.zoom + delta).clamp(10.5, 18));
-  }
-
-  /// The map is always north-up and cannot rotate, so the compass control
-  /// re-frames the whole city rather than re-centring an arbitrary zoom.
-  void _resetNorth() {
-    DigosVectorMap.fitCity(_mapController);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fitted to the city · all 26 barangays')),
-    );
-  }
-
   Map<String, int> get _driveCounts {
     final counts = <String, int>{};
     for (final drive in _repo.drives) {
@@ -530,6 +472,17 @@ class _FindDonorPageState extends State<FindDonorPage> {
     return markers;
   }
 
+  /// One duration for every map/list transition, so the map switch, the list
+  /// chevron and the bottom restore bar all move at the same pace.
+  static const Duration _paneAnimation = Duration(milliseconds: 280);
+
+  /// A panel that is animating away is laid out at least this tall and then
+  /// clipped; reflowing it below its own header would overflow on every frame.
+  static const double _minPaneLayoutHeight = 200;
+
+  /// Width of the donor directory on a wide window.
+  static const double _widePanelWidth = 330;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -538,459 +491,211 @@ class _FindDonorPageState extends State<FindDonorPage> {
         // enough room for a 430 px map plus the 330 px donor pane, and keeping
         // them side by side is what makes desktop labels readable.
         final narrow = constraints.maxWidth < 760;
-        final width = constraints.maxWidth;
-        final height = constraints.maxHeight;
-
-        if (narrow) {
-          switch (_mapMode) {
-            case _DonorMapMode.mapOnly:
-              return SizedBox(
-                width: width,
-                height: height,
-                child: _buildMapPane(context, compact: true),
-              );
-            case _DonorMapMode.hidden:
-              return _buildDonorOnlyPane(context, compact: true);
-            case _DonorMapMode.half:
-              return _stackedMap(
+        return narrow
+            ? _buildNarrowLayout(
                 context,
-                width: width,
-                mapHeight: math.max(220.0, height * 0.52),
-              );
-          }
-        }
-
-        return switch (_mapMode) {
-          _DonorMapMode.mapOnly => _buildMapPane(context, compact: false),
-          _DonorMapMode.hidden => _buildDonorOnlyPane(context, compact: false),
-          // One visible arrangement on a wide window: map and directory side
-          // by side.
-          _DonorMapMode.half => Row(
-            children: [
-              Expanded(child: _buildMapPane(context, compact: false)),
-              Container(
-                width: 330,
-                decoration: BoxDecoration(
-                  color: context.surface,
-                  border: Border(left: BorderSide(color: context.border)),
-                ),
-                child: _buildDonorPane(context, compact: false),
-              ),
-            ],
-          ),
-        };
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+              )
+            : _buildWideLayout(context);
       },
     );
   }
 
-  /// The stacked phone arrangement: map above the directory.
-  Widget _stackedMap(
+  /// Phone arrangement with a real height animation: the map grows or shrinks
+  /// between full, half and hidden while the directory takes the remainder.
+  Widget _buildNarrowLayout(
     BuildContext context, {
     required double width,
-    required double mapHeight,
+    required double height,
   }) {
-    return Column(
-      children: [
-        SizedBox(
-          height: mapHeight,
-          width: width,
-          child: _buildMapPane(context, compact: true),
-        ),
-        Divider(height: 1, color: context.border),
-        Expanded(child: _buildDonorPane(context, compact: true)),
-      ],
-    );
-  }
-
-  /// The directory with no map above it. The restore control stays outside the
-  /// scroll view so it cannot be lost after the map has been hidden.
-  Widget _buildDonorOnlyPane(BuildContext context, {required bool compact}) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            TabangSpace.lg,
-            TabangSpace.md,
-            TabangSpace.lg,
-            0,
-          ),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const ValueKey('showDonorMapButton'),
-              // The switch is symmetrical: Show map brings back the default
-              // half split, not a special short-strip arrangement.
-              onPressed: () => setState(() => _mapMode = _DonorMapMode.half),
-              icon: const Icon(Icons.map_outlined, size: 16),
-              label: const Text('Show map'),
-            ),
-          ),
-        ),
-        Expanded(child: _buildDonorPane(context, compact: compact)),
-      ],
-    );
-  }
-
-  /// One switch button for map visibility, sitting where the old size menu
-  /// was in the donor list header. The hidden state reuses the **Show map**
-  /// button rendered above the list.
-  Widget _hideMapButton(BuildContext context) {
-    return OutlinedButton.icon(
-      key: const ValueKey('hideDonorMapButton'),
-      onPressed: () => setState(() => _mapMode = _DonorMapMode.hidden),
-      icon: const Icon(Icons.visibility_off_outlined, size: 15),
-      label: const Text('Hide map'),
-      style: OutlinedButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        textStyle: const TextStyle(fontSize: 12),
-      ),
-    );
-  }
-
-  Widget _buildMapPane(BuildContext context, {required bool compact}) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Stack(
-          clipBehavior: Clip.hardEdge,
+    final mapTarget = switch (_mapMode) {
+      _DonorMapMode.hidden => 0.0,
+      _DonorMapMode.half => math.max(220.0, height * 0.52),
+      _DonorMapMode.mapOnly => height,
+    };
+    return TweenAnimationBuilder<double>(
+      // begin == end on the first build, so the page opens at the half split
+      // without animating from zero. Later target changes animate from the
+      // current height.
+      tween: Tween<double>(begin: mapTarget, end: mapTarget),
+      duration: _paneAnimation,
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedHeight, _) {
+        final mapHeight = animatedHeight.clamp(0.0, height);
+        final listHeight = math.max(0.0, height - mapHeight);
+        final layoutHeight = math.max(listHeight, _minPaneLayoutHeight);
+        return Column(
           children: [
-            // The Digos vector map (OSM tiles behind an inverse city mask,
-            // with all TABANG layers drawn locally).
-            Positioned.fill(
-              child: RepaintBoundary(
-                child: DigosVectorMap(
-                  controller: _mapController,
-                  donorCounts: _donorCounts,
-                  drives: _driveMarkers,
-                  selectedBarangay: _selectedBarangay,
-                  mapDark: _mapDark,
-                  onSelectBarangay: (name) =>
-                      setState(() => _selectedBarangay = name),
-                  onDriveTap: _showDriveSheet,
-                  onFacilityTap: _showFacilitySheet,
-                  onInteractionStart: _startMapInteraction,
-                  onInteractionEnd: _endMapInteraction,
-                ),
-              ),
+            SizedBox(
+              width: width,
+              height: mapHeight,
+              // A map laid out at a sub-pixel height has no camera to fit;
+              // the last sliver is invisible anyway.
+              child: mapHeight < 1
+                  ? const SizedBox.shrink()
+                  : _buildMapPane(context, compact: true),
             ),
-
-            // Title + blood type filter.
-            //
-            // `left` AND `right` must both be set: a Positioned with only one
-            // horizontal edge gives its child unbounded width, and a
-            // horizontal ListView with unbounded width fails layout, which
-            // takes the whole page's render tree down with it.
-            Positioned(
-              top: TabangSpace.md,
-              left: TabangSpace.md,
-              right: TabangSpace.md,
-              child: IgnorePointer(
-                ignoring: _overlaysHidden,
-                child: ValueListenableBuilder<bool>(
-                  valueListenable: _interactingNotifier,
-                  builder: (context, interacting, child) => AnimatedOpacity(
-                    opacity: _opacityFor(interacting, control: false),
-                    duration: _fadeDuration,
-                    curve: Curves.easeInOut,
-                    child: child,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Just the name of the map, and only when there is room for
-                      // it. The old card also carried an eyebrow, a one-line
-                      // explanation and a "2D VECTOR MAP" badge: three lines of
-                      // chrome over a map the user can already see. On a phone the
-                      // title is dropped so the filter chips get the top edge.
-                      if (!compact)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: SurfaceCard(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 7,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.map_outlined,
-                                  size: 15,
-                                  color: TabangColors.crimson,
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    'Digos City Barangay Map',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.2,
-                                      color: context.textColor,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      if (_selectedBarangay != null) ...[
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: SurfaceCard(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.place,
-                                  size: 14,
-                                  color: TabangColors.crimson,
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    _selectedBarangay!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: context.textColor,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${_donorCounts[_selectedBarangay] ?? 0} donor'
-                                  '${(_donorCounts[_selectedBarangay] ?? 0) == 1 ? '' : 's'}'
-                                  ' · ${_drivesIn(_selectedBarangay!).length} '
-                                  'drive'
-                                  '${_drivesIn(_selectedBarangay!).length == 1 ? '' : 's'}',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: context.textMuted,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () =>
-                                      setState(() => _selectedBarangay = null),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(2),
-                                    child: Icon(
-                                      Icons.close,
-                                      size: 14,
-                                      color: context.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      // Scrollable so every blood type is reachable on a phone,
-                      // now with a bounded width from the Positioned above.
-                      // The chip row stops short of the floating control stack.
-                      // Padding *inside* the ListView only extends the scrollable
-                      // content, so the last chips still painted underneath the
-                      // buttons; shrinking the viewport is what actually keeps
-                      // them clear.
-                      SizedBox(
-                        height: 30,
-                        width: double.infinity,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 46),
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              _typeChip(context, null, 'ALL'),
-                              ...BloodType.values.map(
-                                (t) => _typeChip(context, t, t.label),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Zoom, compass, map-style and donor-pane controls.
-            Positioned(
-              top: TabangSpace.md,
-              right: TabangSpace.md,
-              child: ValueListenableBuilder<bool>(
-                valueListenable: _interactingNotifier,
-                builder: (context, interacting, child) => AnimatedOpacity(
-                  opacity: _opacityFor(interacting, control: true),
-                  duration: _fadeDuration,
-                  curve: Curves.easeInOut,
-                  child: child,
-                ),
-                child: Column(
-                  children: [
-                    SurfaceCard(
-                      padding: const EdgeInsets.all(3),
-                      child: Column(
-                        children: [
-                          _mapButton(
-                            context,
-                            Icons.add,
-                            () => _zoomBy(0.75),
-                            tooltip: 'Zoom in',
-                            size: compact ? 30 : 36,
-                          ),
-                          SizedBox(height: compact ? 4 : 6),
-                          _mapButton(
-                            context,
-                            Icons.remove,
-                            () => _zoomBy(-0.75),
-                            tooltip: 'Zoom out',
-                            size: compact ? 30 : 36,
-                          ),
-                        ],
+            if (mapHeight >= 1 && listHeight >= 1)
+              Divider(height: 1, color: context.border),
+            Expanded(
+              child: listHeight < 1
+                  ? const SizedBox.shrink()
+                  : ClipRect(
+                      child: OverflowBox(
+                        alignment: Alignment.topCenter,
+                        minHeight: layoutHeight,
+                        maxHeight: layoutHeight,
+                        child: _buildDonorPane(context, compact: true),
                       ),
                     ),
-                    SizedBox(height: compact ? 4 : 8),
-                    // One fit control, not two. The map is always drawn
-                    // north-up, so "zoom to fill the pane with the whole city"
-                    // is the useful action; the corner-bracket icon says that
-                    // without implying a rotation compass.
-                    _mapButton(
-                      context,
-                      Icons.fit_screen,
-                      _resetNorth,
-                      tooltip: 'Fit city · show all 26 barangays',
-                      accent: true,
-                      size: compact ? 30 : 36,
-                    ),
-                    // The light/dark switch is desktop-only: on a phone the
-                    // extra button pushed the stack into the legend.
-                    if (!compact) ...[
-                      const SizedBox(height: 6),
-                      _mapButton(
-                        context,
-                        _mapDark
-                            ? Icons.light_mode_outlined
-                            : Icons.dark_mode_outlined,
-                        () => setState(() {
-                          _mapDarkOverride = !_mapDark;
-                          _mapDark = _mapDarkOverride!;
-                        }),
-                        tooltip: _mapDark ? 'Use light map' : 'Use dark map',
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    SizedBox(height: compact ? 4 : 0),
-                    // Hides every map panel for an unobstructed view.
-                    _mapButton(
-                      context,
-                      _overlaysHidden ? Icons.layers : Icons.layers_outlined,
-                      () => setState(() => _overlaysHidden = !_overlaysHidden),
-                      tooltip: _overlaysHidden
-                          ? 'Show map panels'
-                          : 'Hide map panels',
-                      size: compact ? 30 : 36,
-                    ),
-                    // On desktop the chevron flips between map-only and the
-                    // split. On phones the same button appears only while the
-                    // list is hidden, so "Map only" is never a trap; the
-                    // dropdown that picks all four layouts lives in the list.
-                    if (!compact || _mapMode == _DonorMapMode.mapOnly) ...[
-                      const SizedBox(height: 12),
-                      _mapButton(
-                        context,
-                        _mapMode == _DonorMapMode.mapOnly
-                            ? Icons.chevron_left
-                            : Icons.chevron_right,
-                        () => setState(
-                          () => _mapMode = _mapMode == _DonorMapMode.mapOnly
-                              ? _DonorMapMode.half
-                              : _DonorMapMode.mapOnly,
-                        ),
-                        tooltip: _mapMode == _DonorMapMode.mapOnly
-                            ? 'Show donor list'
-                            : 'Hide donor list',
-                        size: compact ? 30 : 36,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-
-            // Always-visible restore control. It lives outside the faded
-            // control stack, otherwise hiding the panels also hid the button
-            // that brings them back.
-            if (_overlaysHidden)
-              Positioned(
-                top: TabangSpace.md,
-                right: TabangSpace.md,
-                child: _mapButton(
-                  context,
-                  Icons.layers,
-                  () => setState(() => _overlaysHidden = false),
-                  tooltip: 'Show map panels',
-                  accent: true,
-                ),
-              ),
-
-            // The legend is essential on every viewport. Compact mode used to
-            // hide it entirely, leaving phone users with coloured shapes and
-            // no key; it is now a single compact row. It fades with the rest
-            // of the map panels while the map is being touched.
-            Positioned(
-              left: TabangSpace.md,
-              bottom: TabangSpace.md,
-              right: compact ? TabangSpace.md : null,
-              child: IgnorePointer(
-                ignoring: _overlaysHidden,
-                child: ValueListenableBuilder<bool>(
-                  valueListenable: _interactingNotifier,
-                  builder: (context, interacting, child) => AnimatedOpacity(
-                    opacity: _opacityFor(interacting, control: false),
-                    duration: _fadeDuration,
-                    curve: Curves.easeInOut,
-                    child: child,
-                  ),
-                  child: Align(
-                    alignment: Alignment.bottomLeft,
-                    child: _buildLegend(context, compact: compact),
-                  ),
-                ),
-              ),
-            ),
-
-            // Tile attribution, required by the OpenStreetMap tile policy.
-            // Compact maps put the legend across the whole bottom edge, so the
-            // credit sits above it there.
-            Positioned(
-              right: TabangSpace.md,
-              bottom: compact ? 66 : 8,
-              child: IgnorePointer(
-                ignoring: _overlaysHidden,
-                child: AnimatedOpacity(
-                  opacity: _overlaysHidden ? 0 : 1,
-                  duration: const Duration(milliseconds: 240),
-                  child: const DigosMapAttribution(),
-                ),
-              ),
             ),
           ],
         );
       },
+    );
+  }
+
+  /// Wide arrangement. Hiding the directory animates its width to zero and
+  /// lets the map take the space, instead of swapping subtrees.
+  Widget _buildWideLayout(BuildContext context) {
+    if (_mapMode == _DonorMapMode.hidden) {
+      return _buildDonorOnlyPane(context, compact: false);
+    }
+    final panelTarget = _mapMode == _DonorMapMode.mapOnly
+        ? 0.0
+        : _widePanelWidth;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: panelTarget, end: panelTarget),
+      duration: _paneAnimation,
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedWidth, _) {
+        final panelWidth = animatedWidth.clamp(0.0, _widePanelWidth);
+        return Row(
+          children: [
+            // Kept in the same slot even at zero width: swapping between a
+            // bare map and a Row would rebuild the map state and reset the
+            // camera at the end of the animation.
+            Expanded(child: _buildMapPane(context, compact: false)),
+            SizedBox(
+              width: panelWidth,
+              child: panelWidth < 0.5
+                  ? const SizedBox.shrink()
+                  : ClipRect(
+                      // The panel keeps its full width while the frame narrows,
+                      // so its content slides out to the right rather than
+                      // reflowing through every intermediate width.
+                      child: OverflowBox(
+                        alignment: Alignment.centerLeft,
+                        minWidth: _widePanelWidth,
+                        maxWidth: _widePanelWidth,
+                        child: SizedBox(
+                          width: _widePanelWidth,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: context.surface,
+                              border: Border(
+                                left: BorderSide(color: context.border),
+                              ),
+                            ),
+                            child: _buildDonorPane(context, compact: false),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// The directory with no map above it. The map switch now lives in the
+  /// shared header, so this is just the list, not a second toolbar.
+  Widget _buildDonorOnlyPane(BuildContext context, {required bool compact}) {
+    return _buildDonorPane(context, compact: compact);
+  }
+
+  /// One switch button for map visibility, in the same header row for every
+  /// tab. "Expand" gives the list the whole page; "Collapse" brings the map
+  /// back down.
+  Widget _hideMapButton(BuildContext context) {
+    return OutlinedButton.icon(
+      key: const ValueKey('hideDonorMapButton'),
+      onPressed: () => setState(() => _mapMode = _DonorMapMode.hidden),
+      // Expanding gives the list the full page; the arrow points up because
+      // the list grows upward into the space the map leaves behind.
+      icon: const Icon(Icons.expand_less, size: 15),
+      label: const Text('Expand'),
+      style: _mapSwitchStyle(context),
+    );
+  }
+
+  Widget _showMapButton(BuildContext context) {
+    return OutlinedButton.icon(
+      key: const ValueKey('showDonorMapButton'),
+      onPressed: () => setState(() => _mapMode = _DonorMapMode.half),
+      icon: const Icon(Icons.expand_more, size: 15),
+      label: const Text('Collapse'),
+      style: _mapSwitchStyle(context),
+    );
+  }
+
+  ButtonStyle _mapSwitchStyle(BuildContext context) {
+    return OutlinedButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      minimumSize: const Size(0, 28),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      backgroundColor: context.surfaceAlt,
+      foregroundColor: context.textColor,
+      side: BorderSide(color: context.border),
+      shape: const StadiumBorder(),
+      textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+    );
+  }
+
+  Widget _buildMapPane(BuildContext context, {required bool compact}) {
+    final selected = _selectedBarangay;
+    final drivesHere = selected == null ? 0 : _drivesIn(selected).length;
+    final donorsHere = selected == null ? 0 : (_donorCounts[selected] ?? 0);
+    final summary = selected == null
+        ? null
+        : '$donorsHere donor${donorsHere == 1 ? '' : 's'}'
+              ' · $drivesHere drive${drivesHere == 1 ? '' : 's'}';
+
+    return DigosMapPane(
+      controller: _mapController,
+      donorCounts: _donorCounts,
+      drives: _driveMarkers,
+      selectedBarangay: selected,
+      selectedSummary: summary,
+      mapDark: _mapDark,
+      onSelectBarangay: (name) => setState(() => _selectedBarangay = name),
+      onDriveTap: _showDriveSheet,
+      onFacilityTap: _showFacilitySheet,
+      onToggleMapDark: () => setState(() {
+        _mapDarkOverride = !_mapDark;
+        _mapDark = _mapDarkOverride!;
+      }),
+      compact: compact,
+      chips: [
+        _typeChip(context, null, 'ALL'),
+        ...BloodType.values.map((t) => _typeChip(context, t, t.label)),
+      ],
+      legend: _buildLegend(context, compact: compact),
+      listCollapsed: _mapMode == _DonorMapMode.mapOnly,
+      onToggleList: () => setState(
+        () => _mapMode = _mapMode == _DonorMapMode.mapOnly
+            ? _DonorMapMode.half
+            : _DonorMapMode.mapOnly,
+      ),
+      listLabel: 'donor list',
+      listTitle: _selectedBarangay == null
+          ? 'Available donors'
+          : 'Donors in $_selectedBarangay',
+      listCount: _visibleDonors.length,
+      listIcon: Icons.people_outline,
     );
   }
 
@@ -1030,182 +735,69 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
-  Widget _mapButton(
-    BuildContext context,
-    IconData icon,
-    VoidCallback onTap, {
-    String? tooltip,
-    bool accent = false,
-    double size = 36,
-  }) {
-    final button = Material(
-      color: accent
-          ? TabangColors.crimson
-          : context.surface.withValues(alpha: 0.96),
-      borderRadius: BorderRadius.circular(TabangRadius.sm),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TabangRadius.sm),
-        onTap: onTap,
-        child: Container(
-          // 36 px controls (30 px on phones): the stack was covering too
-          // much of the map.
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(TabangRadius.sm),
-            border: Border.all(
-              color: accent ? TabangColors.crimson : context.border,
-            ),
-          ),
-          child: Icon(
-            icon,
-            size: size < 36 ? 15 : 17,
-            color: accent ? Colors.white : context.textColor,
-          ),
-        ),
-      ),
-    );
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip, child: button);
-  }
-
   Widget _buildLegend(BuildContext context, {required bool compact}) {
     // Sum, not barangay count: three drives in Zone 1 is three active drives.
     final driveCount = _driveCounts.values.fold<int>(
       0,
       (total, count) => total + count,
     );
-    if (compact) {
-      return SurfaceCard(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 3,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              'Donors',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.3,
-                color: context.textColor,
-              ),
-            ),
-            _legendSwatch(context, 0, '0', small: true),
-            _legendSwatch(context, 1, '1–2', small: true),
-            _legendSwatch(context, 4, '3–5', small: true),
-            _legendSwatch(context, 7, '6+', small: true),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.place, size: 14, color: TabangColors.crimson),
-                const SizedBox(width: 2),
-                Flexible(
-                  child: Text(
-                    '$driveCount drive${driveCount == 1 ? '' : 's'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: context.textMuted,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+    final driveLabel = '$driveCount drive${driveCount == 1 ? '' : 's'}';
+    return DigosLegendPanel(
+      title: compact ? 'Donors' : 'DONOR DENSITY',
+      compact: compact,
+      entries: [
+        DigosLegendEntry(
+          color: _fillFor(0),
+          label: compact ? '0' : 'No available donors',
         ),
-      );
-    }
-
-    return SurfaceCard(
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        DigosLegendEntry(
+          color: _fillFor(1),
+          label: compact ? '1–2' : '1–2 donors',
+        ),
+        DigosLegendEntry(
+          color: _fillFor(4),
+          label: compact ? '3–5' : '3–5 donors',
+        ),
+        DigosLegendEntry(
+          color: _fillFor(7),
+          label: compact ? '6+' : '6+ donors',
+        ),
+      ],
+      footer: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Density key only. The boundary and pin rows repeated what the map
-          // already shows and turned the legend into a layers panel.
+          const Icon(Icons.place, size: 14, color: TabangColors.crimson),
+          const SizedBox(width: 2),
           Text(
-            'DONOR DENSITY',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: context.textMuted,
-            ),
-          ),
-          const SizedBox(height: 5),
-          _legendRow(context, 0, 'No available donors'),
-          _legendRow(context, 1, '1–2 donors'),
-          _legendRow(context, 4, '3–5 donors'),
-          _legendRow(context, 7, '6+ donors'),
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.place, size: 15, color: TabangColors.crimson),
-                const SizedBox(width: 4),
-                Text(
-                  '$driveCount active drive${driveCount == 1 ? '' : 's'}',
-                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
-                ),
-              ],
-            ),
+            compact ? driveLabel : '$driveLabel active',
+            style: TextStyle(fontSize: 11, color: context.textMuted),
           ),
         ],
       ),
     );
   }
 
-  Widget _legendSwatch(
-    BuildContext context,
-    int count,
-    String label, {
-    bool small = false,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: small ? 12 : 15,
-          height: small ? 12 : 15,
-          decoration: BoxDecoration(
-            color: _fillFor(count),
-            border: Border.all(
-              color: context.isDark
-                  ? Colors.white.withValues(alpha: 0.28)
-                  : TabangColors.crimson.withValues(alpha: 0.35),
-            ),
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: small ? 11 : 11.5,
-            color: context.textMuted,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _legendRow(BuildContext context, int count, String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Stack(children: [_legendSwatch(context, count, label)]),
-    );
-  }
-
   Widget _buildDonorPane(BuildContext context, {required bool compact}) {
     final donors = _visibleDonors;
-    final unreadMessages = _repo.unreadMessageCountFor(widget.user.id);
+    final drives = _repo.drives
+        .where((d) => d.status != 'Completed')
+        .toList(growable: false);
+    final heading = switch (_paneTab) {
+      0 => _selectedBarangay == null
+          ? 'Available donors'
+          : 'Available donors in $_selectedBarangay',
+      1 => _selectedBarangay == null
+          ? 'Hospitals & chapter'
+          : 'Facilities in $_selectedBarangay',
+      _ => _selectedBarangay == null
+          ? 'Upcoming drives'
+          : 'Drives in $_selectedBarangay',
+    };
+    final count = switch (_paneTab) {
+      0 => donors.length,
+      1 => digosFacilityPins.length,
+      _ => drives.length,
+    };
 
     return Column(
       children: [
@@ -1219,75 +811,52 @@ class _FindDonorPageState extends State<FindDonorPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // One header for every tab: the map switch used to disappear on
+              // Facilities and Drives because it lived inside the Donors-only
+              // block.
               Row(
                 children: [
                   Expanded(
-                    // Text-only segments: with icons the three labels wrapped
-                    // onto two lines ("Donor / s", "Faciliti / es") in a
-                    // 330 px side panel.
-                    child: SegmentedButton<int>(
-                      segments: const [
-                        ButtonSegment(
-                          value: 0,
-                          label: Text('Donors', softWrap: false),
-                        ),
-                        ButtonSegment(
-                          value: 1,
-                          label: Text('Facilities', softWrap: false),
-                        ),
-                        ButtonSegment(
-                          value: 2,
-                          label: Text('Drives', softWrap: false),
-                        ),
-                      ],
-                      selected: {_paneTab},
-                      showSelectedIcon: false,
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        padding: WidgetStatePropertyAll(
-                          EdgeInsets.symmetric(horizontal: 6),
-                        ),
-                        textStyle: WidgetStatePropertyAll(
-                          TextStyle(fontSize: 12),
-                        ),
+                    child: Text(
+                      heading,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.15,
+                        color: context.textColor,
                       ),
-                      onSelectionChanged: (selection) =>
-                          setState(() => _paneTab = selection.first),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  if (unreadMessages > 0 && widget.onOpenChat != null) ...[
+                  StatusPill('$count', tone: Tone.brand, dense: true),
+                  if (_selectedBarangay != null)
                     Tooltip(
-                      message:
-                          '$unreadMessages new message'
-                          '${unreadMessages == 1 ? '' : 's'}',
+                      message: 'Clear barangay filter',
                       child: InkWell(
-                        onTap: widget.onOpenChat,
+                        key: const ValueKey('clearDonorBarangayFilter'),
+                        onTap: () => setState(() {
+                          _selectedBarangay = null;
+                          _refreshCounts();
+                        }),
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
                           padding: const EdgeInsets.all(4),
-                          child: Badge(
-                            backgroundColor: TabangColors.crimson,
-                            label: Text(
-                              unreadMessages > 99 ? '99+' : '$unreadMessages',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.forum_outlined,
-                              size: 18,
-                              color: TabangColors.crimson,
-                            ),
+                          child: Icon(
+                            Icons.close,
+                            size: 14,
+                            color: context.textMuted,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 2),
-                  ],
-                  if (_mapMode != _DonorMapMode.hidden)
+                  if (_mapMode == _DonorMapMode.hidden)
+                    _showMapButton(context)
+                  else ...[
+                    if (compact) ...[
+                      const SizedBox(width: 4),
+                      _hideMapButton(context),
+                    ],
                     Tooltip(
                       message: 'Hide donor list',
                       child: InkWell(
@@ -1305,67 +874,44 @@ class _FindDonorPageState extends State<FindDonorPage> {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
-              if (_paneTab == 0) ...[
-                const SizedBox(height: TabangSpace.sm),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _selectedBarangay == null
-                            ? 'Available donors'
-                            : 'Available donors in $_selectedBarangay',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: context.textColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              const SizedBox(height: TabangSpace.sm),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<int>(
+                  // Text-only segments: with icons the three labels wrapped
+                  // onto two lines ("Donor / s", "Faciliti / es") in a
+                  // 330 px side panel.
+                  segments: const [
+                    ButtonSegment(
+                      value: 0,
+                      label: Text('Donors', softWrap: false),
                     ),
-                    const Tooltip(
-                      message:
-                          'Updates automatically as donors, requests and '
-                          'messages change.',
-                      child: StatusPill(
-                        'Live',
-                        tone: Tone.success,
-                        icon: Icons.bolt,
-                        dense: true,
-                      ),
+                    ButtonSegment(
+                      value: 1,
+                      label: Text('Facilities', softWrap: false),
                     ),
-                    const SizedBox(width: 6),
-                    StatusPill(
-                      '${donors.length}',
-                      tone: Tone.brand,
-                      dense: true,
+                    ButtonSegment(
+                      value: 2,
+                      label: Text('Drives', softWrap: false),
                     ),
-                    // The map on/off switch belongs to the list it rearranges.
-                    // While the map is hidden the one **Show map** button
-                    // above the list is the switch, so a second button here
-                    // would be a duplicate.
-                    if (compact && _mapMode != _DonorMapMode.hidden) ...[
-                      const SizedBox(width: 6),
-                      _hideMapButton(context),
-                    ],
-                    if (_selectedBarangay != null) ...[
-                      const SizedBox(width: 6),
-                      InkWell(
-                        onTap: () => setState(() => _selectedBarangay = null),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Icon(
-                            Icons.close,
-                            size: 14,
-                            color: context.textMuted,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
+                  selected: {_paneTab},
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    padding: WidgetStatePropertyAll(
+                      EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                    textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
+                  ),
+                  onSelectionChanged: (selection) =>
+                      setState(() => _paneTab = selection.first),
                 ),
+              ),
+              if (_paneTab == 0) ...[
                 const SizedBox(height: TabangSpace.sm),
                 TextField(
                   onChanged: (v) => setState(() => _query = v),

@@ -54,6 +54,12 @@ class _ChatPageState extends State<ChatPage> {
   String _query = '';
   _ThreadSort _sort = _ThreadSort.recent;
 
+  /// Staff/admin option in one-to-one threads with community users: post as
+  /// the official chapter identity (default) instead of the personal alias.
+  /// Ignored in staff-to-staff threads, where both sides always see each
+  /// other's account and role.
+  bool _sendAsChapter = true;
+
   /// Guards against stacking post-frame read receipts while a rebuild is
   /// already on its way.
   String? _pendingReadThreadId;
@@ -143,24 +149,28 @@ class _ChatPageState extends State<ChatPage> {
   bool _isChapter(ChatThread thread) => _repo.isChapterThread(thread);
 
   String _otherAlias(ChatThread thread) {
+    if (thread.isGroup) return thread.groupName ?? 'Group';
     return thread.participantAId == widget.user.id
         ? thread.participantBAlias
         : thread.participantAAlias;
   }
 
   String _otherId(ChatThread thread) {
+    if (thread.isGroup) return thread.id;
     return thread.participantAId == widget.user.id
         ? thread.participantBId
         : thread.participantAId;
   }
 
-  AppUser? _otherUser(ChatThread thread) => _repo.userById(_otherId(thread));
+  AppUser? _otherUser(ChatThread thread) =>
+      thread.isGroup ? null : _repo.userById(_otherId(thread));
 
   /// Real names appear only after both participants consent. Until then the
   /// thread shows the alias from the paper's double-blind design. The chapter
   /// thread is the exception: it is an organization identity, so it always
   /// reads as the Philippine Red Cross chapter rather than a staff member.
   String _displayName(ChatThread thread) {
+    if (thread.isGroup) return thread.groupName ?? 'Group';
     if (_isChapter(thread)) return TabangRepository.chapterName;
     final other = _otherUser(thread);
     if (thread.identityRevealed && other != null) return other.fullName;
@@ -168,13 +178,13 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   bool _blockedByMe(ChatThread thread) =>
-      _repo.isBlocked(widget.user.id, _otherId(thread));
+      !thread.isGroup && _repo.isBlocked(widget.user.id, _otherId(thread));
 
   bool _blockedByOther(ChatThread thread) =>
-      _repo.isBlocked(_otherId(thread), widget.user.id);
+      !thread.isGroup && _repo.isBlocked(_otherId(thread), widget.user.id);
 
   bool _isBlocked(ChatThread thread) =>
-      _blockedByMe(thread) || _blockedByOther(thread);
+      !thread.isGroup && (_blockedByMe(thread) || _blockedByOther(thread));
 
   ChatThread? get _active {
     final threads = _threads;
@@ -190,7 +200,12 @@ class _ChatPageState extends State<ChatPage> {
     final text = _composer.text.trim();
     if (thread == null || text.isEmpty) return;
 
-    _repo.sendMessage(thread.id, widget.user.id, text);
+    _repo.sendMessage(
+      thread.id,
+      widget.user.id,
+      text,
+      asChapter: _sendAsChapter,
+    );
     _composer.clear();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -447,7 +462,23 @@ class _ChatPageState extends State<ChatPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_isChapter(thread))
+              if (thread.isGroup)
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: context.surfaceAlt,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: context.border),
+                  ),
+                  child: Icon(
+                    Icons.groups_outlined,
+                    size: 19,
+                    color: context.textMuted,
+                  ),
+                )
+              else if (_isChapter(thread))
                 const ChapterMark(size: 40)
               else
                 ClipOval(
@@ -555,7 +586,11 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      last?.text ?? 'No messages yet',
+                      last == null
+                          ? 'No messages yet'
+                          : thread.isGroup
+                          ? '${last.senderAlias}: ${last.text}'
+                          : last.text,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -577,10 +612,14 @@ class _ChatPageState extends State<ChatPage> {
                           const SizedBox(width: 6),
                         ],
                         StatusPill(
-                          thread.identityRevealed
+                          thread.isGroup
+                              ? 'Staff only'
+                              : thread.identityRevealed
                               ? 'Identities shared'
                               : 'Identity protected',
-                          tone: thread.identityRevealed
+                          tone: thread.isGroup
+                              ? Tone.info
+                              : thread.identityRevealed
                               ? Tone.success
                               : Tone.neutral,
                           dense: true,
@@ -704,7 +743,23 @@ class _ChatPageState extends State<ChatPage> {
                   icon: const Icon(Icons.arrow_back, size: 18),
                   onPressed: onBack,
                 ),
-              if (_isChapter(thread))
+              if (thread.isGroup)
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: context.surfaceAlt,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: context.border),
+                  ),
+                  child: Icon(
+                    Icons.groups_outlined,
+                    size: 20,
+                    color: context.textMuted,
+                  ),
+                )
+              else if (_isChapter(thread))
                 const ChapterMark(size: 42)
               else
                 ClipOval(
@@ -754,20 +809,28 @@ class _ChatPageState extends State<ChatPage> {
                     Row(
                       children: [
                         Icon(
-                          _isChapter(thread)
+                          thread.isGroup
+                              ? Icons.shield_outlined
+                              : _isChapter(thread)
                               ? Icons.verified_user_outlined
                               : thread.identityRevealed
                               ? Icons.lock_open
                               : Icons.lock_outline,
                           size: 12,
-                          color: thread.identityRevealed && !_isChapter(thread)
+                          color:
+                              thread.identityRevealed &&
+                                  !_isChapter(thread) &&
+                                  !thread.isGroup
                               ? TabangColors.teal
                               : context.textMuted,
                         ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            _isChapter(thread)
+                            thread.isGroup
+                                ? 'Staff & admin room · '
+                                      '${thread.memberIds.length} members'
+                                : _isChapter(thread)
                                 ? TabangRepository.chapterSubtitle
                                 : thread.identityRevealed
                                 ? (other?.phone ??
@@ -789,7 +852,21 @@ class _ChatPageState extends State<ChatPage> {
                   ],
                 ),
               ),
-              if (onBack != null)
+              if (thread.isGroup)
+                // The staff room has no identity reveal, blocking or
+                // reporting; staff know each other by account.
+                IconButton(
+                  tooltip: thread.isMuted ? 'Unmute' : 'Mute',
+                  icon: Icon(
+                    thread.isMuted
+                        ? Icons.volume_off_outlined
+                        : Icons.volume_up_outlined,
+                    size: 17,
+                  ),
+                  onPressed: () =>
+                      _repo.setThreadMuted(thread.id, !thread.isMuted),
+                )
+              else if (onBack != null)
                 _buildCompactConversationMenu(
                   context,
                   thread,
@@ -948,6 +1025,7 @@ class _ChatPageState extends State<ChatPage> {
                           messages[i],
                           previous: i > 0 ? messages[i - 1] : null,
                           showSeen: i == lastSeenIndex,
+                          chapterThread: _isChapter(thread),
                         ),
                       );
                     },
@@ -962,32 +1040,72 @@ class _ChatPageState extends State<ChatPage> {
             color: context.surface,
             border: Border(top: BorderSide(color: context.border)),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _composer,
-                  enabled: !thread.isMuted && !blocked,
-                  onSubmitted: (_) => _send(),
-                  style: const TextStyle(fontSize: 12.5),
-                  decoration: InputDecoration(
-                    hintText: blocked
-                        ? 'Messaging disabled while blocked'
-                        : thread.isMuted
-                        ? 'This conversation is muted'
-                        : 'Write a message',
-                    isDense: true,
+              // Staff talking to a community user can choose the chapter
+              // identity or their own account; staff-to-staff threads always
+              // use the personal account and never show this switch.
+              if (!thread.isGroup &&
+                  !_isChapter(thread) &&
+                  widget.user.role.isAdminSide &&
+                  other != null &&
+                  !other.role.isAdminSide)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: TabangSpace.sm),
+                  child: Row(
+                    children: [
+                      Switch(
+                        value: _sendAsChapter,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onChanged: (value) =>
+                            setState(() => _sendAsChapter = value),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          _sendAsChapter
+                              ? 'Sending as the PRC chapter identity'
+                              : 'Sending as ${widget.user.alias} · '
+                                    '${widget.user.role.label}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: context.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: TabangSpace.sm),
-              IconButton.filled(
-                onPressed: thread.isMuted || blocked ? null : _send,
-                icon: const Icon(Icons.send, size: 17),
-                style: IconButton.styleFrom(
-                  backgroundColor: TabangColors.crimson,
-                  foregroundColor: Colors.white,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _composer,
+                      enabled: !thread.isMuted && !blocked,
+                      onSubmitted: (_) => _send(),
+                      style: const TextStyle(fontSize: 12.5),
+                      decoration: InputDecoration(
+                        hintText: blocked
+                            ? 'Messaging disabled while blocked'
+                            : thread.isMuted
+                            ? 'This conversation is muted'
+                            : 'Write a message',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: TabangSpace.sm),
+                  IconButton.filled(
+                    onPressed: thread.isMuted || blocked ? null : _send,
+                    icon: const Icon(Icons.send, size: 17),
+                    style: IconButton.styleFrom(
+                      backgroundColor: TabangColors.crimson,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1001,9 +1119,18 @@ class _ChatPageState extends State<ChatPage> {
     ChatMessage message, {
     ChatMessage? previous,
     bool showSeen = false,
+    bool chapterThread = false,
   }) {
     final mine = message.senderId == widget.user.id;
     final flagged = message.flag != ModerationFlag.clean;
+    // In the official chapter thread every reply is the organization; in a
+    // personal thread only messages explicitly sent as the chapter are.
+    final chapterIdentity = chapterThread || message.sentAsChapter;
+    final senderRole = chapterIdentity
+        ? null
+        : _repo.userById(message.senderId)?.role;
+    final staffIdentity =
+        senderRole == UserRole.staff || senderRole == UserRole.admin;
     // Name the sender only when the speaker changes, the way chat apps group
     // consecutive messages. It keeps the double-blind aliases visible without
     // repeating them on every bubble.
@@ -1025,8 +1152,10 @@ class _ChatPageState extends State<ChatPage> {
                 children: [
                   Flexible(
                     child: Text(
-                      message.senderId == TabangRepository.chapterAccountId
+                      chapterIdentity
                           ? TabangRepository.chapterName
+                          : staffIdentity
+                          ? '${message.senderAlias} · ${senderRole!.label}'
                           : message.senderAlias,
                       style: TextStyle(
                         fontSize: 11.5,
@@ -1035,7 +1164,7 @@ class _ChatPageState extends State<ChatPage> {
                       ),
                     ),
                   ),
-                  if (message.senderId == TabangRepository.chapterAccountId)
+                  if (chapterIdentity)
                     const Padding(
                       padding: EdgeInsets.only(left: 4),
                       child: VerifiedBadge(size: 13),

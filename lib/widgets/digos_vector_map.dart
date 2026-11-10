@@ -483,10 +483,6 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     mapScaleBarScale(zoom: 11, latitude: 6.84),
   );
 
-  /// Tile loading state, used only to explain a blank base map.
-  int _tileFailures = 0;
-  bool _tileWarned = false;
-
   /// Map widget size, used to reject labels that would fall off the canvas.
   Size? _mapSize;
   bool _firstFrameDone = false;
@@ -635,15 +631,25 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                         maxZoom: 13,
                       ),
                       interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                        // No double-tap zoom: its recognizer holds every single
+                        // tap in the gesture arena for ~300 ms, which made
+                        // selecting a barangay feel unresponsive. Pinch, the
+                        // wheel and the ± buttons still zoom; one-finger drag
+                        // still pans.
+                        flags:
+                            InteractiveFlag.all &
+                            ~(InteractiveFlag.rotate |
+                                InteractiveFlag.doubleTapZoom |
+                                InteractiveFlag.doubleTapDragZoom),
                       ),
                       onPositionChanged: (camera, hasGesture) {
                         // The bar uses the exact camera zoom on every frame;
                         // the coarser value below still drives label and pin
-                        // scaling, where tiny increments would only rebuild
-                        // the whole layer stack for no visual gain.
+                        // scaling. A 0.12 threshold keeps a pinch from
+                        // rebuilding the whole layer stack dozens of times a
+                        // second for sub-pixel size changes.
                         _syncScale(camera);
-                        if ((camera.zoom - _zoom).abs() > 0.05) {
+                        if ((camera.zoom - _zoom).abs() > 0.12) {
                           setState(() => _zoom = camera.zoom);
                         }
                       },
@@ -688,12 +694,15 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                                 : DigosMapColors.lightTileFilter,
                           ),
                           child: TileLayer(
-                            // HOT (Humanitarian OpenStreetMap Team) tiles are
-                            // still OSM data, but the style draws no mountain
-                            // peak symbols or hill shading. The standard OSM
-                            // Carto style covers the Digos highlands - and the
-                            // screenshot problem was those brown triangles.
-                            urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                            // OSM France's "osmfr" style is plain OSM data
+                            // without hill shading or mountain-peak symbols,
+                            // which is what the old HOT tiles used to give.
+                            // HOT moved to a retired endpoint (404); the fr
+                            // host needs an a/b/c subdomain - the bare host
+                            // also 404s. CARTO's keyless style is unusable
+                            // here because its CDN now requires an API key.
+                            urlTemplate:
+                                'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
                             subdomains: const ['a', 'b', 'c'],
                             userAgentPackageName: 'com.digos.barangay_map',
                             maxNativeZoom: 19,
@@ -719,16 +728,8 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                             tileDisplay: const TileDisplay.instantaneous(),
                             // Offline or rate-limited tiles must never break the map: the
                             // local vector layers keep rendering over the paper background.
-                            // A few failures in a row also raise a small "base map offline"
-                            // note so a blank base is explained rather than mysterious.
-                            errorTileCallback: (tile, error, stackTrace) {
-                              _tileFailures++;
-                              if (!_tileWarned &&
-                                  _tileFailures >= 4 &&
-                                  mounted) {
-                                setState(() => _tileWarned = true);
-                              }
-                            },
+                            // No floating offline banner: it covered the legend on
+                            // phones and said nothing the map itself did not.
                           ),
                         ),
 
@@ -815,51 +816,19 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                 ),
               ),
             ),
-            // Distance scale (metric). On a short map pane the compact legend
-            // and the attribution stack along the bottom, so the bar sits
-            // above both instead of on top of them. The notifier keeps the
-            // label and the drawn line locked to the live camera zoom.
+            // Distance scale (metric). Pinned low in the bottom-right corner so
+            // it stops competing with the map; the tile credit sits directly
+            // underneath it. The notifier keeps the label and the drawn line
+            // locked to the live camera zoom.
             Positioned(
-              right: 10,
-              bottom: (_mapSize?.height ?? 500) < 430 ? 96 : 34,
+              right: 8,
+              bottom: 22,
               child: ValueListenableBuilder<MapScaleBarScale>(
                 valueListenable: _scaleNotifier,
                 builder: (context, scale, _) =>
                     _ScaleBar(scale: scale, dark: dark),
               ),
             ),
-            if (_tileWarned && DigosVectorMap.tilesEnabled)
-              Positioned(
-                right: 10,
-                bottom: (_mapSize?.height ?? 500) < 430 ? 128 : 66,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: dark
-                        ? const Color(0xFF241C1A)
-                        : const Color(0xFFFFFFFF).withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: dark
-                          ? const Color(0xFF4A3B36)
-                          : const Color(0xFFE0D5CE),
-                    ),
-                  ),
-                  child: Text(
-                    'Base map offline — showing vector layers',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w600,
-                      color: dark
-                          ? const Color(0xFFD9CFC9)
-                          : const Color(0xFF5A4F4B),
-                    ),
-                  ),
-                ),
-              ),
           ],
         );
       },
@@ -1384,14 +1353,11 @@ class _ScaleBar extends StatelessWidget {
     final color = dark ? const Color(0xFFD9CFC9) : const Color(0xFF3A2C28);
     return Container(
       key: const ValueKey('mapScaleBar'),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: (dark ? const Color(0xFF241C1A) : const Color(0xFFFFFFFF))
-            .withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: (dark ? const Color(0xFF4A3B36) : const Color(0xFFE0D5CE)),
-        ),
+            .withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1402,21 +1368,22 @@ class _ScaleBar extends StatelessWidget {
             scale.label,
             key: const ValueKey('mapScaleBarLabel'),
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 8.5,
+              height: 1.1,
               fontWeight: FontWeight.w700,
               color: color,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Container(
             key: const ValueKey('mapScaleBarLine'),
             width: scale.width,
-            height: 7,
+            height: 4,
             decoration: BoxDecoration(
               border: Border(
-                left: BorderSide(color: color, width: 1.6),
-                right: BorderSide(color: color, width: 1.6),
-                bottom: BorderSide(color: color, width: 1.6),
+                left: BorderSide(color: color, width: 1.2),
+                right: BorderSide(color: color, width: 1.2),
+                bottom: BorderSide(color: color, width: 1.2),
               ),
             ),
           ),
@@ -1433,15 +1400,14 @@ class DigosMapAttribution extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       decoration: BoxDecoration(
-        color: context.surface.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(TabangRadius.xs),
-        border: Border.all(color: context.border),
+        color: context.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(3),
       ),
       child: Text(
         '© OpenStreetMap contributors',
-        style: TextStyle(fontSize: 8.5, height: 1.1, color: context.textMuted),
+        style: TextStyle(fontSize: 7.5, height: 1, color: context.textMuted),
       ),
     );
   }

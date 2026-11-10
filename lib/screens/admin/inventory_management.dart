@@ -6,6 +6,7 @@ import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/barcode.dart';
 import '../../widgets/common.dart';
+import '../../widgets/filter_bar.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/request_document_list.dart';
 import '../../widgets/request_review_dialogs.dart';
@@ -195,59 +196,51 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: TabangSpace.md,
-          runSpacing: TabangSpace.md,
-          children: [
-            SizedBox(
-              width: 180,
-              child: DropdownButtonFormField<BloodType?>(
-                initialValue: _typeFilter,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Blood type',
-                  isDense: true,
-                ),
-                style: TextStyle(fontSize: 12.5, color: context.textColor),
-                items: [
-                  const DropdownMenuItem<BloodType?>(
-                    value: null,
-                    child: Text('All types'),
-                  ),
-                  ...BloodType.values.map(
-                    (t) => DropdownMenuItem<BloodType?>(
-                      value: t,
-                      child: Text(t.label),
-                    ),
-                  ),
-                ],
-                onChanged: (v) => setState(() => _typeFilter = v),
+        TabangFilterBar(
+          filters: [
+            DropdownButtonFormField<BloodType?>(
+              initialValue: _typeFilter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Blood type',
+                isDense: true,
               ),
+              style: TextStyle(fontSize: 12.5, color: context.textColor),
+              items: [
+                const DropdownMenuItem<BloodType?>(
+                  value: null,
+                  child: Text('All types'),
+                ),
+                ...BloodType.values.map(
+                  (t) => DropdownMenuItem<BloodType?>(
+                    value: t,
+                    child: Text(t.label),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _typeFilter = v),
             ),
-            SizedBox(
-              width: 180,
-              child: DropdownButtonFormField<UnitStatus?>(
-                initialValue: _statusFilter,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Status',
-                  isDense: true,
-                ),
-                style: TextStyle(fontSize: 12.5, color: context.textColor),
-                items: [
-                  const DropdownMenuItem<UnitStatus?>(
-                    value: null,
-                    child: Text('All statuses'),
-                  ),
-                  ...UnitStatus.values.map(
-                    (s) => DropdownMenuItem<UnitStatus?>(
-                      value: s,
-                      child: Text(s.label),
-                    ),
-                  ),
-                ],
-                onChanged: (v) => setState(() => _statusFilter = v),
+            DropdownButtonFormField<UnitStatus?>(
+              initialValue: _statusFilter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Status',
+                isDense: true,
               ),
+              style: TextStyle(fontSize: 12.5, color: context.textColor),
+              items: [
+                const DropdownMenuItem<UnitStatus?>(
+                  value: null,
+                  child: Text('All statuses'),
+                ),
+                ...UnitStatus.values.map(
+                  (s) => DropdownMenuItem<UnitStatus?>(
+                    value: s,
+                    child: Text(s.label),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _statusFilter = v),
             ),
           ],
         ),

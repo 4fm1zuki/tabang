@@ -1554,6 +1554,90 @@ void main() {
     });
   });
 
+  group('Staff communications', () {
+    test('the staff room includes every staff and admin account', () {
+      final room = repo.staffRoom!;
+      expect(room.isGroup, isTrue);
+      expect(room.groupName, 'Staff room');
+      final staffIds = repo.users
+          .where((user) => user.role.isAdminSide)
+          .map((user) => user.id)
+          .toSet();
+      expect(room.memberIds.toSet(), staffIds);
+
+      // Community users never see the room; staff and admins always do.
+      expect(
+        repo
+            .threadsFor('USR-001')
+            .any((t) => t.id == TabangRepository.staffRoomId),
+        isFalse,
+      );
+      expect(
+        repo
+            .threadsFor('USR-010')
+            .any((t) => t.id == TabangRepository.staffRoomId),
+        isTrue,
+      );
+      expect(
+        repo
+            .threadsFor('USR-011')
+            .any((t) => t.id == TabangRepository.staffRoomId),
+        isTrue,
+      );
+    });
+
+    test('staff-to-staff messages keep personal aliases, not the chapter', () {
+      repo.sendMessage(
+        TabangRepository.staffRoomId,
+        'USR-010',
+        'Shift swap: I can cover Friday.',
+      );
+      final message = repo.staffRoom!.messages.last;
+      expect(message.senderId, 'USR-010');
+      expect(message.senderAlias, 'Staff Marco');
+      // The chapter account shares the staff user's id, so the flag is what
+      // tells the UI this was a personal message.
+      expect(message.sentAsChapter, isFalse);
+    });
+
+    test('staff choose the chapter identity or their own account', () {
+      final thread = repo.startConversation(
+        initiatorId: 'USR-010',
+        otherId: 'USR-001',
+        firstMessage: 'Hi Juan — quick chapter update.',
+      )!;
+
+      repo.sendMessage(
+        thread.id,
+        'USR-010',
+        'Your slot is confirmed.',
+        asChapter: true,
+      );
+      var latest = repo.threadBetween('USR-010', 'USR-001')!.messages.last;
+      expect(latest.senderId, TabangRepository.chapterAccountId);
+      expect(latest.senderAlias, TabangRepository.chapterName);
+      expect(latest.sentAsChapter, isTrue);
+
+      repo.sendMessage(
+        thread.id,
+        'USR-010',
+        'Ping me if you need anything.',
+        asChapter: false,
+      );
+      latest = repo.threadBetween('USR-010', 'USR-001')!.messages.last;
+      expect(latest.senderId, 'USR-010');
+      expect(latest.senderAlias, 'Staff Marco');
+      expect(latest.sentAsChapter, isFalse);
+    });
+
+    test('reading the staff room clears the badge only for that member', () {
+      expect(repo.staffRoom!.hasUnreadFor('USR-010'), isTrue);
+      repo.markThreadRead(TabangRepository.staffRoomId, 'USR-010');
+      expect(repo.staffRoom!.hasUnreadFor('USR-010'), isFalse);
+      expect(repo.staffRoom!.hasUnreadFor('USR-011'), isTrue);
+    });
+  });
+
   group('Undo and the removed-units ledger', () {
     test('a removed unit is listed and can be restored', () {
       final staff = repo.userById('USR-010')!;

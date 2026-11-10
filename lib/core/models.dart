@@ -779,6 +779,7 @@ class ChatMessage {
     required this.sentAt,
     this.flag = ModerationFlag.clean,
     this.flagReason,
+    this.sentAsChapter = false,
   });
 
   final String id;
@@ -792,6 +793,10 @@ class ChatMessage {
   /// message was flagged instead of trusting an opaque badge.
   final String? flagReason;
 
+  /// True when a staff member chose to post this message as the official
+  /// chapter identity rather than their own account.
+  final bool sentAsChapter;
+
   ChatMessage copyWith({ModerationFlag? flag, String? flagReason}) =>
       ChatMessage(
         id: id,
@@ -801,13 +806,16 @@ class ChatMessage {
         sentAt: sentAt,
         flag: flag ?? this.flag,
         flagReason: flagReason ?? this.flagReason,
+        sentAsChapter: sentAsChapter,
       );
 }
 
-/// A conversation between two parties.
+/// A conversation, either between two parties or a named group room.
 ///
 /// `identityRevealed` implements the double-blind rule: real names stay
-/// hidden until both sides agree to proceed.
+/// hidden until both sides agree to proceed. A non-empty [memberIds] turns
+/// the thread into a group room (for example the staff room), where every
+/// member can post and each member has their own read marker.
 class ChatThread {
   const ChatThread({
     required this.id,
@@ -822,6 +830,9 @@ class ChatThread {
     this.unblockedAt,
     this.participantAReadAt,
     this.participantBReadAt,
+    this.groupName,
+    this.memberIds = const [],
+    this.memberReadAt = const {},
   });
 
   final String id;
@@ -831,6 +842,19 @@ class ChatThread {
   final String participantBAlias;
   final List<ChatMessage> messages;
   final bool identityRevealed;
+
+  /// Group rooms carry a display name and a member list instead of the two
+  /// participant fields.
+  final String? groupName;
+  final List<String> memberIds;
+  final Map<String, DateTime> memberReadAt;
+
+  bool get isGroup => memberIds.isNotEmpty;
+
+  /// True when [userId] may read and post in this thread.
+  bool includes(String userId) => isGroup
+      ? memberIds.contains(userId)
+      : participantAId == userId || participantBId == userId;
 
   /// The participant who has asked to reveal identities. A reveal only takes
   /// effect when the *other* participant accepts, preserving the paper's
@@ -845,6 +869,7 @@ class ChatThread {
   final DateTime? participantBReadAt;
 
   DateTime? readAtFor(String userId) {
+    if (isGroup) return memberReadAt[userId];
     if (userId == participantAId) return participantAReadAt;
     if (userId == participantBId) return participantBReadAt;
     return null;
@@ -882,6 +907,7 @@ class ChatThread {
     bool clearUnblockedAt = false,
     DateTime? participantAReadAt,
     DateTime? participantBReadAt,
+    Map<String, DateTime>? memberReadAt,
   }) {
     return ChatThread(
       id: id,
@@ -898,6 +924,9 @@ class ChatThread {
       unblockedAt: clearUnblockedAt ? null : (unblockedAt ?? this.unblockedAt),
       participantAReadAt: participantAReadAt ?? this.participantAReadAt,
       participantBReadAt: participantBReadAt ?? this.participantBReadAt,
+      groupName: groupName,
+      memberIds: memberIds,
+      memberReadAt: memberReadAt ?? this.memberReadAt,
     );
   }
 }

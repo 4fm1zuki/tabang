@@ -68,6 +68,10 @@ class _AdminShellState extends State<AdminShell> {
   /// Staff can pin the phone bar open when they swipe through long lists.
   bool _navPinned = false;
 
+  /// Horizontal scroll for the phone bar. Material only auto-adds scrollbars
+  /// to vertical lists, so the bar owns a visible one.
+  final ScrollController _navScroll = ScrollController();
+
   /// Downward travel accumulates before the bar hides, so tiny settling
   /// deltas cannot toggle it.
   double _navDownTravel = 0;
@@ -147,6 +151,7 @@ class _AdminShellState extends State<AdminShell> {
   @override
   void dispose() {
     _repo.removeListener(_refresh);
+    _navScroll.dispose();
     super.dispose();
   }
 
@@ -355,7 +360,8 @@ class _AdminShellState extends State<AdminShell> {
                           final barWidth = constraints.maxWidth < minBarWidth
                               ? minBarWidth
                               : constraints.maxWidth;
-                          return SingleChildScrollView(
+                          final bar = SingleChildScrollView(
+                            controller: _navScroll,
                             scrollDirection: Axis.horizontal,
                             child: SizedBox(
                               width: barWidth,
@@ -393,6 +399,16 @@ class _AdminShellState extends State<AdminShell> {
                                 ],
                               ),
                             ),
+                          );
+                          if (barWidth <= constraints.maxWidth) return bar;
+                          return Scrollbar(
+                            key: const ValueKey('adminPhoneNavScrollbar'),
+                            controller: _navScroll,
+                            thumbVisibility: true,
+                            scrollbarOrientation: ScrollbarOrientation.top,
+                            thickness: 3,
+                            radius: const Radius.circular(3),
+                            child: bar,
                           );
                         },
                       ),
@@ -601,26 +617,33 @@ class _AdminPhoneHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: TabangSpace.sm),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'TABANG',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                  color: context.textColor,
+          // Long aliases and role labels must ellipsize, never widen the row:
+          // the donor and staff headers share this rule.
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TABANG',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: context.textColor,
+                  ),
                 ),
-              ),
-              Text(
-                '${user.alias} · ${user.role.label}',
-                style: TextStyle(fontSize: 11.5, color: context.textMuted),
-              ),
-            ],
+                Text(
+                  '${user.alias} · ${user.role.label}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                ),
+              ],
+            ),
           ),
-          const Spacer(),
           IconButton(
             key: const ValueKey('phoneNavPinButton'),
             tooltip: navPinned

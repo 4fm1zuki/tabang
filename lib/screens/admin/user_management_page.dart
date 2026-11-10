@@ -8,6 +8,7 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
+import '../../widgets/filter_bar.dart';
 import '../../widgets/photo.dart';
 import '../donor/chat_page.dart';
 
@@ -475,81 +476,70 @@ class _UserManagementPageState extends State<UserManagementPage> {
             const SizedBox(height: TabangSpace.lg),
           ],
 
-          Wrap(
-            spacing: TabangSpace.md,
-            runSpacing: TabangSpace.md,
-            children: [
-              SizedBox(
-                width: 240,
-                child: TextField(
-                  controller: _search,
-                  onChanged: (v) => setState(() => _query = v),
-                  style: const TextStyle(fontSize: 12.5),
-                  decoration: InputDecoration(
-                    hintText: 'Name, alias, email, barangay',
-                    isDense: true,
-                    prefixIcon: const Icon(Icons.search, size: 17),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.close, size: 15),
-                            onPressed: () {
-                              _search.clear();
-                              setState(() => _query = '');
-                            },
-                          ),
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 170,
-                child: DropdownButtonFormField<AccountStatus?>(
-                  initialValue: _statusFilter,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    isDense: true,
-                  ),
-                  style: TextStyle(fontSize: 12.5, color: context.textColor),
-                  items: [
-                    const DropdownMenuItem<AccountStatus?>(
-                      value: null,
-                      child: Text('All statuses'),
-                    ),
-                    ...AccountStatus.values.map(
-                      (s) => DropdownMenuItem<AccountStatus?>(
-                        value: s,
-                        child: Text(s.label),
+          TabangFilterBar(
+            search: TextField(
+              controller: _search,
+              onChanged: (v) => setState(() => _query = v),
+              style: const TextStyle(fontSize: 12.5),
+              decoration: InputDecoration(
+                hintText: 'Name, alias, email, barangay',
+                isDense: true,
+                prefixIcon: const Icon(Icons.search, size: 17),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close, size: 15),
+                        onPressed: () {
+                          _search.clear();
+                          setState(() => _query = '');
+                        },
                       ),
-                    ),
-                  ],
-                  onChanged: (v) => setState(() => _statusFilter = v),
-                ),
               ),
-              SizedBox(
-                width: 170,
-                child: DropdownButtonFormField<UserRole?>(
-                  initialValue: _roleFilter,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Role',
-                    isDense: true,
-                  ),
-                  style: TextStyle(fontSize: 12.5, color: context.textColor),
-                  items: [
-                    const DropdownMenuItem<UserRole?>(
-                      value: null,
-                      child: Text('All roles'),
-                    ),
-                    ...UserRole.values.map(
-                      (r) => DropdownMenuItem<UserRole?>(
-                        value: r,
-                        child: Text(r.label),
-                      ),
-                    ),
-                  ],
-                  onChanged: (v) => setState(() => _roleFilter = v),
+            ),
+            filters: [
+              DropdownButtonFormField<AccountStatus?>(
+                initialValue: _statusFilter,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Status',
+                  isDense: true,
                 ),
+                style: TextStyle(fontSize: 12.5, color: context.textColor),
+                items: [
+                  const DropdownMenuItem<AccountStatus?>(
+                    value: null,
+                    child: Text('All statuses'),
+                  ),
+                  ...AccountStatus.values.map(
+                    (s) => DropdownMenuItem<AccountStatus?>(
+                      value: s,
+                      child: Text(s.label),
+                    ),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _statusFilter = v),
+              ),
+              DropdownButtonFormField<UserRole?>(
+                initialValue: _roleFilter,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Role',
+                  isDense: true,
+                ),
+                style: TextStyle(fontSize: 12.5, color: context.textColor),
+                items: [
+                  const DropdownMenuItem<UserRole?>(
+                    value: null,
+                    child: Text('All roles'),
+                  ),
+                  ...UserRole.values.map(
+                    (r) => DropdownMenuItem<UserRole?>(
+                      value: r,
+                      child: Text(r.label),
+                    ),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _roleFilter = v),
               ),
             ],
           ),

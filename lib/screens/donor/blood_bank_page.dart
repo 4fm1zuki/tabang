@@ -7,6 +7,7 @@ import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/blood_request_dialog.dart';
 import '../../widgets/common.dart';
+import '../../widgets/filter_bar.dart';
 import '../../widgets/illustrations.dart';
 
 /// Blood bank inventory, reservations and the blood-request flow.
@@ -121,7 +122,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
           PageHeader(
             title: 'Blood Bank',
             subtitle:
-                'Live stock at the Davao del Sur chapter, unit holds and '
+                'Stock at the Davao del Sur chapter, unit holds and '
                 'booked request slots.',
             actions: [
               if (_canRequest)
@@ -565,33 +566,44 @@ class _BloodBankPageState extends State<BloodBankPage> {
   }
 
   Widget _buildFilters(BuildContext context) {
-    return Wrap(
-      spacing: TabangSpace.md,
-      runSpacing: TabangSpace.md,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        SizedBox(
-          width: 230,
-          child: TextField(
-            controller: _searchController,
-            onChanged: (v) => setState(() => _query = v),
-            style: const TextStyle(fontSize: 12.5),
-            decoration: InputDecoration(
-              hintText: 'Barcode, product, storage',
-              isDense: true,
-              prefixIcon: const Icon(Icons.search, size: 17),
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.close, size: 15),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _query = '');
-                      },
-                    ),
-            ),
-          ),
+    final hasFilters =
+        _unitType != null ||
+        _recipientType != null ||
+        _component != null ||
+        _status != null;
+    return TabangFilterBar(
+      search: TextField(
+        controller: _searchController,
+        onChanged: (v) => setState(() => _query = v),
+        style: const TextStyle(fontSize: 12.5),
+        decoration: InputDecoration(
+          hintText: 'Barcode, product, storage',
+          isDense: true,
+          prefixIcon: const Icon(Icons.search, size: 17),
+          suffixIcon: _query.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close, size: 15),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _query = '');
+                  },
+                ),
         ),
+      ),
+      trailing: hasFilters
+          ? TextButton.icon(
+              onPressed: () => setState(() {
+                _unitType = null;
+                _recipientType = null;
+                _component = null;
+                _status = null;
+              }),
+              icon: const Icon(Icons.filter_alt_off, size: 15),
+              label: const Text('Clear'),
+            )
+          : null,
+      filters: [
         _dropdown<BloodType?>(
           context,
           label: 'Blood type',
@@ -660,20 +672,6 @@ class _BloodBankPageState extends State<BloodBankPage> {
           ],
           onChanged: (v) => setState(() => _status = v),
         ),
-        if (_unitType != null ||
-            _recipientType != null ||
-            _component != null ||
-            _status != null)
-          TextButton.icon(
-            onPressed: () => setState(() {
-              _unitType = null;
-              _recipientType = null;
-              _component = null;
-              _status = null;
-            }),
-            icon: const Icon(Icons.filter_alt_off, size: 15),
-            label: const Text('Clear'),
-          ),
       ],
     );
   }
@@ -685,16 +683,13 @@ class _BloodBankPageState extends State<BloodBankPage> {
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
   }) {
-    return SizedBox(
-      width: 174,
-      child: DropdownButtonFormField<T>(
-        initialValue: value,
-        isExpanded: true,
-        decoration: InputDecoration(labelText: label, isDense: true),
-        style: TextStyle(fontSize: 12.5, color: context.textColor),
-        items: items,
-        onChanged: onChanged,
-      ),
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(labelText: label, isDense: true),
+      style: TextStyle(fontSize: 12.5, color: context.textColor),
+      items: items,
+      onChanged: onChanged,
     );
   }
 

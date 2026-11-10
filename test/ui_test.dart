@@ -78,14 +78,23 @@ void main() {
     expect(find.text('2D VECTOR MAP'), findsNothing);
     expect(find.text('ALL'), findsOneWidget);
 
-    // Repeated taps must not wedge the page.
+    // Repeated taps must not wedge the page, and a tap selects a barangay
+    // immediately (no double-tap recognizer holding the gesture).
     final mapCentre = tester.getCenter(find.byType(DigosVectorMap));
     for (var i = 0; i < 3; i++) {
-      await tester.tapAt(mapCentre + Offset(i * 24.0, 0));
+      await tester.tapAt(mapCentre);
       await tester.pumpAndSettle();
     }
+    expect(
+      find.byKey(const ValueKey('clearDonorBarangayFilter')),
+      findsOneWidget,
+    );
 
-    expect(find.textContaining('Available donors'), findsOneWidget);
+    // Clear the filter so the rest of the test describes the whole directory.
+    await tester.tap(find.byKey(const ValueKey('clearDonorBarangayFilter')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Available donors'), findsOneWidget);
 
     // The scale bar is tied to the live camera, not a cached zoom: its label
     // and the number of pixels drawn must describe the same ground distance.
@@ -122,10 +131,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('collapseDonorListButton')));
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.textContaining('Available donors'), findsNothing);
+    // The panel is replaced by the compact restore bar at the bottom of the
+    // map, which still names the hidden list and carries its count.
+    expect(find.textContaining('Available donors'), findsOneWidget);
+    expect(find.text('Show donor list'), findsOneWidget);
     await tester.tap(find.byTooltip('Show donor list'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Available donors'), findsOneWidget);
+    expect(find.text('Show donor list'), findsNothing);
     expect(hideMapButton, findsOneWidget);
 
     // Hide map swaps the switch for the Show map button above the list.
@@ -207,12 +220,13 @@ void main() {
     }
     expect(selected, isTrue, reason: 'a map tap should select a barangay');
 
-    // The donor pane collapses to the right and expands again.
-    await tester.tap(find.byIcon(Icons.chevron_right));
+    // The donor pane collapses to the map-only restore bar and expands again.
+    await tester.tap(find.byKey(const ValueKey('collapseDonorListButton')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Available donors'), findsNothing);
-    await tester.tap(find.byIcon(Icons.chevron_left));
+    expect(find.text('Show donor list'), findsOneWidget);
+    await tester.tap(find.byTooltip('Show donor list'));
     await tester.pumpAndSettle();
+    expect(find.text('Show donor list'), findsNothing);
     expect(find.textContaining('Available donors'), findsOneWidget);
   });
 
@@ -385,8 +399,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('staff operations map renders the request layer', (tester) async {
-    tester.view.physicalSize = const Size(1280, 900);
+  testWidgets('staff operations map reuses the community map chrome', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -399,27 +415,34 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Operations map'), findsOneWidget);
-    expect(find.text('OPEN REQUESTS'), findsOneWidget);
-    expect(find.text('Inventory queue'), findsOneWidget);
+    // Same map surface as Find Donor: title card, blood-type chips, zoom and
+    // fit stack, donor-style side panel with the Expand switch.
     expect(find.byType(DigosVectorMap), findsOneWidget);
-
-    // The legend switch gives staff the same donor-density heatmap that the
-    // community map uses, and swaps the legend with it.
-    await tester.tap(find.text('Donor density'));
-    await tester.pumpAndSettle();
-    expect(find.text('DONOR DENSITY'), findsOneWidget);
-    expect(find.text('No available donors'), findsOneWidget);
-    expect(find.text('OPEN REQUESTS'), findsNothing);
-
-    await tester.tap(find.text('Requests'));
-    await tester.pumpAndSettle();
+    expect(find.text('Digos City Barangay Map'), findsOneWidget);
+    expect(find.text('ALL'), findsOneWidget);
+    expect(find.byIcon(Icons.add), findsOneWidget);
+    expect(find.byIcon(Icons.fit_screen), findsOneWidget);
+    expect(find.text('Open requests'), findsOneWidget);
     expect(find.text('OPEN REQUESTS'), findsOneWidget);
-    expect(find.text('DONOR DENSITY'), findsNothing);
+    expect(find.text('Requests'), findsOneWidget);
+    expect(find.text('Registrations'), findsOneWidget);
+
+    // The old staff-only chrome is gone: no page header, inventory shortcut,
+    // size menu, layer toggle or "city-wide queue" section.
+    expect(find.text('Operations map'), findsNothing);
+    expect(find.text('Inventory queue'), findsNothing);
+    expect(find.text('City-wide queue'), findsNothing);
+    expect(find.text('Donor density'), findsNothing);
+    expect(find.byKey(const ValueKey('mapSizeMenu')), findsNothing);
+
+    // The blood-type chips filter the request panel, like the donor map.
+    await tester.tap(find.text('O+'));
+    await tester.pumpAndSettle();
+    expect(find.text('Open requests'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('phone operations map offers size menu, list-only and restore', (
+  testWidgets('phone operations map uses the same Expand/Collapse switch', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -436,38 +459,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.byKey(const ValueKey('mapSizeMenu')), findsOneWidget);
-    expect(find.byKey(const ValueKey('showMapButton')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('hideOperationsMapButton')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('showOperationsMapButton')), findsNothing);
+    expect(find.byKey(const ValueKey('mapSizeMenu')), findsNothing);
 
-    // The pull-up handle under the strip removes the map and leaves the
-    // queue; the companion button restores it.
-    await tester.ensureVisible(find.byKey(const ValueKey('hideMapButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('hideMapButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(DigosVectorMap), findsNothing);
-    expect(find.byKey(const ValueKey('showMapButton')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('showMapButton')));
+    // The panel chevron collapses to map only, then restores the split.
+    await tester.tap(
+      find.byKey(const ValueKey('collapseOperationsListButton')),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.byKey(const ValueKey('showMapButton')), findsNothing);
-
-    // The size menu replaces the old full-screen toggle pair and also offers
-    // the same list-only destination directly.
-    await tester.tap(find.byKey(const ValueKey('mapSizeMenu')));
+    // The request panel becomes the compact restore bar over the map.
+    expect(find.text('Open requests'), findsOneWidget);
+    expect(find.text('Show request list'), findsOneWidget);
+    await tester.tap(find.byTooltip('Show request list'));
     await tester.pumpAndSettle();
+    expect(find.text('Open requests'), findsOneWidget);
+    expect(find.text('Show request list'), findsNothing);
 
-    for (final label in ['Strip + list', 'Half map', 'Full map', 'List only']) {
-      expect(find.text(label), findsOneWidget);
-    }
-
-    await tester.tap(find.text('List only'));
+    // Expand gives the list the whole page; Collapse restores the map.
+    await tester.tap(find.byKey(const ValueKey('hideOperationsMapButton')));
     await tester.pumpAndSettle();
-
     expect(find.byType(DigosVectorMap), findsNothing);
-    expect(find.byKey(const ValueKey('showMapButton')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('showOperationsMapButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('showOperationsMapButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DigosVectorMap), findsOneWidget);
+    expect(find.byKey(const ValueKey('showOperationsMapButton')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -606,25 +631,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // One Operations destination, with the two working views in an inner rail.
-    expect(find.text('OPERATIONS'), findsOneWidget);
-    expect(find.text('Operations map'), findsOneWidget);
+    // One Operations destination with a top segmented control at every width;
+    // there is no desktop-only inner sidebar.
+    expect(find.byKey(const ValueKey('operationsSidebar')), findsNothing);
+    expect(find.text('Open requests'), findsOneWidget);
     expect(find.byType(DigosVectorMap), findsOneWidget);
 
     await tester.tap(find.text('Inventory'));
     await tester.pumpAndSettle();
-    expect(find.text('Inventory & requests'), findsOneWidget);
     expect(find.text('Add unit'), findsOneWidget);
 
     await tester.tap(find.text('Map'));
     await tester.pumpAndSettle();
-    expect(find.text('Operations map'), findsOneWidget);
-
-    // The inner rail collapses to icons without hiding the two sections.
-    await tester.tap(find.byTooltip('Collapse operations sidebar'));
-    await tester.pumpAndSettle();
-    expect(find.byTooltip('Expand operations sidebar'), findsOneWidget);
-    expect(find.text('OPERATIONS'), findsNothing);
+    expect(find.text('Open requests'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -643,6 +662,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // The staff room is listed for staff with its staff-only marker (the
+    // auto-opened header repeats the name, hence findsWidgets).
+    expect(find.text('Staff room'), findsWidgets);
+    expect(find.text('Staff only'), findsWidgets);
 
     await tester.tap(find.byTooltip('New conversation'));
     await tester.pumpAndSettle();
@@ -664,6 +688,9 @@ void main() {
 
     expect(find.byType(AlertDialog), findsNothing);
     expect(find.text('Write a message'), findsOneWidget);
+    // Staff can choose the chapter identity or their own account; the safe
+    // default is the chapter.
+    expect(find.text('Sending as the PRC chapter identity'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -806,7 +833,9 @@ void main() {
 
     expect(find.text('READINESS SCORE'), findsOneWidget);
     expect(find.text('of 100% max'), findsOneWidget);
-    expect(find.text('Live'), findsOneWidget);
+    // The old "Live"/"Simulated data" chips were removed as noise.
+    expect(find.text('Live'), findsNothing);
+    expect(find.text('SIMULATED DATA'), findsNothing);
 
     // Every bar names the count against its target instead of a bare
     // percentage, and the KPI footnotes repeat the same denominator.

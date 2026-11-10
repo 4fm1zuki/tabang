@@ -193,43 +193,9 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageHeader(
+          const PageHeader(
             title: 'Statistics',
             subtitle: 'Supply, donor engagement and barangay coverage for Digos City.',
-            actions: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TabangSpace.md,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: context.infoBg,
-                  borderRadius: BorderRadius.circular(TabangRadius.pill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.science_outlined,
-                      size: 12,
-                      color: TabangColors.info,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'SIMULATED DATA',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                        color: context.isDark
-                            ? const Color(0xFF8FB8E8)
-                            : TabangColors.info,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
           const SizedBox(height: TabangSpace.lg),
 
@@ -433,14 +399,6 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                             letterSpacing: 1.3,
                             color: Colors.white.withValues(alpha: 0.72),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        const StatusPill(
-                          'Live',
-                          tone: Tone.success,
-                          icon: Icons.bolt,
-                          dense: true,
-                          onImage: true,
                         ),
                       ],
                     ),

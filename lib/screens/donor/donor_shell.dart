@@ -76,6 +76,10 @@ class _DonorShellState extends State<DonorShell> {
   /// Pins the phone bar open so a long downward swipe cannot hide it.
   bool _navPinned = false;
 
+  /// Horizontal scroll for the phone bar. Material gives vertical lists a
+  /// scrollbar on desktop but leaves horizontal rows bare, so the bar owns one.
+  final ScrollController _navScroll = ScrollController();
+
   void _toggleNavPin() {
     setState(() {
       _navPinned = !_navPinned;
@@ -175,6 +179,7 @@ class _DonorShellState extends State<DonorShell> {
   @override
   void dispose() {
     _repo.removeListener(_refresh);
+    _navScroll.dispose();
     super.dispose();
   }
 
@@ -415,7 +420,8 @@ class _DonorShellState extends State<DonorShell> {
                           final barWidth = constraints.maxWidth < minBarWidth
                               ? minBarWidth
                               : constraints.maxWidth;
-                          return SingleChildScrollView(
+                          final bar = SingleChildScrollView(
+                            controller: _navScroll,
                             scrollDirection: Axis.horizontal,
                             child: SizedBox(
                               width: barWidth,
@@ -453,6 +459,16 @@ class _DonorShellState extends State<DonorShell> {
                                 ],
                               ),
                             ),
+                          );
+                          if (barWidth <= constraints.maxWidth) return bar;
+                          return Scrollbar(
+                            key: const ValueKey('donorPhoneNavScrollbar'),
+                            controller: _navScroll,
+                            thumbVisibility: true,
+                            scrollbarOrientation: ScrollbarOrientation.top,
+                            thickness: 3,
+                            radius: const Radius.circular(3),
+                            child: bar,
                           );
                         },
                       ),
@@ -640,26 +656,33 @@ class _PhoneHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: TabangSpace.sm),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'TABANG',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.0,
-                  color: context.textColor,
+          // Matches the staff header: the identity gets the free space and
+          // ellipsizes instead of pushing the actions off-screen.
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TABANG',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                    color: context.textColor,
+                  ),
                 ),
-              ),
-              Text(
-                user.alias,
-                style: TextStyle(fontSize: 12, color: context.textMuted),
-              ),
-            ],
+                Text(
+                  user.alias,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: context.textMuted),
+                ),
+              ],
+            ),
           ),
-          const Spacer(),
           IconButton(
             key: const ValueKey('phoneNavPinButton'),
             tooltip: navPinned

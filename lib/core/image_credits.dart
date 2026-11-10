@@ -36,7 +36,6 @@ class ImageCredit {
 }
 
 const String kAvatarDirectory = 'assets/images/avatars/';
-const String kEducationalDirectory = 'assets/images/educational/';
 
 const List<ImageCredit> kImageCredits = [
   ImageCredit(
@@ -49,11 +48,12 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_hydration.jpg',
-    title: 'Boy drinks water from a glass at home',
-    author: 'Shixart1985',
-    license: 'CC BY 2.0',
+    title: 'Still mineral water poured into a glass',
+    author: 'Walter J. Pilsak, Waldsassen',
+    license: 'CC BY-SA 3.0',
     kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Boy_drinks_water_from_glass_in_a_cozy_home_environment.jpg',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:Stilles_Mineralwasser.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_nutrition.jpg',
@@ -82,20 +82,19 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_drive.jpg',
-    title: 'A donated bag of blood held at a collection session',
-    author: 'Bibeyjj',
-    license: 'CC BY-SA 4.0',
+    title: 'Bloodletting and blood donation, Philippine Red Cross, Baliuag',
+    author: 'Judgefloro',
+    license: 'CC0',
     kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Blood_Donation_Bag.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_07.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/drive_community.jpg',
-    title: 'Blood donation camp with donors resting on beds',
-    author: 'Ameyawiki',
-    license: 'CC BY-SA 4.0',
+    title: 'Blood donation drive at a mall activity centre, Baliuag',
+    author: 'Judgefloro',
+    license: 'CC0',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:Blood_donation_GIFT.jpg',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_04.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_story.jpg',
@@ -107,11 +106,12 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_privacy.jpg',
-    title: 'Anonymised blood donor card with name and number redacted',
-    author: 'Wikimedia Commons contributor',
-    license: 'CC BY-SA 4.0',
+    title: 'Blood donor registration desk, Philippine Red Cross, Baliuag',
+    author: 'Judgefloro',
+    license: 'CC0',
     kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Blood_donor_card_japan_20141024.jpg',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_08.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_tattoo.jpg',
@@ -124,21 +124,29 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/images/content_donation_day.jpg',
-    title: 'Needle in place during a blood donation',
-    author: 'Makysm',
+    title: 'Blood donation beds at a Philippine Red Cross drive, Baliuag',
+    author: 'Judgefloro',
     license: 'CC0',
     kind: 'photo',
     sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:Blood_donation_process.jpg',
+        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_03.jpg',
+  ),
+  ImageCredit(
+    asset: 'assets/images/content_community.jpg',
+    title: 'Registration and screening at a community blood drive, Baliuag',
+    author: 'Judgefloro',
+    license: 'CC0',
+    kind: 'photo',
+    sourceUrl:
+        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_14.jpg',
   ),
   ImageCredit(
     asset: 'assets/images/content_aftercare.jpg',
-    title: 'Resting the arm after a plasma donation',
-    author: 'U3061292',
-    license: 'CC BY-SA 3.0',
+    title: 'Dugtong Buhay Caravan blood donation, Bulacan',
+    author: 'Philippine Red Cross',
+    license: '© Philippine Red Cross — used with attribution',
     kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:After_Plasma_Donation.jpg',
+    sourceUrl: 'https://redcross.org.ph/2023/05/30/prc-and-rmns-dugtong-buhay-caravan-draws-blood-donors-in-bulacan/',
   ),
   ImageCredit(
     asset: 'assets/branding/app_icon.png',
@@ -155,55 +163,6 @@ const List<ImageCredit> kImageCredits = [
     kind: 'icon',
     sourceUrl:
         'https://commons.wikimedia.org/wiki/File:Logo_Philippine_Red_Cross.svg',
-  ),
-  ImageCredit(
-    asset: '${kEducationalDirectory}edu_benefits.png',
-    title: 'One donation, three lives',
-    author: 'TABANG original artwork (tools/make_edu_art.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
-  ),
-  ImageCredit(
-    asset: '${kEducationalDirectory}edu_help.png',
-    title: 'Donation supports patients and families',
-    author: 'TABANG original artwork (tools/make_edu_art.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
-  ),
-  ImageCredit(
-    asset: '${kEducationalDirectory}edu_prepare.png',
-    title: 'Preparing for a donation',
-    author: 'TABANG original artwork (tools/make_edu_art.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
-  ),
-  ImageCredit(
-    asset: '${kEducationalDirectory}edu_aftercare.png',
-    title: 'Rest and recovery after donating',
-    author: 'TABANG original artwork (tools/make_edu_art.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
-  ),
-  ImageCredit(
-    asset: '${kEducationalDirectory}edu_facts.png',
-    title: 'Blood components and compatibility facts',
-    author: 'TABANG original artwork (tools/make_edu_art.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
-  ),
-  ImageCredit(
-    asset: '${kEducationalDirectory}edu_eligibility.png',
-    title: 'Donor eligibility checklist',
-    author: 'TABANG original artwork (tools/make_edu_art.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
-  ),
-  ImageCredit(
-    asset: '${kEducationalDirectory}drive_locator.png',
-    title: 'Find a nearby blood drive',
-    author: 'TABANG original artwork (tools/make_edu_art.py)',
-    license: 'Original / CC0',
-    kind: 'illustration',
   ),
 ];
 
