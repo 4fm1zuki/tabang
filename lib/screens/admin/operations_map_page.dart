@@ -11,16 +11,16 @@ import '../../widgets/common.dart';
 import '../../widgets/digos_map_pane.dart';
 import '../../widgets/digos_vector_map.dart';
 import '../../widgets/illustrations.dart';
+import '../../widgets/map_split_handle.dart';
 import '../../widgets/request_document_list.dart';
 import '../../widgets/request_review_dialogs.dart';
 import '../../widgets/user_record_dialog.dart';
 
 /// How the map and the request panel share a screen.
 ///
-/// Deliberately the same three states as Find Donor: the map is either on (the
-/// default [half] split) or off ([hidden]), toggled by one **Expand** /
-/// **Collapse** button. [mapOnly] is the panel's own collapsed state, driven by
-/// the chevron rather than by the map switch.
+/// The draggable divider between them snaps between three states: [mapOnly]
+/// (the list steps aside and its restore bubble appears), [half] (the default
+/// 50/50 split) and [hidden] (the map steps aside and the list fills the page).
 enum _OperationsMapMode { mapOnly, half, hidden }
 
 /// Staff/admin operational map.
@@ -58,6 +58,20 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   BloodType? _bloodType;
   String _query = '';
   _OperationsMapMode _mapMode = _OperationsMapMode.half;
+
+  /// Fraction of the phone's body height given to the map (0–1). The draggable
+  /// divider updates it live; on release it snaps to 0, 0.52 or 1.
+  double _mapFraction = 0.52;
+
+  /// Width of the desktop request panel. Dragging the vertical divider left
+  /// shrinks it to zero (map only), which shows the same restore bubble.
+  double _panelWidth = _widePanelWidth;
+  bool _draggingSplit = false;
+
+  /// Staff can switch the heat ramp between the amber request-workload view
+  /// (default) and the community donor-density view. The legend switch drives
+  /// both this flag and the map fill.
+  bool _showDonorDensity = false;
 
   /// 0 = requests, 1 = pending registrations.
   int _paneTab = 0;
@@ -113,12 +127,17 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     return markers;
   }
 
-  /// Open requests per barangay, filtered by the same blood-type chips the
-  /// community map uses.
+  /// Actionable requests per barangay, filtered by the same blood-type chips
+  /// the community map uses.
+  ///
+  /// Matches the panel list exactly: **Awaiting verification** requests count
+  /// too, otherwise a queue made up only of newly submitted requests paints no
+  /// heat at all and the map reads as empty.
   Map<String, int> get _requestCounts {
     final counts = <String, int>{};
     for (final request in _repo.requests) {
-      if (request.status != RequestStatus.open &&
+      if (request.status != RequestStatus.pendingReview &&
+          request.status != RequestStatus.open &&
           request.status != RequestStatus.matched) {
         continue;
       }
@@ -196,43 +215,59 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
               )
-            : _buildWideLayout(context);
+            : _buildWideLayout(context, width: constraints.maxWidth);
       },
     );
   }
 
-  /// Phone arrangement with a real height animation, matching Find Donor:
-  /// Expand/Collapse grows or shrinks the map while the request panel takes
-  /// the remainder, and hiding the panel grows the map to the full page.
+  /// The map fraction that the narrow split snaps back to.
+  static const double _halfFraction = 0.52;
+
+  /// Phone arrangement: a draggable bar between the stacked map and request
+  /// panel. Pull the bar down to grow the map (the restore bubble appears at
+  /// map-only); pull it up to grow the list. Releasing near the middle restores
+  /// the normal half-and-half split.
   Widget _buildNarrowLayout(
     BuildContext context, {
     required double width,
     required double height,
   }) {
+    final available = math.max(0.0, height - MapSplitHandle.extent);
     final mapTarget = switch (_mapMode) {
       _OperationsMapMode.hidden => 0.0,
-      _OperationsMapMode.half => math.max(220.0, height * 0.52),
-      _OperationsMapMode.mapOnly => height,
+      _OperationsMapMode.mapOnly => available,
+      _OperationsMapMode.half => math.min(
+        available,
+        math.max(220.0, available * _mapFraction),
+      ),
     };
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: mapTarget, end: mapTarget),
-      duration: _paneAnimation,
+      duration: _draggingSplit ? Duration.zero : _paneAnimation,
       curve: Curves.easeOutCubic,
       builder: (context, animatedHeight, _) {
-        final mapHeight = animatedHeight.clamp(0.0, height);
-        final listHeight = math.max(0.0, height - mapHeight);
+        final mapHeight = animatedHeight.clamp(0.0, available);
+        final listHeight = math.max(0.0, available - mapHeight);
         final layoutHeight = math.max(listHeight, _minPaneLayoutHeight);
         return Column(
           children: [
-            SizedBox(
-              width: width,
-              height: mapHeight,
-              child: mapHeight < 1
-                  ? const SizedBox.shrink()
-                  : _buildMapPane(context, compact: true),
+            if (mapHeight >= 1)
+              SizedBox(
+                width: width,
+                height: mapHeight,
+                child: _buildMapPane(context, compact: true),
+              ),
+            MapSplitHandle(
+              key: const ValueKey('mapSplitHandle'),
+              vertical: false,
+              tooltip: _mapMode == _OperationsMapMode.mapOnly
+                  ? 'Drag up to show the request list'
+                  : _mapMode == _OperationsMapMode.hidden
+                  ? 'Drag down to show the map'
+                  : 'Drag to resize the map and request list',
+              onDelta: (delta) => _dragNarrowSplit(delta, available),
+              onDragEnd: _endNarrowSplitDrag,
             ),
-            if (mapHeight >= 1 && listHeight >= 1)
-              Divider(height: 1, color: context.border),
             Expanded(
               child: listHeight < 1
                   ? const SizedBox.shrink()
@@ -251,26 +286,68 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
-  /// Wide arrangement: collapsing the panel animates its width to zero and
-  /// hands the space to the map.
-  Widget _buildWideLayout(BuildContext context) {
-    if (_mapMode == _OperationsMapMode.hidden) {
-      return _buildPanelOnlyPane(context, compact: false);
-    }
+  void _dragNarrowSplit(double delta, double available) {
+    if (available <= 0) return;
+    final next = (_mapFraction + delta / available).clamp(0.0, 1.0);
+    setState(() {
+      _draggingSplit = true;
+      _mapFraction = next;
+      if (next >= 0.985) {
+        _mapMode = _OperationsMapMode.mapOnly;
+      } else if (next <= 0.015) {
+        _mapMode = _OperationsMapMode.hidden;
+      } else {
+        _mapMode = _OperationsMapMode.half;
+      }
+    });
+  }
+
+  void _endNarrowSplitDrag() {
+    if (!_draggingSplit) return;
+    setState(() {
+      _draggingSplit = false;
+      if (_mapFraction >= 0.82) {
+        _mapMode = _OperationsMapMode.mapOnly;
+        _mapFraction = 1;
+      } else if (_mapFraction <= 0.25) {
+        _mapMode = _OperationsMapMode.hidden;
+        _mapFraction = 0;
+      } else {
+        _mapMode = _OperationsMapMode.half;
+        _mapFraction = _halfFraction;
+      }
+    });
+  }
+
+  /// Wide arrangement: the divider is a vertical bar between the map and the
+  /// request panel. Drag it left to shrink the panel to zero (map only), or
+  /// right to widen it.
+  Widget _buildWideLayout(BuildContext context, {required double width}) {
+    final maxPanel = math.max(260.0, math.min(520.0, width * 0.55));
     final panelTarget = _mapMode == _OperationsMapMode.mapOnly
         ? 0.0
-        : _widePanelWidth;
+        : _panelWidth.clamp(0.0, maxPanel);
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: panelTarget, end: panelTarget),
-      duration: _paneAnimation,
+      duration: _draggingSplit ? Duration.zero : _paneAnimation,
       curve: Curves.easeOutCubic,
       builder: (context, animatedWidth, _) {
-        final panelWidth = animatedWidth.clamp(0.0, _widePanelWidth);
+        final panelWidth = animatedWidth.clamp(0.0, maxPanel);
+        final contentWidth = math.max(panelWidth, _widePanelWidth);
         return Row(
           children: [
             // Same element slot at every width, so collapsing the last few
             // pixels does not rebuild the map and reset its camera.
             Expanded(child: _buildMapPane(context, compact: false)),
+            MapSplitHandle(
+              key: const ValueKey('mapSplitHandle'),
+              vertical: true,
+              tooltip: panelWidth < 1
+                  ? 'Drag right to show the request list'
+                  : 'Drag to resize the map and request list',
+              onDelta: (delta) => _dragWideSplit(delta, maxPanel),
+              onDragEnd: _endWideSplitDrag,
+            ),
             SizedBox(
               width: panelWidth,
               child: panelWidth < 0.5
@@ -279,9 +356,9 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                       child: OverflowBox(
                         alignment: Alignment.centerLeft,
                         minWidth: _widePanelWidth,
-                        maxWidth: _widePanelWidth,
+                        maxWidth: contentWidth,
                         child: SizedBox(
-                          width: _widePanelWidth,
+                          width: contentWidth,
                           child: Container(
                             decoration: BoxDecoration(
                               color: context.surface,
@@ -301,6 +378,34 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
+  void _dragWideSplit(double delta, double maxPanel) {
+    // Dragging left (negative dx) grows the panel.
+    final next = (_panelWidth - delta).clamp(0.0, maxPanel);
+    setState(() {
+      _draggingSplit = true;
+      _panelWidth = next;
+      _mapMode = next < 0.5
+          ? _OperationsMapMode.mapOnly
+          : _OperationsMapMode.half;
+    });
+  }
+
+  void _endWideSplitDrag() {
+    if (!_draggingSplit) return;
+    setState(() {
+      _draggingSplit = false;
+      if (_panelWidth < 80) {
+        _mapMode = _OperationsMapMode.mapOnly;
+        _panelWidth = 0;
+      } else if (_panelWidth < 280) {
+        _mapMode = _OperationsMapMode.half;
+        _panelWidth = _widePanelWidth;
+      } else {
+        _mapMode = _OperationsMapMode.half;
+      }
+    });
+  }
+
   Widget _buildMapPane(BuildContext context, {required bool compact}) {
     final selected = _selected;
     final requestsHere = selected == null
@@ -318,7 +423,9 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     return DigosMapPane(
       controller: _mapController,
       donorCounts: _repo.donorCountsByBarangay(),
-      requestCounts: _requestCounts,
+      // A null requestCounts makes the shared map paint the donor-density
+      // ramp; the legend switch decides which ramp is live.
+      requestCounts: _showDonorDensity ? null : _requestCounts,
       drives: _driveMarkers,
       selectedBarangay: selected,
       selectedSummary: summary,
@@ -349,11 +456,17 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
       ],
       legend: _buildLegend(context, compact: compact),
       listCollapsed: _mapMode == _OperationsMapMode.mapOnly,
-      onToggleList: () => setState(
-        () => _mapMode = _mapMode == _OperationsMapMode.mapOnly
+      // The restore bubble always returns to the normal half split, whichever
+      // way the divider was dragged before.
+      onToggleList: () => setState(() {
+        _mapMode = _mapMode == _OperationsMapMode.mapOnly
             ? _OperationsMapMode.half
-            : _OperationsMapMode.mapOnly,
-      ),
+            : _OperationsMapMode.mapOnly;
+        if (_mapMode == _OperationsMapMode.half) {
+          _mapFraction = _halfFraction;
+          _panelWidth = _widePanelWidth;
+        }
+      }),
       listLabel: 'request list',
       listTitle: _paneTab == 0 ? 'Open requests' : 'Pending registrations',
       listCount: _paneTab == 0
@@ -395,27 +508,61 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   }
 
   Widget _buildLegend(BuildContext context, {required bool compact}) {
+    // Staff get both ramps through one two-state switch: the amber
+    // request-workload heat (the default, matching the old operations map) and
+    // the same warm donor-density ramp the community map uses.
+    final donor = _showDonorDensity;
     return DigosLegendPanel(
-      title: compact ? 'Requests' : 'OPEN REQUESTS',
+      title: compact
+          ? (donor ? 'Donors' : 'Requests')
+          : (donor ? 'DONOR DENSITY' : 'OPEN REQUESTS'),
       compact: compact,
-      entries: [
-        DigosLegendEntry(
-          color: digosRequestColor(0, dark: _mapDark),
-          label: compact ? '0' : 'None open',
-        ),
-        DigosLegendEntry(
-          color: digosRequestColor(1, dark: _mapDark),
-          label: compact ? '1' : '1 request',
-        ),
-        DigosLegendEntry(
-          color: digosRequestColor(3, dark: _mapDark),
-          label: compact ? '2–3' : '2–3 requests',
-        ),
-        DigosLegendEntry(
-          color: digosRequestColor(6, dark: _mapDark),
-          label: compact ? '4+' : '4+ requests',
-        ),
-      ],
+      header: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _layerToggle(context, compact: compact, donor: true),
+          _layerToggle(context, compact: compact, donor: false),
+        ],
+      ),
+      entries: donor
+          ? [
+              DigosLegendEntry(
+                color: digosHeatColor(0, dark: _mapDark),
+                label: compact ? '0' : 'No available donors',
+              ),
+              DigosLegendEntry(
+                color: digosHeatColor(1, dark: _mapDark),
+                label: compact ? '1–2' : '1–2 donors',
+              ),
+              DigosLegendEntry(
+                color: digosHeatColor(4, dark: _mapDark),
+                label: compact ? '3–5' : '3–5 donors',
+              ),
+              DigosLegendEntry(
+                color: digosHeatColor(7, dark: _mapDark),
+                label: compact ? '6+' : '6+ donors',
+              ),
+            ]
+          : [
+              DigosLegendEntry(
+                color: digosRequestColor(0, dark: _mapDark),
+                label: compact ? '0' : 'None open',
+              ),
+              DigosLegendEntry(
+                color: digosRequestColor(1, dark: _mapDark),
+                label: compact ? '1' : '1 request',
+              ),
+              DigosLegendEntry(
+                color: digosRequestColor(3, dark: _mapDark),
+                label: compact ? '2–3' : '2–3 requests',
+              ),
+              DigosLegendEntry(
+                color: digosRequestColor(6, dark: _mapDark),
+                label: compact ? '4+' : '4+ requests',
+              ),
+            ],
       footer: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -430,44 +577,43 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
-  /// The panel with no map above it. The map switch lives in the shared
-  /// header, so there is no second toolbar here.
-  Widget _buildPanelOnlyPane(BuildContext context, {required bool compact}) {
-    return _buildPanel(context, compact: compact);
-  }
-
-  /// One switch button for map visibility, mirroring the donor list header.
-  Widget _hideMapButton(BuildContext context) {
-    return OutlinedButton.icon(
-      key: const ValueKey('hideOperationsMapButton'),
-      onPressed: () => setState(() => _mapMode = _OperationsMapMode.hidden),
-      icon: const Icon(Icons.expand_less, size: 15),
-      label: const Text('Expand'),
-      style: _mapSwitchStyle(context),
-    );
-  }
-
-  Widget _showMapButton(BuildContext context) {
-    return OutlinedButton.icon(
-      key: const ValueKey('showOperationsMapButton'),
-      onPressed: () => setState(() => _mapMode = _OperationsMapMode.half),
-      icon: const Icon(Icons.expand_more, size: 15),
-      label: const Text('Collapse'),
-      style: _mapSwitchStyle(context),
-    );
-  }
-
-  ButtonStyle _mapSwitchStyle(BuildContext context) {
-    return OutlinedButton.styleFrom(
-      visualDensity: VisualDensity.compact,
-      minimumSize: const Size(0, 28),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      backgroundColor: context.surfaceAlt,
-      foregroundColor: context.textColor,
-      side: BorderSide(color: context.border),
-      shape: const StadiumBorder(),
-      textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+  /// Small two-state switch inside the map legend card.
+  Widget _layerToggle(
+    BuildContext context, {
+    required bool compact,
+    required bool donor,
+  }) {
+    final selected = _showDonorDensity == donor;
+    return InkWell(
+      key: ValueKey(
+        donor ? 'operationsHeatDonors' : 'operationsHeatRequests',
+      ),
+      borderRadius: BorderRadius.circular(TabangRadius.xs),
+      onTap: () => setState(() => _showDonorDensity = donor),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: selected
+              ? (context.isDark
+                    ? TabangColors.crimson.withValues(alpha: 0.22)
+                    : TabangColors.crimsonSoft)
+              : null,
+          borderRadius: BorderRadius.circular(TabangRadius.xs),
+          border: Border.all(
+            color: selected
+                ? TabangColors.crimson.withValues(alpha: 0.45)
+                : context.border,
+          ),
+        ),
+        child: Text(
+          donor ? (compact ? 'Donors' : 'Donor density') : 'Requests',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: selected ? TabangColors.crimson : context.textMuted,
+          ),
+        ),
+      ),
     );
   }
 
@@ -527,8 +673,9 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Same anatomy as Find Donor: heading and map switch first, then
-              // the segmented tabs, then the search field.
+              // Same anatomy as Find Donor: heading first (the map/list switch
+              // is now the draggable divider below the map), then the
+              // segmented tabs, then the search field.
               Row(
                 children: [
                   Expanded(
@@ -560,32 +707,6 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                         ),
                       ),
                     ),
-                  if (_mapMode == _OperationsMapMode.hidden)
-                    _showMapButton(context)
-                  else ...[
-                    if (compact) ...[
-                      const SizedBox(width: 4),
-                      _hideMapButton(context),
-                    ],
-                    Tooltip(
-                      message: 'Hide request list',
-                      child: InkWell(
-                        key: const ValueKey('collapseOperationsListButton'),
-                        onTap: () => setState(
-                          () => _mapMode = _OperationsMapMode.mapOnly,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Icon(
-                            Icons.keyboard_arrow_down,
-                            size: 18,
-                            color: context.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
               const SizedBox(height: TabangSpace.sm),

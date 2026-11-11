@@ -115,42 +115,42 @@ void main() {
       closeTo(scale.width, 0.01),
       reason: 'the drawn ruler must match its label',
     );
-    expect(find.text('© OpenStreetMap contributors'), findsOneWidget);
+    expect(
+      find.textContaining('© OpenStreetMap contributors'),
+      findsOneWidget,
+    );
     expect(find.textContaining('HOT style'), findsNothing);
 
-    // The old four-mode dropdown is gone: one switch hides and shows the map.
+    // The old four-mode dropdown and the header switches are gone. A draggable
+    // divider now sits between the map and the directory.
     expect(find.byKey(const ValueKey('findDonorMapModeMenu')), findsNothing);
-    final hideMapButton = find.byKey(const ValueKey('hideDonorMapButton'));
-    expect(hideMapButton, findsOneWidget);
+    expect(find.byKey(const ValueKey('hideDonorMapButton')), findsNothing);
     expect(find.byKey(const ValueKey('showDonorMapButton')), findsNothing);
+    expect(find.byKey(const ValueKey('collapseDonorListButton')), findsNothing);
+    final splitHandle = find.byKey(const ValueKey('mapSplitHandle'));
+    expect(splitHandle, findsOneWidget);
     final halfHeight = tester.getSize(find.byType(DigosVectorMap)).height;
 
-    // The donor pane's own collapse arrow still switches to "Map only": the
-    // map keeps the page and the directory steps out of the way. The chevron
-    // in the map stack brings the list back.
-    await tester.tap(find.byKey(const ValueKey('collapseDonorListButton')));
+    // Pull the divider down: the map grows to the full page and the donor
+    // panel becomes the compact restore bubble over it.
+    await tester.drag(splitHandle, const Offset(0, 300));
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    // The panel is replaced by the compact restore bar at the bottom of the
-    // map, which still names the hidden list and carries its count.
     expect(find.textContaining('Available donors'), findsOneWidget);
     expect(find.text('Show donor list'), findsOneWidget);
     await tester.tap(find.byTooltip('Show donor list'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Available donors'), findsOneWidget);
     expect(find.text('Show donor list'), findsNothing);
-    expect(hideMapButton, findsOneWidget);
 
-    // Hide map swaps the switch for the Show map button above the list.
-    await tester.tap(hideMapButton);
+    // Pull it up: the directory fills the page and the map steps aside.
+    await tester.drag(splitHandle, const Offset(0, -300));
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsNothing);
-    expect(find.byKey(const ValueKey('showDonorMapButton')), findsOneWidget);
     expect(find.textContaining('Available donors'), findsOneWidget);
-    expect(hideMapButton, findsNothing);
 
-    // Show map brings back exactly the default half split.
-    await tester.tap(find.byKey(const ValueKey('showDonorMapButton')));
+    // Pull it back down to the middle: the default half split returns.
+    await tester.drag(splitHandle, const Offset(0, 300));
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
     expect(find.textContaining('Available donors'), findsOneWidget);
@@ -158,7 +158,6 @@ void main() {
       tester.getSize(find.byType(DigosVectorMap)).height,
       closeTo(halfHeight, 1),
     );
-    expect(hideMapButton, findsOneWidget);
   });
 
   testWidgets('find donor desktop layout keeps its overlays and controls', (
@@ -220,8 +219,12 @@ void main() {
     }
     expect(selected, isTrue, reason: 'a map tap should select a barangay');
 
-    // The donor pane collapses to the map-only restore bar and expands again.
-    await tester.tap(find.byKey(const ValueKey('collapseDonorListButton')));
+    // The vertical divider collapses the donor pane to the map-only restore
+    // bar and expands it again.
+    await tester.drag(
+      find.byKey(const ValueKey('mapSplitHandle')),
+      const Offset(400, 0),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Show donor list'), findsOneWidget);
     await tester.tap(find.byTooltip('Show donor list'));
@@ -416,23 +419,35 @@ void main() {
     await tester.pumpAndSettle();
 
     // Same map surface as Find Donor: title card, blood-type chips, zoom and
-    // fit stack, donor-style side panel with the Expand switch.
+    // fit stack, donor-style side panel with the draggable divider.
     expect(find.byType(DigosVectorMap), findsOneWidget);
     expect(find.text('Digos City Barangay Map'), findsOneWidget);
     expect(find.text('ALL'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsOneWidget);
     expect(find.byIcon(Icons.fit_screen), findsOneWidget);
     expect(find.text('Open requests'), findsOneWidget);
+    // Staff open on the amber request-workload ramp, with a legend switch to
+    // the community donor-density ramp.
     expect(find.text('OPEN REQUESTS'), findsOneWidget);
-    expect(find.text('Requests'), findsOneWidget);
+    expect(find.text('DONOR DENSITY'), findsNothing);
+    expect(find.byKey(const ValueKey('mapSplitHandle')), findsOneWidget);
+    // "Requests" is both the queue tab and the legend's layer switch.
+    expect(find.text('Requests'), findsWidgets);
     expect(find.text('Registrations'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('operationsHeatDonors')));
+    await tester.pumpAndSettle();
+    expect(find.text('DONOR DENSITY'), findsOneWidget);
+    expect(find.text('OPEN REQUESTS'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('operationsHeatRequests')));
+    await tester.pumpAndSettle();
+    expect(find.text('OPEN REQUESTS'), findsOneWidget);
 
     // The old staff-only chrome is gone: no page header, inventory shortcut,
     // size menu, layer toggle or "city-wide queue" section.
     expect(find.text('Operations map'), findsNothing);
     expect(find.text('Inventory queue'), findsNothing);
     expect(find.text('City-wide queue'), findsNothing);
-    expect(find.text('Donor density'), findsNothing);
     expect(find.byKey(const ValueKey('mapSizeMenu')), findsNothing);
 
     // The blood-type chips filter the request panel, like the donor map.
@@ -442,7 +457,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('phone operations map uses the same Expand/Collapse switch', (
+  testWidgets('phone operations map uses the draggable split handle', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -459,20 +474,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('hideOperationsMapButton')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('mapSplitHandle')), findsOneWidget);
+    expect(find.byKey(const ValueKey('hideOperationsMapButton')), findsNothing);
     expect(find.byKey(const ValueKey('showOperationsMapButton')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('collapseOperationsListButton')),
+      findsNothing,
+    );
     expect(find.byKey(const ValueKey('mapSizeMenu')), findsNothing);
 
-    // The panel chevron collapses to map only, then restores the split.
-    await tester.tap(
-      find.byKey(const ValueKey('collapseOperationsListButton')),
+    // Pull the divider down: the map keeps the page, and the request list
+    // becomes the compact restore bubble over the map.
+    await tester.drag(
+      find.byKey(const ValueKey('mapSplitHandle')),
+      const Offset(0, 300),
     );
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    // The request panel becomes the compact restore bar over the map.
     expect(find.text('Open requests'), findsOneWidget);
     expect(find.text('Show request list'), findsOneWidget);
     await tester.tap(find.byTooltip('Show request list'));
@@ -480,19 +498,22 @@ void main() {
     expect(find.text('Open requests'), findsOneWidget);
     expect(find.text('Show request list'), findsNothing);
 
-    // Expand gives the list the whole page; Collapse restores the map.
-    await tester.tap(find.byKey(const ValueKey('hideOperationsMapButton')));
+    // Pull it up: the list fills the page and the map steps aside.
+    await tester.drag(
+      find.byKey(const ValueKey('mapSplitHandle')),
+      const Offset(0, -300),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsNothing);
-    expect(
-      find.byKey(const ValueKey('showOperationsMapButton')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('mapSplitHandle')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('showOperationsMapButton')));
+    // Pull it back down to restore the half split.
+    await tester.drag(
+      find.byKey(const ValueKey('mapSplitHandle')),
+      const Offset(0, 300),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.byKey(const ValueKey('showOperationsMapButton')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

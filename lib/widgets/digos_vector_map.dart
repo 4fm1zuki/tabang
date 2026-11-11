@@ -16,6 +16,16 @@ import '../theme.dart';
 /// layered structure — paper base, internal boundaries, a heavy outer city
 /// border, halo labels — is re-coloured to the app's warm crimson, maroon,
 /// charcoal and gold set, with the donor heat ramp kept for density.
+///
+/// Where to edit the map's colours:
+/// - canvas under the raster: [paperGradient] / [paperGradientDark] and
+///   [outsideGradient] / [outsideGradientDark];
+/// - the raster street base itself: [lightTileFilter] / [darkTileFilter];
+/// - barangay data fills: [digosHeatColor], [digosRequestColor] and
+///   [digosHeatOpacity] in this same file;
+/// - borders, selection, pins and labels: [internalBorder], [cityBorder],
+///   [selectionFill], [selectionBorder], [drive], [hospital], [chapter],
+///   [label] and their `…Dark` variants below.
 class DigosMapColors {
   const DigosMapColors._();
 
@@ -75,25 +85,31 @@ class DigosMapColors {
   static const Color chapterDark = Color(0xFFFFB4A8);
   static const Color attribution = Color(0xFF5A4F4B);
 
-  /// Light tiles are drawn untinted. Both earlier matrices changed the base
-  /// map's colour (warm beige, then cool blue); identity lets the standard
-  /// Humanitarian raster sit neutrally on the plain white canvas.
+  /// Light tiles keep the familiar street-map colours, softened just enough to
+  /// sit under TABANG's data layers.
+  ///
+  /// The old near-neutral wash drained every colour out of the base, which is
+  /// why the map read as dim grey. This matrix keeps ~82% saturation and lifts
+  /// the range by 6, so rivers stay blue, parks stay green and main roads keep
+  /// a warm tint while the whole raster still reads pale next to the paper
+  /// canvas. Edit these 20 numbers to retune the light base (the first three
+  /// rows are R/G/B; the fifth column is the 0–255 offset).
   static const List<double> lightTileFilter = <double>[
-    1,
+    0.843,
+    0.143,
+    0.014,
     0,
+    6,
+    0.043,
+    0.943,
+    0.014,
     0,
+    6,
+    0.043,
+    0.143,
+    0.814,
     0,
-    0,
-    0,
-    1,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-    0,
+    6,
     0.000,
     0.000,
     0.000,
@@ -363,6 +379,32 @@ class DigosVectorMap extends StatefulWidget {
   /// offset by the same amount on every side.
   static const double baseMapMargin = 128 * math.sqrt2 + 16;
 
+  /// The inverse city mask: the whole canvas rectangle with [cityRing]
+  /// (already projected to canvas coordinates) punched out as a hole.
+  ///
+  /// Uses the even-odd fill rule rather than
+  /// `Path.combine(PathOperation.difference, ...)`. On the web renderer the
+  /// combined path lost the hole for city-wide cameras — painting the mask
+  /// over the entire viewport and hiding the raster base behind it — and
+  /// collapsed to nothing at street level. Exposed as a pure function so tests
+  /// can assert the hole directly ([Path.contains] respects the fill rule).
+  static ui.Path outsideCityMaskPath(Size size, List<Offset> cityRing) {
+    final city = ui.Path();
+    for (var i = 0; i < cityRing.length; i++) {
+      final point = cityRing[i];
+      if (i == 0) {
+        city.moveTo(point.dx, point.dy);
+      } else {
+        city.lineTo(point.dx, point.dy);
+      }
+    }
+    city.close();
+    return ui.Path()
+      ..fillType = ui.PathFillType.evenOdd
+      ..addRect(Offset.zero & size)
+      ..addPath(city, Offset.zero);
+  }
+
   /// The camera fit that frames the whole city, using the same bounds as the
   /// standalone `map/` project so the framing matches the previous map.
   static final LatLngBounds cityBounds = LatLngBounds(
@@ -440,9 +482,8 @@ class DigosVectorMap extends StatefulWidget {
         // padding grows with it to keep the visible framing identical to a
         // plain 40 px inset.
         padding: const EdgeInsets.all(40 + baseMapMargin),
-        // Same cap as the standalone map. The one-time re-fit after the first
-        // real layout (@see _fitOnceMeasured) means an early zero-sized
-        // layout can no longer leave the city framed at street level.
+        // Same cap as the standalone map, and as the initial fit below, so the
+        // compass button cannot zoom past the city-wide framing.
         maxZoom: 13,
       ),
     );
@@ -483,32 +524,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     mapScaleBarScale(zoom: 11, latitude: 6.84),
   );
 
-  /// Map widget size, used to reject labels that would fall off the canvas.
-  Size? _mapSize;
   bool _firstFrameDone = false;
-
-  /// `initialCameraFit` is computed before the map has a real size when the
-  /// page is restored straight into Find Donor, which used to leave the city
-  /// framed too small. Once a valid layout size exists, re-fit exactly once.
-  bool _didInitialFit = false;
-
-  void _fitOnceMeasured() {
-    if (_didInitialFit) return;
-    final size = _mapSize;
-    if (size == null || size.width < 50 || size.height < 50) return;
-    _didInitialFit = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      try {
-        DigosVectorMap.fitCity(widget.controller);
-        _syncScale(widget.controller.camera);
-      } catch (_) {
-        // The camera may not exist on the very first frame; the next layout
-        // will schedule another attempt.
-        _didInitialFit = false;
-      }
-    });
-  }
 
   void _syncScale(MapCamera camera) {
     _scaleNotifier.value = mapScaleBarScale(
@@ -573,9 +589,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
     final pinScale = _lerp(10.5, 0.62, 14, 1.0);
 
     return LayoutBuilder(
-      builder: (context, constraints) {
-        _mapSize = constraints.biggest;
-        _fitOnceMeasured();
+      builder: (context, _) {
         return Stack(
           clipBehavior: Clip.hardEdge,
           children: [
@@ -621,6 +635,13 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                         ),
                       ),
                       backgroundColor: Colors.transparent,
+                      // The one and only initial framing. flutter_map 8 applies
+                      // this once real constraints exist, so it must not be
+                      // followed by a post-frame `fitCamera` re-fit: a camera
+                      // jump while the first tiles are in flight aborts every
+                      // request and the layer never retries, leaving the base
+                      // blank until the user pans (the old v7 re-fit did
+                      // exactly that).
                       initialCameraFit: CameraFit.bounds(
                         // Same framing as the standalone map project, with the
                         // canvas margin added so the visible inset stays 40 px.
@@ -683,10 +704,11 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                     ),
                     children: [
                       if (DigosVectorMap.tilesEnabled)
-                        // Street base exactly as the standalone map project
-                        // renders it. Light mode keeps the raster as drawn —
-                        // no tint — so the base map cannot pick up a warm or
-                        // cool cast; only the dark theme transforms it.
+                        // The raster is only lightly tinted in light mode (see
+                        // [DigosMapColors.lightTileFilter]); the dark theme
+                        // transforms it into the inverted night base. Retune
+                        // both matrices in that class to change the map's base
+                        // colours.
                         ColorFiltered(
                           colorFilter: ColorFilter.matrix(
                             dark
@@ -694,20 +716,15 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                                 : DigosMapColors.lightTileFilter,
                           ),
                           child: TileLayer(
-                            // OpenStreetMap France's Carto fork: plain OSM
-                            // data with no hill shading or mountain-peak
-                            // symbols, which is what the old HOT tiles used to
-                            // give before HOT retired that endpoint (404).
-                            // Served from the Bretagne (bzh) mirror rather
-                            // than {s}.tile.openstreetmap.fr/osmfr: the main
-                            // osmfr host answers 403 to a localhost Referer,
-                            // so the base map would be blank in a local web
-                            // build. CARTO's keyless style is unusable now
-                            // (its CDN returns "API KEY REQUIRED"), and the
-                            // standard OSM/ Esri styles draw terrain shading
-                            // over the Digos highlands.
-                            urlTemplate:
-                                'https://tile.openstreetmap.bzh/br/{z}/{x}/{y}.png',
+                            // OSM France's Carto fork, served from the keyless
+                            // Bretagne mirror. It is the old coloured base:
+                            // blue rivers, green parks and warm main roads,
+                            // without terrain shading or peak symbols. Unlike
+                            // Stadia's grey Positron style it stays recognisable
+                            // as a street map at every zoom, and because the
+                            // mirror needs no API key the same URL works on
+                            // localhost and in a deployed build.
+                            urlTemplate: 'https://tile.openstreetmap.bzh/br/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.digos.barangay_map',
                             maxNativeZoom: 19,
                             // The offset is re-evaluated inside the tile builder so
@@ -715,10 +732,11 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                             // Whole-tile shifts are fetched by the provider; only
                             // the sub-tile remainder is translated here, which
                             // keeps the oversized canvas above small even at
-                            // zoom 18. panBuffer keeps a preloaded ring so a short
-                            // pan does not reveal unloaded tiles.
+                            // zoom 18. The tile buffers stay at FlutterMap's
+                            // defaults: the widened ring cost ~4x the tiles at
+                            // zoom 18 on a slow mirror, which is what made
+                            // zooming laggy and blank-prone.
                             tileProvider: _tileProvider,
-                            panBuffer: 1,
                             tileBuilder: (context, tileWidget, tile) =>
                                 Transform.translate(
                                   offset: DigosVectorMap.baseMapResidualFor(
@@ -949,6 +967,9 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
       );
     }
 
+    // Staff maps pass requestCounts for the amber request-workload ramp; when
+    // they do not (or the legend switch selects donors) the same fill uses the
+    // community donor-density ramp.
     final requestCounts = widget.requestCounts;
     final count = requestCounts != null
         ? (requestCounts[canonical] ?? 0)
@@ -970,9 +991,9 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
 
     return Polygon(
       points: feature.ring,
-      // Requests are a workload layer, so even zero-request barangays keep a
-      // slightly stronger wash than the donor ramp's near-invisible empty
-      // state; the map should read as "nothing open here" at a glance.
+      // Request fills keep a faint wash even at zero so the amber workload
+      // layer reads as "nothing open here" at a glance; the donor ramp lets
+      // empty barangays fall back to the streets.
       color: fill.withValues(
         alpha: requestCounts != null
             ? (count == 0 ? 0.10 : digosHeatOpacity(count) + 0.08)
@@ -1034,24 +1055,16 @@ class _OutsideCityMaskPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final viewport = Offset.zero & size;
-    final city = ui.Path();
-    for (var i = 0; i < cityRing.length; i++) {
-      final point = camera.latLngToScreenPoint(cityRing[i]);
-      if (i == 0) {
-        city.moveTo(point.x, point.y);
-      } else {
-        city.lineTo(point.x, point.y);
-      }
-    }
-    city.close();
-
-    // Everything in the visible canvas except the city ring.
-    final mask = ui.Path.combine(
-      ui.PathOperation.difference,
-      ui.Path()..addRect(viewport),
-      city,
+    // Everything in the visible canvas except the city ring; see
+    // [DigosVectorMap.outsideCityMaskPath] for why the hole is built with the
+    // even-odd fill rule instead of `Path.combine`.
+    canvas.drawPath(
+      DigosVectorMap.outsideCityMaskPath(
+        size,
+        [for (final point in cityRing) camera.latLngToScreenOffset(point)],
+      ),
+      Paint()..shader = gradient.createShader(viewport),
     );
-    canvas.drawPath(mask, Paint()..shader = gradient.createShader(viewport));
   }
 
   @override

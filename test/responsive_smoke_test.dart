@@ -175,39 +175,35 @@ void main() {
     // only cue that more chips sit off-screen.
     expect(find.byKey(const ValueKey('mapChipScrollbar')), findsOneWidget);
 
-    // The map switch belongs to the panel header, not the Donors tab: it must
-    // stay available on Facilities and Drives too.
-    final hideMap = find.byKey(const ValueKey('hideDonorMapButton'));
+    // The split handle belongs to the map/list boundary, not the Donors tab:
+    // it stays available on Facilities and Drives too.
+    final splitHandle = find.byKey(const ValueKey('mapSplitHandle'));
     final donationTabs = find.byType(SegmentedButton<int>);
     await tester.tap(
       find.descendant(of: donationTabs, matching: find.text('Facilities')),
     );
     await tester.pumpAndSettle();
-    expect(hideMap, findsOneWidget);
+    expect(splitHandle, findsOneWidget);
     await tester.tap(
       find.descendant(of: donationTabs, matching: find.text('Drives')),
     );
     await tester.pumpAndSettle();
-    expect(hideMap, findsOneWidget);
+    expect(splitHandle, findsOneWidget);
     await tester.tap(
       find.descendant(of: donationTabs, matching: find.text('Donors')),
     );
     await tester.pumpAndSettle();
 
-    // The single map switch: Hide map swaps for Show map in the list header,
-    // and only one of the two ever exists.
-    await tester.ensureVisible(hideMap);
+    // Pull the divider down: map-only with a "Show donor list" bubble.
+    await tester.drag(splitHandle, const Offset(0, 300));
     await tester.pumpAndSettle();
-    await tester.tap(hideMap);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('hideDonorMapButton')), findsNothing);
-    expect(find.byKey(const ValueKey('showDonorMapButton')), findsOneWidget);
+    expect(find.text('Show donor list'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byKey(const ValueKey('showDonorMapButton')));
+    // Tapping the bubble restores the half split.
+    await tester.tap(find.byTooltip('Show donor list'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('hideDonorMapButton')), findsOneWidget);
-    expect(find.byKey(const ValueKey('showDonorMapButton')), findsNothing);
+    expect(find.text('Show donor list'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

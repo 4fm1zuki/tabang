@@ -620,12 +620,16 @@ class DigosLegendPanel extends StatelessWidget {
     super.key,
     required this.title,
     required this.entries,
+    this.header,
     this.footer,
     this.compact = false,
   });
 
   final String title;
   final List<DigosLegendEntry> entries;
+
+  /// Optional control shown under the title, such as the staff layer switch.
+  final Widget? header;
   final Widget? footer;
   final bool compact;
 
@@ -648,6 +652,7 @@ class DigosLegendPanel extends StatelessWidget {
                 color: context.textColor,
               ),
             ),
+            if (header != null) header!,
             for (final entry in entries) _swatch(context, entry, small: true),
             if (footer != null) footer!,
           ],
@@ -670,6 +675,10 @@ class DigosLegendPanel extends StatelessWidget {
               color: context.textMuted,
             ),
           ),
+          if (header != null) ...[
+            const SizedBox(height: 4),
+            header!,
+          ],
           const SizedBox(height: 5),
           for (final entry in entries) _swatch(context, entry),
           if (footer != null)

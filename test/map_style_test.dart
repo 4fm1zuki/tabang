@@ -70,19 +70,87 @@ void main() {
       expect(DigosMapColors.outsideGradient.colors, [white, white]);
     });
 
-    test('light tiles are drawn untinted', () {
-      // Identity matrix: no warm or cool cast on the Humanitarian raster.
-      expect(DigosMapColors.lightTileFilter, [
-        1, 0, 0, 0, 0, //
-        0, 1, 0, 0, 0, //
-        0, 0, 1, 0, 0, //
-        0, 0, 0, 1, 0, //
-      ]);
+    test('light tiles keep rivers blue and parks green while staying pale', () {
+      const filter = DigosMapColors.lightTileFilter;
+
+      // The base is the familiar coloured street map again, only softened.
+      // Carto's water tile colour must stay blue: B > G > R.
+      final water = _apply(filter, [125, 168, 215]);
+      expect(water[2], greaterThan(water[1]));
+      expect(water[1], greaterThan(water[0]));
+
+      // Parks stay green: G is the strongest channel.
+      final forest = _apply(filter, [173, 209, 158]);
+      expect(forest[1], greaterThan(forest[0]));
+      expect(forest[1], greaterThan(forest[2]));
+
+      // Main roads keep their warm tint: R > G > B.
+      final road = _apply(filter, [230, 138, 92]);
+      expect(road[0], greaterThan(road[1]));
+      expect(road[1], greaterThan(road[2]));
+
+      // Nothing is allowed to get darker than a light base map; the tint only
+      // softens the palette instead of draining it to grey.
+      for (final colour in [water, forest, road]) {
+        for (final channel in colour) {
+          expect(channel, greaterThan(100), reason: 'base must read pale');
+        }
+      }
+
+      // White land stays essentially white.
+      final white = _apply(filter, [255, 255, 255]);
+      for (final channel in white) {
+        expect(channel, greaterThanOrEqualTo(235));
+      }
     });
 
     test('barangay outlines use the deeper opaque terracotta', () {
       expect(DigosMapColors.internalBorder, const Color(0xFFB85C42));
       expect(DigosMapColors.cityBorder, const Color(0xFF5A1512));
+    });
+  });
+
+  group('outside city mask', () {
+    test('punches the city ring out of the canvas rectangle', () {
+      // Regression: the mask used to be built with
+      // `Path.combine(PathOperation.difference, ...)`, which lost the hole on
+      // the web renderer at city-wide zoom — the mask covered the whole
+      // viewport and hid the raster base. The even-odd path must keep the hole.
+      const size = Size(400, 400);
+      const ring = [
+        Offset(100, 100),
+        Offset(300, 100),
+        Offset(300, 300),
+        Offset(100, 300),
+      ];
+
+      final mask = DigosVectorMap.outsideCityMaskPath(size, ring);
+
+      // The ring interior is a hole: the mask must not cover it.
+      expect(mask.contains(const Offset(200, 200)), isFalse);
+      // Everything outside the ring is masked.
+      expect(mask.contains(const Offset(50, 200)), isTrue);
+      expect(mask.contains(const Offset(350, 350)), isTrue);
+      // The path still spans the canvas so the margins can be hidden.
+      expect(mask.getBounds(), const Rect.fromLTRB(0, 0, 400, 400));
+    });
+
+    test('keeps the hole for a city-wide camera', () {
+      // At the desktop fit (~2 km) the ring is only a fraction of the canvas;
+      // this is the exact case that turned into a full-viewport cover.
+      const size = Size(1234, 1199);
+      const ring = [
+        Offset(430, 237),
+        Offset(804, 237),
+        Offset(804, 962),
+        Offset(430, 962),
+      ];
+
+      final mask = DigosVectorMap.outsideCityMaskPath(size, ring);
+
+      expect(mask.contains(const Offset(617, 600)), isFalse);
+      expect(mask.contains(const Offset(10, 10)), isTrue);
+      expect(mask.contains(const Offset(1200, 1180)), isTrue);
     });
   });
 }

@@ -13,14 +13,15 @@ import '../../widgets/digos_map_pane.dart';
 import '../../widgets/digos_vector_map.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/layout.dart';
+import '../../widgets/map_split_handle.dart';
 import '../../widgets/photo.dart';
 
-/// How the map and donor directory share a phone screen.
+/// How the map and donor directory share a screen.
 ///
-/// The map is either on (the default [half] split) or off ([hidden]), toggled
-/// by one **Hide map** / **Show map** button. [mapOnly] is the donor list's own
-/// collapsed state, driven by the **Hide donor list** / **Show donor list**
-/// chevron rather than by the map switch.
+/// The draggable divider between them snaps between three states: [mapOnly]
+/// (the list steps aside and its restore bubble appears), [half] (the default
+/// 50/50 split) and [hidden] (the map steps aside and the directory fills the
+/// page).
 enum _DonorMapMode { mapOnly, half, hidden }
 
 /// Find Donor: Digos City vector map plus the donor directory.
@@ -75,6 +76,15 @@ class _FindDonorPageState extends State<FindDonorPage> {
   String _query = '';
   _DonorMapMode _mapMode = _DonorMapMode.half;
 
+  /// Fraction of the phone's body height given to the map (0–1). The draggable
+  /// divider updates it live; on release it snaps to 0, 0.52 or 1.
+  double _mapFraction = 0.52;
+
+  /// Width of the desktop donor panel. Dragging the vertical divider left
+  /// shrinks it to zero (map only), showing the same restore bubble.
+  double _panelWidth = _widePanelWidth;
+  bool _draggingSplit = false;
+
   /// The map style follows the app's effective theme, so it darkens with the
   /// system as soon as the theme does. The style button sets a per-visit
   /// override; without one, [didChangeDependencies] re-syncs on every theme
@@ -103,6 +113,8 @@ class _FindDonorPageState extends State<FindDonorPage> {
     setState(() {
       _selectedBarangay = donor.barangay;
       _mapMode = _DonorMapMode.half;
+      _mapFraction = 0.52;
+      _panelWidth = _widePanelWidth;
     });
     _focusBarangay(donor.barangay);
   }
@@ -497,47 +509,64 @@ class _FindDonorPageState extends State<FindDonorPage> {
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
               )
-            : _buildWideLayout(context);
+            : _buildWideLayout(context, width: constraints.maxWidth);
       },
     );
   }
 
-  /// Phone arrangement with a real height animation: the map grows or shrinks
-  /// between full, half and hidden while the directory takes the remainder.
+  /// The map fraction that the narrow split snaps back to.
+  static const double _halfFraction = 0.52;
+
+  /// Phone arrangement: a draggable bar between the stacked map and directory.
+  /// Pull it down to grow the map (the restore bubble appears at map-only);
+  /// pull it up to grow the list. Releasing near the middle restores the
+  /// normal half-and-half split.
   Widget _buildNarrowLayout(
     BuildContext context, {
     required double width,
     required double height,
   }) {
+    final available = math.max(0.0, height - MapSplitHandle.extent);
     final mapTarget = switch (_mapMode) {
       _DonorMapMode.hidden => 0.0,
-      _DonorMapMode.half => math.max(220.0, height * 0.52),
-      _DonorMapMode.mapOnly => height,
+      _DonorMapMode.mapOnly => available,
+      _DonorMapMode.half => math.min(
+        available,
+        math.max(220.0, available * _mapFraction),
+      ),
     };
     return TweenAnimationBuilder<double>(
       // begin == end on the first build, so the page opens at the half split
       // without animating from zero. Later target changes animate from the
       // current height.
       tween: Tween<double>(begin: mapTarget, end: mapTarget),
-      duration: _paneAnimation,
+      duration: _draggingSplit ? Duration.zero : _paneAnimation,
       curve: Curves.easeOutCubic,
       builder: (context, animatedHeight, _) {
-        final mapHeight = animatedHeight.clamp(0.0, height);
-        final listHeight = math.max(0.0, height - mapHeight);
+        final mapHeight = animatedHeight.clamp(0.0, available);
+        final listHeight = math.max(0.0, available - mapHeight);
         final layoutHeight = math.max(listHeight, _minPaneLayoutHeight);
         return Column(
           children: [
-            SizedBox(
-              width: width,
-              height: mapHeight,
-              // A map laid out at a sub-pixel height has no camera to fit;
-              // the last sliver is invisible anyway.
-              child: mapHeight < 1
-                  ? const SizedBox.shrink()
-                  : _buildMapPane(context, compact: true),
+            if (mapHeight >= 1)
+              SizedBox(
+                width: width,
+                height: mapHeight,
+                // A map laid out at a sub-pixel height has no camera to fit;
+                // the last sliver is invisible anyway.
+                child: _buildMapPane(context, compact: true),
+              ),
+            MapSplitHandle(
+              key: const ValueKey('mapSplitHandle'),
+              vertical: false,
+              tooltip: _mapMode == _DonorMapMode.mapOnly
+                  ? 'Drag up to show the donor list'
+                  : _mapMode == _DonorMapMode.hidden
+                  ? 'Drag down to show the map'
+                  : 'Drag to resize the map and donor list',
+              onDelta: (delta) => _dragNarrowSplit(delta, available),
+              onDragEnd: _endNarrowSplitDrag,
             ),
-            if (mapHeight >= 1 && listHeight >= 1)
-              Divider(height: 1, color: context.border),
             Expanded(
               child: listHeight < 1
                   ? const SizedBox.shrink()
@@ -556,41 +585,83 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
-  /// Wide arrangement. Hiding the directory animates its width to zero and
-  /// lets the map take the space, instead of swapping subtrees.
-  Widget _buildWideLayout(BuildContext context) {
-    if (_mapMode == _DonorMapMode.hidden) {
-      return _buildDonorOnlyPane(context, compact: false);
-    }
+  void _dragNarrowSplit(double delta, double available) {
+    if (available <= 0) return;
+    final next = (_mapFraction + delta / available).clamp(0.0, 1.0);
+    setState(() {
+      _draggingSplit = true;
+      _mapFraction = next;
+      if (next >= 0.985) {
+        _mapMode = _DonorMapMode.mapOnly;
+      } else if (next <= 0.015) {
+        _mapMode = _DonorMapMode.hidden;
+      } else {
+        _mapMode = _DonorMapMode.half;
+      }
+    });
+  }
+
+  void _endNarrowSplitDrag() {
+    if (!_draggingSplit) return;
+    setState(() {
+      _draggingSplit = false;
+      if (_mapFraction >= 0.82) {
+        _mapMode = _DonorMapMode.mapOnly;
+        _mapFraction = 1;
+      } else if (_mapFraction <= 0.25) {
+        _mapMode = _DonorMapMode.hidden;
+        _mapFraction = 0;
+      } else {
+        _mapMode = _DonorMapMode.half;
+        _mapFraction = _halfFraction;
+      }
+    });
+  }
+
+  /// Wide arrangement. The divider is a vertical bar between the map and the
+  /// directory; drag it left to shrink the panel to zero (map only), or right
+  /// to widen it.
+  Widget _buildWideLayout(BuildContext context, {required double width}) {
+    final maxPanel = math.max(260.0, math.min(520.0, width * 0.55));
     final panelTarget = _mapMode == _DonorMapMode.mapOnly
         ? 0.0
-        : _widePanelWidth;
+        : _panelWidth.clamp(0.0, maxPanel);
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: panelTarget, end: panelTarget),
-      duration: _paneAnimation,
+      duration: _draggingSplit ? Duration.zero : _paneAnimation,
       curve: Curves.easeOutCubic,
       builder: (context, animatedWidth, _) {
-        final panelWidth = animatedWidth.clamp(0.0, _widePanelWidth);
+        final panelWidth = animatedWidth.clamp(0.0, maxPanel);
+        final contentWidth = math.max(panelWidth, _widePanelWidth);
         return Row(
           children: [
             // Kept in the same slot even at zero width: swapping between a
             // bare map and a Row would rebuild the map state and reset the
             // camera at the end of the animation.
             Expanded(child: _buildMapPane(context, compact: false)),
+            MapSplitHandle(
+              key: const ValueKey('mapSplitHandle'),
+              vertical: true,
+              tooltip: panelWidth < 1
+                  ? 'Drag right to show the donor list'
+                  : 'Drag to resize the map and donor list',
+              onDelta: (delta) => _dragWideSplit(delta, maxPanel),
+              onDragEnd: _endWideSplitDrag,
+            ),
             SizedBox(
               width: panelWidth,
               child: panelWidth < 0.5
                   ? const SizedBox.shrink()
                   : ClipRect(
-                      // The panel keeps its full width while the frame narrows,
-                      // so its content slides out to the right rather than
-                      // reflowing through every intermediate width.
+                      // The panel keeps its full width while the frame
+                      // narrows, so its content slides out to the right rather
+                      // than reflowing through every intermediate width.
                       child: OverflowBox(
                         alignment: Alignment.centerLeft,
                         minWidth: _widePanelWidth,
-                        maxWidth: _widePanelWidth,
+                        maxWidth: contentWidth,
                         child: SizedBox(
-                          width: _widePanelWidth,
+                          width: contentWidth,
                           child: Container(
                             decoration: BoxDecoration(
                               color: context.surface,
@@ -610,49 +681,30 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
-  /// The directory with no map above it. The map switch now lives in the
-  /// shared header, so this is just the list, not a second toolbar.
-  Widget _buildDonorOnlyPane(BuildContext context, {required bool compact}) {
-    return _buildDonorPane(context, compact: compact);
+  void _dragWideSplit(double delta, double maxPanel) {
+    // Dragging left (negative dx) grows the panel.
+    final next = (_panelWidth - delta).clamp(0.0, maxPanel);
+    setState(() {
+      _draggingSplit = true;
+      _panelWidth = next;
+      _mapMode = next < 0.5 ? _DonorMapMode.mapOnly : _DonorMapMode.half;
+    });
   }
 
-  /// One switch button for map visibility, in the same header row for every
-  /// tab. "Expand" gives the list the whole page; "Collapse" brings the map
-  /// back down.
-  Widget _hideMapButton(BuildContext context) {
-    return OutlinedButton.icon(
-      key: const ValueKey('hideDonorMapButton'),
-      onPressed: () => setState(() => _mapMode = _DonorMapMode.hidden),
-      // Expanding gives the list the full page; the arrow points up because
-      // the list grows upward into the space the map leaves behind.
-      icon: const Icon(Icons.expand_less, size: 15),
-      label: const Text('Expand'),
-      style: _mapSwitchStyle(context),
-    );
-  }
-
-  Widget _showMapButton(BuildContext context) {
-    return OutlinedButton.icon(
-      key: const ValueKey('showDonorMapButton'),
-      onPressed: () => setState(() => _mapMode = _DonorMapMode.half),
-      icon: const Icon(Icons.expand_more, size: 15),
-      label: const Text('Collapse'),
-      style: _mapSwitchStyle(context),
-    );
-  }
-
-  ButtonStyle _mapSwitchStyle(BuildContext context) {
-    return OutlinedButton.styleFrom(
-      visualDensity: VisualDensity.compact,
-      minimumSize: const Size(0, 28),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      backgroundColor: context.surfaceAlt,
-      foregroundColor: context.textColor,
-      side: BorderSide(color: context.border),
-      shape: const StadiumBorder(),
-      textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-    );
+  void _endWideSplitDrag() {
+    if (!_draggingSplit) return;
+    setState(() {
+      _draggingSplit = false;
+      if (_panelWidth < 80) {
+        _mapMode = _DonorMapMode.mapOnly;
+        _panelWidth = 0;
+      } else if (_panelWidth < 280) {
+        _mapMode = _DonorMapMode.half;
+        _panelWidth = _widePanelWidth;
+      } else {
+        _mapMode = _DonorMapMode.half;
+      }
+    });
   }
 
   Widget _buildMapPane(BuildContext context, {required bool compact}) {
@@ -685,11 +737,17 @@ class _FindDonorPageState extends State<FindDonorPage> {
       ],
       legend: _buildLegend(context, compact: compact),
       listCollapsed: _mapMode == _DonorMapMode.mapOnly,
-      onToggleList: () => setState(
-        () => _mapMode = _mapMode == _DonorMapMode.mapOnly
+      // The restore bubble always returns to the normal half split, whichever
+      // way the divider was dragged before.
+      onToggleList: () => setState(() {
+        _mapMode = _mapMode == _DonorMapMode.mapOnly
             ? _DonorMapMode.half
-            : _DonorMapMode.mapOnly,
-      ),
+            : _DonorMapMode.mapOnly;
+        if (_mapMode == _DonorMapMode.half) {
+          _mapFraction = _halfFraction;
+          _panelWidth = _widePanelWidth;
+        }
+      }),
       listLabel: 'donor list',
       listTitle: _selectedBarangay == null
           ? 'Available donors'
@@ -850,31 +908,6 @@ class _FindDonorPageState extends State<FindDonorPage> {
                         ),
                       ),
                     ),
-                  if (_mapMode == _DonorMapMode.hidden)
-                    _showMapButton(context)
-                  else ...[
-                    if (compact) ...[
-                      const SizedBox(width: 4),
-                      _hideMapButton(context),
-                    ],
-                    Tooltip(
-                      message: 'Hide donor list',
-                      child: InkWell(
-                        key: const ValueKey('collapseDonorListButton'),
-                        onTap: () =>
-                            setState(() => _mapMode = _DonorMapMode.mapOnly),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Icon(
-                            Icons.keyboard_arrow_down,
-                            size: 18,
-                            color: context.textMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
               const SizedBox(height: TabangSpace.sm),

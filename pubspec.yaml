@@ -23,7 +23,7 @@ dependencies:
   # lib/core/digos_geodata.dart. OpenStreetMap raster tiles supply the base
   # layer only (attribution shown on the map); every TABANG layer — barangays,
   # donor density, drive pins — is drawn locally and still renders offline.
-  flutter_map: ^7.0.2
+  flutter_map: ^8.3.2
   latlong2: ^0.9.1
 
   firebase_core: ^5.1.0

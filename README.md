@@ -23,8 +23,8 @@ Requirements:
 - Flutter **3.47.0 or newer** (tested with Flutter 3.47.5)
 - Dart **3.13.0 or newer** (tested with Dart 3.13.4)
 - No map key: the barangay geometry and all photography are bundled. The
-  OpenStreetMap raster base (the OSM France Carto style, served from the
-  Bretagne mirror, which draws no mountain-peak symbols or hill shading)
+  OpenStreetMap raster base (the keyless OSM-France Carto style, served from
+  the Bretagne mirror)
   loads when a
   network is available, and the complete vector map still renders on the paper
   background without it
@@ -169,19 +169,19 @@ were bypassed.
   a donor card moves the map to the barangay that donor is from (not just a
   highlight). Over the map the cursor switches to a pointing hand whenever a
   barangay is under the mouse, so "click a region to select it" is discoverable.
-  The map is a simple on/off switch in the panel header: **Expand** (arrow up)
-  leaves the directory full-page and swaps to **Collapse** (arrow down), which
-  restores exactly the default half split. Both switches animate the map height
-  (phone) or the panel width (wide) over 280 ms instead of swapping layouts, so
-  the map resizes rather than snapping. The switch stays on every tab,
-  including **Facilities** and **Drives**. The donor pane's own collapse arrow
-  switches to **Map only** independently, where a compact restore bar at the
-  bottom of the map names the hidden list, shows its count and brings it back
-  with **Show donor list**. The blood-type chip row carries a thin scroll
+  The map and directory share one **draggable divider** instead of header
+  switches: pull the bar down to give the map the page (a compact **Show donor
+  list** bubble appears with the hidden directory's count), pull it up to give
+  the directory the page, or release it near the middle to snap back to the
+  normal half-and-half split. The split follows the finger live on both the
+  stacked phone layout and the side-by-side desktop layout, then animates to
+  the nearest snap point over 280 ms. The handle stays on every tab, including
+  **Facilities** and **Drives**. The blood-type chip row carries a thin scroll
   indicator so the off-screen types are discoverable, and tapping a barangay
   selects it immediately (double-tap zoom is off so its gesture recognizer
-  cannot delay the tap). The map credit reads `© OpenStreetMap contributors` and
-  sits on the very bottom edge under the scale bar, out of the way.
+  cannot delay the tap). The map credit reads
+  `© OpenStreetMap contributors` and sits on the very bottom edge under the
+  scale bar, out of the way.
 - **Donor Hub** — a dedicated donor tab with eligibility window, next available
   date, donation history and availability controls. Availability is managed two
   ways: the manual **Directory availability** switch hides a donor on demand,
@@ -302,10 +302,14 @@ were bypassed.
   sits above the content at every width; there is no desktop-only inner sidebar.
   The map is
   deliberately the **same surface as community Find Donor** — identical title
-  card, blood-type chips, zoom/fit/style/layers stack and side-panel anatomy —
-  with the amber **open-request heat layer** instead of donor density. The one
-  map switch is **Expand** / **Collapse**, and the panel chevron collapses to
-  map-only exactly like the donor list. The panel tabs hold **Requests** and
+  card, blood-type chips, zoom/fit/style/layers stack, draggable split divider
+  and side-panel anatomy — and its legend carries a **Requests / Donor
+  density** switch: the default amber heat shows actionable requests per
+  barangay (including **Awaiting verification**), and one tap swaps the same
+  fill to the community donor-density ramp. The divider replaces the old
+  Expand/Collapse and panel chevron: drag it to grow either side, release near
+  the middle for the half split, and at map-only a **Show request list** bubble
+  restores the panel. The panel tabs hold **Requests** and
   **Registrations**; tapping a barangay scopes both lists. Requests put
   **Awaiting verification** first: staff open the details, inspect the uploaded
   request documents, confirm the booked slot with **Verify and open**
@@ -527,9 +531,13 @@ The About tab renders the full registry with source links. There is no generic
 **The map has one visual language.** A sequential warm-crimson ramp encodes
 available donors, with a legend; selection uses deep brand tones plus a
 contrasting outline, never the blue that previously meant both "selected" and
-"water". The OpenStreetMap base is drawn untinted in light mode on a plain
-white canvas, so streets, water and buildings stay neutral and the standard
-style's mountain-peak triangles never appear; TABANG's own
+"water". The base is the familiar OSM-France Carto raster, kept slightly pale
+in light mode (about 82% saturation plus a small lift) so rivers stay blue,
+parks stay green and main roads keep their warm tint without competing with the
+data ramp — the matrix lives in `DigosMapColors.lightTileFilter`, and the dark
+style reuses the same `invert + hue-rotate` recipe. It keeps streets and place
+labels legible at every zoom without the standard style's mountain-peak
+triangles; TABANG's own
 labels all sit on their barangay's representative point and never disappear as
 the view widens. The base now follows the
 active theme — the same `invert + hue-rotate` dark recipe keeps water blue and
@@ -618,16 +626,23 @@ deployment, replace the embedded data with PSA or LGU boundary data.
 ## No map key required
 
 No mapping SDK and no API key are involved. Find Donor's geometry comes from
-`lib/core/digos_geodata.dart`, and the OpenStreetMap raster tiles used as the
-base layer (the OSM France Carto style, served from the Bretagne mirror, which
-draws no peak symbols or hill shading)
-need no key or account; the required credit
+`lib/core/digos_geodata.dart`, and the raster tiles used as the
+base layer are the OSM-France Carto style served from the keyless Bretagne
+mirror (`tile.openstreetmap.bzh`), so the same URL works on localhost and in a
+deployed build. The required credit
 (`© OpenStreetMap contributors`) is drawn on the map. For a fully offline
 deployment the tile layer can be switched
 off with one flag (`DigosVectorMap.tilesEnabled`), which leaves the complete
 vector map running on the paper background. The only deployment signing caveat
 left is the Android release keystore, which the research team must supply before
 distributing an APK outside the group.
+
+Two map details are easy to break and are covered by tests: the initial framing
+comes from `initialCameraFit` alone (a post-frame `fitCamera` re-fit aborts every
+tile still loading and the layer never retries, which left the base blank at city
+width until the user panned), and the inverse city mask is built with an
+even-odd `Path` instead of `Path.combine(difference)`, which lost its hole on the
+web renderer and painted over the whole viewport.
 
 ---
 
@@ -781,7 +796,8 @@ flutter test
   control stack, and selects a barangay on tap. The Donor Hub additionally
   renders the automatic-away notice and clears it through the **I'm active**
   action, the staff Operations map reuses the community map chrome (title card,
-  blood-type chips, request legend and the same side-panel anatomy) and filters
+  blood-type chips, the Requests / Donor density legend switch and the same
+  side-panel anatomy) and filters
   its request list from those chips, the Operations workspace moves
   between its Map and Inventory views through the top segmented control with no
   desktop inner sidebar, staff
@@ -796,8 +812,8 @@ flutter test
   (enabling slim rails unpins the sidebar), and the sidebar pin reopens the
   full rail from slim mode.
   Inventory exposes Add unit plus the booked-slot queue; both Find Donor and the
-  staff Operations map hide and restore with one **Expand**/**Collapse** switch
-  while their side list collapses independently, the metric
+  staff Operations map resize with the same draggable split handle and expose a
+  **Show donor/request list** restore bubble at map-only, the metric
   scale bar keeps its label and line length consistent and follows the live
   camera, and the bottom-bar pin keeps the bar visible through a long swipe.
 - **Narrow-screen layout** — Home, Blood Bank (including unit selection and the
@@ -824,8 +840,9 @@ flutter test
 - **Map topology** — all 75 shared arcs stitch 26 complete barangay rings and
   the 60 internal border arcs, so a truncated arc table cannot crash the map.
 - **Light map canvas** — the canvas and outside mask stay plain white, the
-  light raster filter is exactly identity (no warm or cool cast), and the
-  barangay border keeps the deeper opaque terracotta.
+  light raster filter drains chroma and lifts every tone toward paper (a pale
+  base with no warm or cool cast), and the barangay border keeps the deeper
+  opaque terracotta.
 - **Map pin stability** — a drive pin resolves to the same coordinate on every
   call (no zoom-dependent screen-space nudging), and a drive sharing a
   facility's venue receives a fixed south-east offset.
