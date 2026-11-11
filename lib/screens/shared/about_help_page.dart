@@ -1188,8 +1188,8 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
                         height: 52,
                         child: TabangPhoto(
                           'assets/branding/app_icon.png',
-                          semanticLabel: 'TABANG launcher icon',
-                          creditLabel: 'TABANG launcher icon',
+                          semanticLabel: 'TABANG logo',
+                          creditLabel: 'TABANG logo',
                           fallbackIcon: Icons.water_drop,
                           fallbackIconSize: 22,
                         ),

@@ -664,7 +664,7 @@ class _AdminPhoneHeader extends StatelessWidget {
                 child: TabangPhoto(
                   'assets/branding/app_icon.png',
                   semanticLabel: 'TABANG',
-                  creditLabel: 'TABANG launcher icon',
+                  creditLabel: 'TABANG logo',
                   fallbackIcon: Icons.water_drop,
                   fallbackIconSize: 15,
                 ),

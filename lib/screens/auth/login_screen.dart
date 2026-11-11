@@ -277,7 +277,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: TabangPhoto(
                   'assets/branding/app_icon.png',
                   semanticLabel: 'TABANG app icon',
-                  creditLabel: 'TABANG launcher icon',
+                  creditLabel: 'TABANG logo',
                   fallbackIcon: Icons.water_drop,
                   fallbackIconSize: 22,
                 ),

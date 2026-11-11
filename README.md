@@ -675,7 +675,7 @@ off and there is no third-party image host to configure or pay for.
 | Learn and prepare articles | `assets/images/Learn & Prepare/*.jpg` — hydration, iron-rich foods, post-donation rest, basic requirements, tattoo, donation interval, privacy, donation day, recovery plan |
 | Blood drive cards | `assets/images/Blood Drives/*.jpg` — one per seeded drive (Digos City Gym, Barangay Matti, Cor Jesu College, Aplaya, San Jose) |
 | Profile portraits | `assets/images/avatars/avatar_001.png` … `avatar_048.png` |
-| App icon / PWA icons | `assets/branding/app_icon.png` |
+| App icon / PWA icons | `assets/branding/app_icon.png` (the TABANG logo: blood drop, heart and hand), regenerated with `tools/make_logo_assets.py` from `assets/logo.jpg`, which also writes `assets/branding/tabang_logo_{512,256,128,64}.png`, the web/PWA icons and the Android launcher icons |
 | Chapter emblem | `assets/branding/prc_logo.png` (Philippine Red Cross; public domain/PD-ineligible, symbol use regulated by the Geneva Conventions) |
 
 `TabangPhoto` (`lib/widgets/photo.dart`) is the single image surface. It loads

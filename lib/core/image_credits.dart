@@ -315,8 +315,8 @@ const List<ImageCredit> kImageCredits = [
   ),
   ImageCredit(
     asset: 'assets/branding/app_icon.png',
-    title: 'TABANG launcher icon',
-    author: 'TABANG original artwork (tools/make_media_assets.py)',
+    title: 'TABANG logo (blood drop, heart and hand)',
+    author: 'TABANG original artwork (assets/logo.jpg)',
     license: 'Original / CC0',
     kind: 'icon',
   ),
