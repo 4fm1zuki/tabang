@@ -930,6 +930,11 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                           ReportStatus.resolved,
                                         );
                                         setDialogState(() {});
+                                        _showReportUndo(
+                                          context,
+                                          report.id,
+                                          'Report marked resolved.',
+                                        );
                                       },
                                       child: const Text('Resolve'),
                                     ),
@@ -940,6 +945,11 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                           ReportStatus.dismissed,
                                         );
                                         setDialogState(() {});
+                                        _showReportUndo(
+                                          context,
+                                          report.id,
+                                          'Report dismissed.',
+                                        );
                                       },
                                       child: const Text('Dismiss'),
                                     ),
@@ -960,6 +970,25 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// Undo affordance for a report decision: the report returns to the open
+  /// queue, so a mis-tap never silently closes someone's report.
+  void _showReportUndo(
+    BuildContext context,
+    String reportId,
+    String message,
+  ) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => _repo.resolveReport(reportId, ReportStatus.open),
+        ),
       ),
     );
   }

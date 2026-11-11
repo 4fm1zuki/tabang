@@ -1215,6 +1215,9 @@ enum ActivityKind {
   requestSubmitted,
   requestVerified,
   requestRejected,
+  /// A rejection undone from the snackbar before anything else happened to the
+  /// request, so the queue entry is back where it was.
+  requestReopened,
   inventory,
   readinessTargets,
 }

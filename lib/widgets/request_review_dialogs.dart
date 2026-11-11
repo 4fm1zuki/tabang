@@ -190,6 +190,28 @@ Future<void> showRejectRequestDialog(
                       ? 'Request ${request.id} rejected with a reason.'
                       : 'Enter a reason before rejecting.',
                 ),
+                duration: const Duration(seconds: 6),
+                action: ok
+                    ? SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () {
+                          final undone = repo.undoRejectRequest(
+                            request.id,
+                            actorId: actor.id,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                undone
+                                    ? 'Request ${request.id} is back in the '
+                                          'review queue.'
+                                    : 'That rejection can no longer be undone.',
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : null,
               ),
             );
           },

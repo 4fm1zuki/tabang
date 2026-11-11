@@ -1050,6 +1050,32 @@ class TabangRepository {
     return true;
   }
 
+  /// Undo a rejection made moments ago from the snackbar: the request returns to
+  /// the review queue and the reason is cleared.
+  ///
+  /// Refused unless the request is still rejected, so an undo can never unwind a
+  /// rejection the requester has already acted on.
+  bool undoRejectRequest(String requestId, {required String actorId}) {
+    final actor = userById(actorId);
+    final index = _requests.indexWhere((r) => r.id == requestId);
+    if (actor == null || index == -1) return false;
+    if (!actor.role.isAdminSide) return false;
+    final request = _requests[index];
+    if (request.status != RequestStatus.rejected) return false;
+    _requests[index] = request.copyWith(
+      status: RequestStatus.pendingReview,
+      clearReview: true,
+    );
+    _logActivity(
+      kind: ActivityKind.requestReopened,
+      actorId: actorId,
+      subjectId: request.requesterId,
+      summary: 'Reopened request ${request.id} after an undo',
+    );
+    _notify();
+    return true;
+  }
+
   /// Undo a verification: the request returns to the review queue and any
   /// blood-bank holds placed at verification time are released.
   ///

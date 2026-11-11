@@ -60,13 +60,18 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
 
   List<BloodUnit> get _units {
     final now = DateTime.now();
-    return _repo.units.where((u) {
+    final units = _repo.units.where((u) {
       if (_typeFilter != null && u.bloodType != _typeFilter) return false;
       if (_statusFilter != null && u.effectiveStatus(now) != _statusFilter) {
         return false;
       }
       return true;
     }).toList();
+    // Most recent first: the ledger is a working queue, so the unit collected
+    // or registered last belongs at the top instead of at the end of the seed
+    // list. `collectedOn` is the only timestamp a unit carries.
+    units.sort((a, b) => b.collectedOn.compareTo(a.collectedOn));
+    return units;
   }
 
   @override
@@ -91,39 +96,29 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     label: const Text('Add unit'),
                   ),
               ],
-            )
-          else if (widget.currentUser.role.canManageInventory)
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: () => _showAddUnitDialog(context),
-                icon: const Icon(Icons.add, size: 15),
-                label: const Text('Add unit'),
-              ),
             ),
-          SizedBox(height: widget.embedded ? TabangSpace.md : TabangSpace.xl),
+          if (!widget.embedded) const SizedBox(height: TabangSpace.xl),
 
-          // Tabs
-          Wrap(
-            spacing: TabangSpace.sm,
-            runSpacing: TabangSpace.sm,
-            children: [
-              _tabButton(context, 0, 'Blood units', _repo.units.length),
-              _tabButton(context, 1, 'Requests', _repo.requests.length),
-              _tabButton(
-                context,
-                2,
-                'Booked slots',
-                _repo.pendingScheduledRequests.length,
-              ),
-              _tabButton(
-                context,
-                3,
-                'Removed units',
-                _repo.removedUnits.where((record) => !record.restored).length,
-              ),
-            ],
-          ),
+          // Tabs. Embedded in the Operations workspace the strip shares a row
+          // with "Add unit", so the header is one line instead of a lone
+          // right-aligned button sitting above the chips.
+          if (widget.embedded)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: _tabStrip(context)),
+                if (widget.currentUser.role.canManageInventory) ...[
+                  const SizedBox(width: TabangSpace.md),
+                  FilledButton.icon(
+                    onPressed: () => _showAddUnitDialog(context),
+                    icon: const Icon(Icons.add, size: 15),
+                    label: const Text('Add unit'),
+                  ),
+                ],
+              ],
+            )
+          else
+            _tabStrip(context),
           const SizedBox(height: TabangSpace.lg),
 
           switch (_tab) {
@@ -134,6 +129,31 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           },
         ],
       ),
+    );
+  }
+
+  /// The Blood units / Requests / Booked slots / Removed units strip. Rendered
+  /// on its own line on a full page, and beside "Add unit" when embedded.
+  Widget _tabStrip(BuildContext context) {
+    return Wrap(
+      spacing: TabangSpace.sm,
+      runSpacing: TabangSpace.sm,
+      children: [
+        _tabButton(context, 0, 'Blood units', _repo.units.length),
+        _tabButton(context, 1, 'Requests', _repo.requests.length),
+        _tabButton(
+          context,
+          2,
+          'Booked slots',
+          _repo.pendingScheduledRequests.length,
+        ),
+        _tabButton(
+          context,
+          3,
+          'Removed units',
+          _repo.removedUnits.where((record) => !record.restored).length,
+        ),
+      ],
     );
   }
 

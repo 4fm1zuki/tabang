@@ -1179,6 +1179,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.requestSubmitted => Icons.assignment_outlined,
     ActivityKind.requestVerified => Icons.fact_check_outlined,
     ActivityKind.requestRejected => Icons.assignment_late_outlined,
+    ActivityKind.requestReopened => Icons.assignment_return_outlined,
     ActivityKind.inventory => Icons.inventory_2_outlined,
     ActivityKind.readinessTargets => Icons.tune,
   };
@@ -1196,6 +1197,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.requestSubmitted => TabangColors.info,
     ActivityKind.requestVerified => TabangColors.success,
     ActivityKind.requestRejected => TabangColors.danger,
+    ActivityKind.requestReopened => TabangColors.warning,
     ActivityKind.inventory => TabangColors.warning,
     ActivityKind.readinessTargets => TabangColors.crimson,
   };
@@ -1364,14 +1366,20 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                     ),
                   ),
                   const SizedBox(width: TabangSpace.sm),
+                  // Right-aligned and content-sized: a pill stretched across the
+                  // full slot drew a wide outlined box, so the green "more" and
+                  // red "short" badges had visibly different shapes.
                   SizedBox(
                     width: 76,
-                    child: StatusPill(
-                      stat.balance >= 0
-                          ? '${stat.balance} more'
-                          : '${stat.balance.abs()} short',
-                      tone: stat.balance >= 0 ? Tone.success : Tone.danger,
-                      dense: true,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: StatusPill(
+                        stat.balance >= 0
+                            ? '${stat.balance} more'
+                            : '${stat.balance.abs()} short',
+                        tone: stat.balance >= 0 ? Tone.success : Tone.danger,
+                        dense: true,
+                      ),
                     ),
                   ),
                 ],
