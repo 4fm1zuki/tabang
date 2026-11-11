@@ -710,9 +710,36 @@ String formatDateTime(DateTime date) {
   return '${formatDate(date)} · $h:$m';
 }
 
-/// Relative time such as `3h ago`, `2d ago`.
-String formatRelative(DateTime date, {DateTime? now}) {
+/// `12 Oct 2026 · 5 days ago` - a calendar date plus how long ago it was.
+///
+/// Used where the age of a record matters as much as the date itself (when a
+/// unit was collected, when an account registered). Unlike [formatRelative] it
+/// keeps counting past a month, so an old record still reads as an age instead
+/// of repeating the date: days, then weeks, then months.
+String formatDateWithAge(DateTime date, {DateTime? now}) {
   final delta = (now ?? DateTime.now()).difference(date);
+  final days = delta.inDays;
+  final String age;
+  if (delta.inMinutes < 1) {
+    age = 'just now';
+  } else if (delta.inMinutes < 60) {
+    age = '${delta.inMinutes} min ago';
+  } else if (delta.inHours < 24) {
+    age = '${delta.inHours}h ago';
+  } else if (days < 14) {
+    age = '$days ${days == 1 ? 'day' : 'days'} ago';
+  } else if (days < 60) {
+    final weeks = days ~/ 7;
+    age = '$weeks ${weeks == 1 ? 'week' : 'weeks'} ago';
+  } else {
+    final months = days ~/ 30;
+    age = '$months ${months == 1 ? 'month' : 'months'} ago';
+  }
+  return '${formatDate(date)} · $age';
+}
+
+/// Relative time such as `3h ago`, `2d ago`.
+String formatRelative(DateTime date, {DateTime? now}) {  final delta = (now ?? DateTime.now()).difference(date);
   if (delta.inMinutes < 1) return 'just now';
   if (delta.inMinutes < 60) return '${delta.inMinutes}m ago';
   if (delta.inHours < 24) return '${delta.inHours}h ago';

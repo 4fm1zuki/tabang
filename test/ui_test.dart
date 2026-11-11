@@ -23,6 +23,26 @@ import 'package:tabang/widgets/photo.dart';
 import 'package:tabang/widgets/request_document_list.dart';
 import 'package:tabang/widgets/user_record_dialog.dart';
 
+/// Flutter decodes JPEG, PNG and WebP. A download named `.jpg` whose bytes are
+/// actually AVIF (or HEIC) is not an error the loader reports: it silently draws
+/// the fallback icon, so bundled photography is checked by signature here.
+bool _isDecodableImage(ByteData data) {
+  final b = data.buffer.asUint8List();
+  if (b.length < 12) return false;
+  final jpeg = b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF;
+  final png = b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47;
+  final webp =
+      b[0] == 0x52 &&
+      b[1] == 0x49 &&
+      b[2] == 0x46 &&
+      b[3] == 0x46 &&
+      b[8] == 0x57 &&
+      b[9] == 0x45 &&
+      b[10] == 0x42 &&
+      b[11] == 0x50;
+  return jpeg || png || webp;
+}
+
 void main() {
   final repo = TabangRepository.instance;
 
@@ -359,6 +379,11 @@ void main() {
         greaterThan(1000),
         reason: '${item.imageAsset} is missing or empty',
       );
+      expect(
+        _isDecodableImage(data),
+        isTrue,
+        reason: '${item.imageAsset} is not a JPEG/PNG/WebP file',
+      );
     }
 
     // Each card should still have its own photograph rather than repeating
@@ -377,6 +402,11 @@ void main() {
         data.lengthInBytes,
         greaterThan(1000),
         reason: '$photo is missing or empty',
+      );
+      expect(
+        _isDecodableImage(data),
+        isTrue,
+        reason: '$photo is not a JPEG/PNG/WebP file',
       );
       expect(
         creditForAsset(photo),
@@ -485,14 +515,19 @@ void main() {
     expect(find.text('None open'), findsOneWidget);
     expect(find.text('No available donors'), findsNothing);
     expect(find.byKey(const ValueKey('mapSplitHandle')), findsOneWidget);
-    // "Requests" is both the queue tab and the legend's layer switch.
+    // "Requests" is both the queue tab and the legend's layer switch; the
+    // second panel tab is the donor directory, not the registrations queue
+    // (that queue lives on the Users page).
     expect(find.text('Requests'), findsWidgets);
-    expect(find.text('Registrations'), findsOneWidget);
+    expect(find.text('Donors'), findsWidgets);
+    expect(find.text('Registrations'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('operationsHeatDonors')));
     await tester.pumpAndSettle();
     expect(find.text('No available donors'), findsOneWidget);
     expect(find.text('None open'), findsNothing);
+    // Switching to the donor heat also brings the donor list forward.
+    expect(find.text('Donors'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey('operationsHeatRequests')));
     await tester.pumpAndSettle();
     expect(find.text('None open'), findsOneWidget);
@@ -504,8 +539,9 @@ void main() {
     expect(find.text('City-wide queue'), findsNothing);
     expect(find.byKey(const ValueKey('mapSizeMenu')), findsNothing);
 
-    // The blood-type chips filter the request panel, like the donor map.
-    await tester.tap(find.text('O+'));
+    // The blood-type chips filter the request panel, like the donor map. The
+    // donor list also carries "O+" chips, so target the filter row (built first).
+    await tester.tap(find.text('O+').first);
     await tester.pumpAndSettle();
     expect(find.text('Open requests'), findsOneWidget);
     expect(tester.takeException(), isNull);

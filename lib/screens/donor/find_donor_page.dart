@@ -11,10 +11,10 @@ import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/digos_map_pane.dart';
 import '../../widgets/digos_vector_map.dart';
+import '../../widgets/donor_list_card.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/map_split_handle.dart';
-import '../../widgets/photo.dart';
 
 /// How the map and donor directory share a screen.
 ///
@@ -1145,130 +1145,40 @@ class _FindDonorPageState extends State<FindDonorPage> {
   }
 
   Widget _buildDonorCard(BuildContext context, AppUser donor) {
-    final eligibility = EligibilityEngine.evaluate(donor);
-    final commitment = _repo.activeCommitmentFor(donor.id);
-
-    return SurfaceCard(
-      padding: const EdgeInsets.all(TabangSpace.lg),
+    return DonorListCard(
+      donor: donor,
+      eligibility: EligibilityEngine.evaluate(donor),
+      commitmentId: _repo.activeCommitmentFor(donor.id)?.id,
       onTap: donor.shareBarangay ? () => _focusDonor(donor) : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: SizedBox(
-                  width: 42,
-                  height: 42,
-                  child: TabangPhoto(
-                    donor.photoAsset,
-                    semanticLabel: '${donor.mapHandle} profile illustration',
-                    creditLabel: donor.mapHandle,
-                    fallbackIcon: Icons.person_outline,
-                    fallbackIconSize: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: TabangSpace.sm),
-              BloodTypeChip(donor.bloodType ?? BloodType.oPos, size: 30),
-              const SizedBox(width: TabangSpace.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      donor.mapHandle,
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
-                        color: context.textColor,
-                      ),
-                    ),
-                    Text(
-                      donor.shareBarangay ? donor.barangay : 'Barangay hidden',
-                      style: TextStyle(fontSize: 12, color: context.textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              StatusPill(
-                eligibility.isEligible ? 'Eligible' : 'Cooldown',
-                tone: toneForEligibility(eligibility),
-                dense: true,
-              ),
-            ],
+      onTapHint: donor.shareBarangay
+          ? 'Centre the map on ${donor.mapHandle}'
+          : null,
+      actions: [
+        if (widget.onOpenRequests != null)
+          TextButton.icon(
+            onPressed: widget.onOpenRequests,
+            style: _donorCardActionStyle,
+            icon: const Icon(Icons.assignment_outlined, size: 16),
+            label: const Text('Requests', style: TextStyle(fontSize: 12)),
           ),
-          const SizedBox(height: TabangSpace.sm),
-          Row(
-            children: [
-              Icon(Icons.favorite_border, size: 14, color: context.textMuted),
-              const SizedBox(width: 4),
-              Text(
-                '${donor.totalDonations} donations',
-                style: TextStyle(fontSize: 12.5, color: context.textMuted),
-              ),
-              const SizedBox(width: TabangSpace.md),
-              Icon(Icons.schedule, size: 14, color: context.textMuted),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  donor.lastDonationDate == null
-                      ? 'First-time donor'
-                      : 'Last ${formatDate(donor.lastDonationDate!)}',
-                  style: TextStyle(fontSize: 12.5, color: context.textMuted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: TabangSpace.sm),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (commitment != null)
-                Tooltip(
-                  message:
-                      'This donor is already selected for another active '
-                      'request. They stay visible, but cannot be reserved for '
-                      'two requests at once.',
-                  child: StatusPill(
-                    'Coordinating · ${commitment.id}',
-                    tone: Tone.info,
-                    dense: true,
-                  ),
-                ),
-              if (widget.onOpenRequests != null)
-                TextButton.icon(
-                  onPressed: widget.onOpenRequests,
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 30),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  icon: const Icon(Icons.assignment_outlined, size: 16),
-                  label: const Text('Requests', style: TextStyle(fontSize: 12)),
-                ),
-              TextButton.icon(
-                onPressed: donor.id == widget.user.id
-                    ? null
-                    : () => _contactDonor(context, donor),
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(0, 30),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                icon: const Icon(Icons.forum_outlined, size: 16),
-                label: const Text('Message', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
-        ],
-      ),
+        TextButton.icon(
+          onPressed: donor.id == widget.user.id
+              ? null
+              : () => _contactDonor(context, donor),
+          style: _donorCardActionStyle,
+          icon: const Icon(Icons.forum_outlined, size: 16),
+          label: const Text('Message', style: TextStyle(fontSize: 12)),
+        ),
+      ],
     );
   }
+
+  /// Compact trailing actions for a donor card.
+  static final ButtonStyle _donorCardActionStyle = TextButton.styleFrom(
+    minimumSize: const Size(0, 30),
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  );
 
   Future<void> _contactDonor(BuildContext context, AppUser donor) async {
     final controller = TextEditingController();

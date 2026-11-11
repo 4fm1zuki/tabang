@@ -20,6 +20,7 @@ class OperationsWorkspacePage extends StatefulWidget {
     required this.user,
     this.initialSection = 0,
     this.onOpenUsers,
+    this.onOpenMessages,
   });
 
   final AppUser user;
@@ -29,6 +30,9 @@ class OperationsWorkspacePage extends StatefulWidget {
   final int initialSection;
 
   final VoidCallback? onOpenUsers;
+
+  /// Opens Messages on a conversation with the given user id (staff donor list).
+  final ValueChanged<String>? onOpenMessages;
 
   @override
   State<OperationsWorkspacePage> createState() =>
@@ -73,6 +77,7 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
                 user: widget.user,
                 embedded: true,
                 onOpenUsers: widget.onOpenUsers,
+                onOpenMessages: widget.onOpenMessages,
               ),
               InventoryManagementPage(
                 currentUser: widget.user,

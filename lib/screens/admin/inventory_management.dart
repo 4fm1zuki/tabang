@@ -481,7 +481,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 _detail(
                   dialogContext,
                   'Collected',
-                  formatDate(unit.collectedOn),
+                  formatDateWithAge(unit.collectedOn, now: now),
                 ),
                 _detail(dialogContext, 'Expires', formatDate(unit.expiresOn)),
                 _detail(dialogContext, 'Remaining', unit.timeLeft(now)),

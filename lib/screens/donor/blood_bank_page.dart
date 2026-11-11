@@ -933,7 +933,11 @@ class _BloodBankPageState extends State<BloodBankPage> {
                 _detail(context, 'Component', unit.product),
                 _detail(context, 'Status', effective.label),
                 _detail(context, 'Storage', unit.storageBay),
-                _detail(context, 'Collected', formatDate(unit.collectedOn)),
+                _detail(
+                  context,
+                  'Collected',
+                  formatDateWithAge(unit.collectedOn, now: now),
+                ),
                 _detail(context, 'Expires', formatDate(unit.expiresOn)),
                 _detail(context, 'Remaining', unit.timeLeft(now)),
                 if (unit.reservedBy != null)

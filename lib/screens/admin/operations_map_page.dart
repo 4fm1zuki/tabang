@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../core/eligibility.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/digos_map_pane.dart';
 import '../../widgets/digos_vector_map.dart';
+import '../../widgets/donor_list_card.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/map_split_handle.dart';
 import '../../widgets/request_document_list.dart';
@@ -27,20 +29,25 @@ enum _OperationsMapMode { mapOnly, half, hidden }
 ///
 /// This is the community Find Donor map with staff data: the same map surface,
 /// the same overlay chrome, the same Expand/Collapse switch and the same
-/// side-panel anatomy. The list holds open requests (and pending donor
-/// registrations) instead of donors; everything else is shared.
+/// side-panel anatomy. The list holds the open request queue and the donor
+/// directory; everything else is shared.
 class OperationsMapPage extends StatefulWidget {
   const OperationsMapPage({
     super.key,
     required this.user,
     this.onOpenInventory,
     this.onOpenUsers,
+    this.onOpenMessages,
     this.embedded = false,
   });
 
   final AppUser user;
   final VoidCallback? onOpenInventory;
   final VoidCallback? onOpenUsers;
+
+  /// Opens the shell's Messages tab on a conversation with the given user id.
+  /// When null the donor card simply omits its Message action.
+  final ValueChanged<String>? onOpenMessages;
 
   /// Embedded inside [OperationsWorkspacePage]. Kept for API compatibility;
   /// the map always fills its slot the way Find Donor does.
@@ -73,7 +80,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   /// both this flag and the map fill.
   bool _showDonorDensity = false;
 
-  /// 0 = requests, 1 = pending registrations.
+  /// 0 = requests, 1 = donors.
   int _paneTab = 0;
 
   /// Follows the app's effective theme (system-aware) unless the style button
@@ -178,15 +185,15 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     return list;
   }
 
-  List<DonorApplication> get _visibleApplications {
+  /// Donors shown in the panel's Donors tab: the same audience Find Donor
+  /// lists, narrowed by the selected barangay and the search box.
+  List<AppUser> get _visibleDonors {
     final q = _query.trim().toLowerCase();
-    return _repo.openDonorApplications.where((application) {
-      final applicant = _repo.userById(application.userId);
-      if (_selected != null && applicant?.barangay != _selected) return false;
+    return _repo.findDonors(barangay: _selected).where((donor) {
       if (q.isEmpty) return true;
-      return (applicant?.mapHandle.toLowerCase().contains(q) ?? false) ||
-          (applicant?.fullName.toLowerCase().contains(q) ?? false) ||
-          (applicant?.barangay.toLowerCase().contains(q) ?? false);
+      return donor.mapHandle.toLowerCase().contains(q) ||
+          (donor.shareBarangay && donor.barangay.toLowerCase().contains(q)) ||
+          (donor.bloodType?.label.toLowerCase().contains(q) ?? false);
     }).toList();
   }
 
@@ -585,7 +592,13 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
         donor ? 'operationsHeatDonors' : 'operationsHeatRequests',
       ),
       borderRadius: BorderRadius.circular(TabangRadius.xs),
-      onTap: () => setState(() => _showDonorDensity = donor),
+      onTap: () => setState(() {
+        _showDonorDensity = donor;
+        // The panel follows the heat: choosing the donor ramp brings the donor
+        // directory forward, choosing the request ramp brings the queue back,
+        // so the list always describes the layer that is painted.
+        _paneTab = donor ? 1 : 0;
+      }),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
@@ -650,12 +663,10 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
 
   Widget _buildPanel(BuildContext context, {required bool compact}) {
     final requests = _visibleRequests;
-    final applications = _visibleApplications;
+    final donors = _visibleDonors;
     final heading = _paneTab == 0
         ? (_selected == null ? 'Open requests' : 'Requests in $_selected')
-        : (_selected == null
-              ? 'Pending registrations'
-              : 'Registrations in $_selected');
+        : (_selected == null ? 'Donors' : 'Donors in $_selected');
 
     return Column(
       children: [
@@ -718,7 +729,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                     ),
                     ButtonSegment(
                       value: 1,
-                      label: _tabLabel('Registrations', applications.length),
+                      label: _tabLabel('Donors', donors.length),
                     ),
                   ],
                   selected: {_paneTab},
@@ -741,7 +752,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                 decoration: InputDecoration(
                   hintText: _paneTab == 0
                       ? 'Search request # or barangay'
-                      : 'Search applicant or barangay',
+                      : 'Search donor or barangay',
                   isDense: true,
                   prefixIcon: const Icon(Icons.search, size: 16),
                 ),
@@ -768,20 +779,21 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                         itemBuilder: (context, i) =>
                             _requestCard(context, requests[i]),
                       ))
-              : (applications.isEmpty
-                    ? const EmptyState(
+              : (donors.isEmpty
+                    ? EmptyState(
                         art: TabangArt.donors,
-                        title: 'No pending registrations',
-                        message:
-                            'New donor applications appear here for review.',
+                        title: 'No donors here',
+                        message: _selected == null
+                            ? 'No donor is currently listed for this chapter.'
+                            : 'No donor is listed in $_selected right now.',
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.all(TabangSpace.md),
-                        itemCount: applications.length,
+                        itemCount: donors.length,
                         separatorBuilder: (_, __) =>
                             const SizedBox(height: TabangSpace.sm),
                         itemBuilder: (context, i) =>
-                            _applicationCard(context, applications[i]),
+                            _donorCard(context, donors[i]),
                       )),
         ),
       ],
@@ -789,6 +801,42 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   }
 
   // -------------------------------------------------------------- card bodies
+
+  /// Staff see the same donor card the community map shows, with a tap that
+  /// opens the account record and a Message action that reuses the shell's
+  /// Messages tab.
+  Widget _donorCard(BuildContext context, AppUser donor) {
+    return DonorListCard(
+      donor: donor,
+      eligibility: EligibilityEngine.evaluate(donor),
+      commitmentId: _repo.activeCommitmentFor(donor.id)?.id,
+      onTap: () => showUserRecordDialog(context, donor),
+      onTapHint: 'Open ${donor.mapHandle}\'s record',
+      actions: [
+        TextButton.icon(
+          onPressed: () => showUserRecordDialog(context, donor),
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, 30),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: const Icon(Icons.badge_outlined, size: 16),
+          label: const Text('Record', style: TextStyle(fontSize: 12)),
+        ),
+        if (widget.onOpenMessages != null)
+          TextButton.icon(
+            onPressed: () => widget.onOpenMessages!(donor.id),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 30),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.forum_outlined, size: 16),
+            label: const Text('Message', style: TextStyle(fontSize: 12)),
+          ),
+      ],
+    );
+  }
 
   Widget _requestCard(BuildContext context, BloodRequest request) {
     return SurfaceCard(
@@ -881,47 +929,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
-  Widget _applicationCard(BuildContext context, DonorApplication application) {
-    final applicant = _repo.userById(application.userId);
-    return SurfaceCard(
-      padding: const EdgeInsets.all(TabangSpace.md),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  applicant?.mapHandle ?? application.userId,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: context.textColor,
-                  ),
-                ),
-                Text(
-                  '${applicant?.barangay ?? '—'} · '
-                  '${application.hasExistingCard ? 'Has PRC card' : 'New donor'} · '
-                  '${application.status.label}',
-                  style: TextStyle(fontSize: 11, color: context.textMuted),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: applicant == null
-                ? null
-                : () => showUserRecordDialog(context, applicant),
-            child: const Text('Details'),
-          ),
-          TextButton(
-            onPressed: widget.onOpenUsers,
-            child: const Text('Review'),
-          ),
-        ],
-      ),
-    );
-  }
+  // -------------------------------------------------------------- card bodies
 
   // ----------------------------------------------------------------- actions
 

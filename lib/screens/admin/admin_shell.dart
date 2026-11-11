@@ -158,6 +158,17 @@ class _AdminShellState extends State<AdminShell> {
     });
   }
 
+  /// Opens Messages on the conversation with [otherUserId], starting one if
+  /// there is none yet. Used by the staff donor list and the Users page.
+  void _openMessagesWith(String otherUserId) {
+    final thread = _repo.startConversation(
+      initiatorId: widget.user.id,
+      otherId: otherUserId,
+    );
+    if (thread == null) return;
+    _openMessages(threadId: thread.id);
+  }
+
   /// Key of the live Messages page; replaced on every deep link.
   Key _chatKey = UniqueKey();
 
@@ -537,6 +548,7 @@ class _AdminShellState extends State<AdminShell> {
           user: widget.user,
           initialSection: _operationsSection,
           onOpenUsers: () => _select(3),
+          onOpenMessages: _openMessagesWith,
         );
       case 2:
         return ChatPage(
