@@ -335,7 +335,28 @@ void main() {
     final distinct = repo.content.map((c) => c.imageAsset).toSet();
     expect(distinct.length, greaterThanOrEqualTo(8));
 
-    // Every bundled image resolves to its own credit entry.
+    // Every seeded drive ships its own photograph from the Blood Drives
+    // folder, and each one resolves to a credit entry.
+    final drivePhotos = <String>{};
+    for (final drive in repo.drives) {
+      final photo = drive.photoAsset;
+      expect(photo, isNotNull, reason: '${drive.id} should have a photo');
+      final data = await rootBundle.load(photo!);
+      expect(
+        data.lengthInBytes,
+        greaterThan(1000),
+        reason: '$photo is missing or empty',
+      );
+      expect(
+        creditForAsset(photo),
+        isNotNull,
+        reason: '$photo has no credit entry',
+      );
+      drivePhotos.add(photo);
+    }
+    expect(drivePhotos.length, repo.drives.length);
+
+    // Every bundled content image resolves to its own credit entry.
     final credited = distinct.where((asset) => creditForAsset(asset) != null);
     expect(credited.length, distinct.length);
 

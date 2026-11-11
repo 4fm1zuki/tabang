@@ -669,13 +669,11 @@ off and there is no third-party image host to configure or pay for.
 | Surface | Asset |
 |---|---|
 | Login brand panel, Home hero | `assets/images/hero_donation.jpg` |
-| Hydration and nutrition articles | `content_hydration.jpg`, `content_nutrition.jpg` |
-| Recovery, screening and drive articles | `content_recovery.jpg`, `content_screening.jpg`, `content_drive.jpg` |
-| Privacy, tattoo and donation-day articles | `content_privacy.jpg`, `content_tattoo.jpg`, `content_donation_day.jpg` |
-| Community article | `content_community.jpg` |
-| Recovery article (aftercare) | `content_aftercare.jpg` |
-| Recipient story | `content_story.jpg` |
-| Donor spotlight and drive cards | `drive_community.jpg`, `content_drive.jpg` |
+| Explore article | `assets/images/Announcements & Stories/How Donation Helps the Whole Community.jpg` |
+| Recipient story | `assets/images/Announcements & Stories/A stranger's donation saved my daughter's life.jpg` |
+| Donor spotlight (Meet Mark) | `assets/images/Announcements & Stories/daniel-article-1000x800px.png` |
+| Learn and prepare articles | `assets/images/Learn & Prepare/*.jpg` — hydration, iron-rich foods, post-donation rest, basic requirements, tattoo, donation interval, privacy, donation day, recovery plan |
+| Blood drive cards | `assets/images/Blood Drives/*.jpg` — one per seeded drive (Digos City Gym, Barangay Matti, Cor Jesu College, Aplaya, San Jose) |
 | Profile portraits | `assets/images/avatars/avatar_001.png` … `avatar_048.png` |
 | App icon / PWA icons | `assets/branding/app_icon.png` |
 | Chapter emblem | `assets/branding/prc_logo.png` (Philippine Red Cross; public domain/PD-ineligible, symbol use regulated by the Geneva Conventions) |
@@ -688,10 +686,14 @@ with a visible `PhotoCredit` line and a hover credit that names the actual file,
 creator and licence. The photo is paired with a scrim in the hero and login
 views to keep white copy legible.
 
-**Licences.** Source photographs are public domain, CC0 or CC BY/CC BY-SA;
-attribution for the share-alike and attribution licences is shown on the image
-itself and in the About tab. Original artwork is TABANG's own. Source URLs,
-authors and licence details are recorded
+**Licences.** The bundled photographs are a mix: the original Wikimedia/PRC set
+is public domain, CC0 or CC BY/CC BY-SA (attribution shown on the image itself
+and in the About tab), while the Discover page photos supplied for the 2026
+content pass are drawn from Facebook drive posts, iStock, Pexels, Pinterest and
+news CDNs — those keep the terms recorded against each file in
+`lib/core/image_credits.dart`, and any that is not cleared for redistribution
+must be replaced before a public release. Original artwork is TABANG's own.
+Source URLs, authors and licence details are recorded
 in [`tools/image_sources/CREDITS.md`](tools/image_sources/CREDITS.md) and in the
 About tab's per-image credit cards. The source files are kept in
 `tools/image_sources/`; regenerate the cropped, graded assets and all platform
@@ -713,7 +715,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**153 tests** cover:
+**158 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled

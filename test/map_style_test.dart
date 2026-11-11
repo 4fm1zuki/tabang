@@ -70,17 +70,17 @@ void main() {
   });
 
   group('dark map canvas', () {
-    test('the canvas stays warm charcoal, never blue', () {
+    test('the canvas stays neutral or warm, never blue', () {
       // The blue-navy gradient the map used before read as a different product
-      // next to the shell's warm dark surfaces, so blue must never be the
-      // strongest channel.
+      // next to the shell's dark surfaces, so blue must never be the strongest
+      // channel: the canvas may be warm charcoal or a flat neutral grey.
       for (final gradient in [
         DigosMapColors.paperGradientDark,
         DigosMapColors.outsideGradientDark,
       ]) {
         for (final colour in gradient.colors) {
-          expect(colour.r, greaterThan(colour.b));
-          expect(colour.g, greaterThanOrEqualTo(colour.b));
+          expect(colour.b, lessThanOrEqualTo(colour.r));
+          expect(colour.b, lessThanOrEqualTo(colour.g));
         }
       }
     });

@@ -40,4 +40,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/avatars/
+    - assets/images/Blood Drives/
+    - assets/images/Announcements & Stories/
+    - assets/images/Learn & Prepare/
     - assets/branding/

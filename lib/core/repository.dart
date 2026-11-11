@@ -3624,6 +3624,7 @@ class TabangRepository {
         startsAt: _atHour(now, 4, 8),
         endsAt: _atHour(now, 4, 15),
         expectedDonors: 120,
+        photoAsset: 'assets/images/Blood Drives/Digos City Gym Blood Drive.jpg',
       ),
       BloodDrive(
         id: 'DRV-002',
@@ -3636,6 +3637,7 @@ class TabangRepository {
         startsAt: _atHour(now, 8, 9),
         endsAt: _atHour(now, 8, 14),
         expectedDonors: 75,
+        photoAsset: 'assets/images/Blood Drives/Barangay Matti Health Drive.jpg',
       ),
       BloodDrive(
         id: 'DRV-003',
@@ -3647,6 +3649,8 @@ class TabangRepository {
         startsAt: _atHour(now, 14, 10),
         endsAt: _atHour(now, 14, 16),
         expectedDonors: 150,
+        photoAsset:
+            'assets/images/Blood Drives/Cor Jesu College Campus Drive.jpg',
       ),
       BloodDrive(
         id: 'DRV-004',
@@ -3658,6 +3662,7 @@ class TabangRepository {
         startsAt: _atHour(now, 5, 8),
         endsAt: _atHour(now, 5, 13),
         expectedDonors: 60,
+        photoAsset: 'assets/images/Blood Drives/Aplaya Community Drive.jpg',
       ),
       BloodDrive(
         id: 'DRV-005',
@@ -3669,6 +3674,8 @@ class TabangRepository {
         startsAt: _atHour(now, 11, 9),
         endsAt: _atHour(now, 11, 17),
         expectedDonors: 95,
+        photoAsset:
+            'assets/images/Blood Drives/San Jose Community Bloodletting.jpg',
       ),
     ]);
 
@@ -3697,7 +3704,8 @@ class TabangRepository {
             'alcohol in the 24 hours before your appointment.',
         tag: 'PRE-DONATION',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/content_hydration.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/Hydration First Before Donating.jpg',
       ),
       ContentItem(
         id: 'CNT-003',
@@ -3710,7 +3718,7 @@ class TabangRepository {
             'sources with vitamin C to improve absorption.',
         tag: 'NUTRITION',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/content_nutrition.jpg',
+        imageAsset: 'assets/images/Learn & Prepare/Eat Iron-Rich Foods.jpg',
       ),
       ContentItem(
         id: 'CNT-004',
@@ -3722,7 +3730,8 @@ class TabangRepository {
             'feel dizzy.',
         tag: 'RECOVERY',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/content_recovery.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/Post-Donation Rest & Recovery.jpg',
       ),
       ContentItem(
         id: 'CNT-005',
@@ -3733,7 +3742,8 @@ class TabangRepository {
             'screening. Bring a valid ID and your blood donor card if you have one.',
         tag: 'CHECKLIST',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/content_screening.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/Basic Requirements = Age, Weight & Health.jpg',
       ),
       ContentItem(
         id: 'CNT-006',
@@ -3745,7 +3755,7 @@ class TabangRepository {
             'The screening nurse makes the final call.',
         tag: 'FAQ',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/content_tattoo.jpg',
+        imageAsset: 'assets/images/Learn & Prepare/Can I Donate If I Got a Tattoo.jpg',
       ),
       ContentItem(
         id: 'CNT-007',
@@ -3758,7 +3768,7 @@ class TabangRepository {
             'intervals automatically through the donor cooldown timer.',
         tag: 'INTERVALS',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/content_drive.jpg',
+        imageAsset: 'assets/images/Learn & Prepare/How Often Can You Donate.jpg',
       ),
       ContentItem(
         id: 'CNT-008',
@@ -3770,7 +3780,8 @@ class TabangRepository {
             'once both parties confirm they intend to proceed with a donation.',
         tag: 'PRIVACY',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/content_privacy.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/Why TABANG Never Shows Real Names.jpg',
       ),
       ContentItem(
         id: 'CNT-009',
@@ -3782,7 +3793,8 @@ class TabangRepository {
             'is built to close: visibility of who is available, right now, nearby.',
         tag: 'RECIPIENT STORY',
         category: ContentCategory.stories,
-        imageAsset: 'assets/images/content_story.jpg',
+        imageAsset:
+            "assets/images/Announcements & Stories/A stranger's donation saved my daughter's life.jpg",
       ),
       ContentItem(
         id: 'CNT-010',
@@ -3794,7 +3806,8 @@ class TabangRepository {
             'emergency recruitment every time.',
         tag: 'DONOR SPOTLIGHT',
         category: ContentCategory.stories,
-        imageAsset: 'assets/images/drive_community.jpg',
+        imageAsset:
+            'assets/images/Announcements & Stories/daniel-article-1000x800px.png',
       ),
       ContentItem(
         id: 'CNT-011',
@@ -3808,7 +3821,7 @@ class TabangRepository {
             'identity and walk you through the questionnaire.',
         tag: 'CHECKLIST',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/content_donation_day.jpg',
+        imageAsset: 'assets/images/Learn & Prepare/What to Bring on Donation Day.jpg',
       ),
       ContentItem(
         id: 'CNT-012',
@@ -3821,7 +3834,8 @@ class TabangRepository {
             'Regular donors make planned care possible.',
         tag: 'WHY DONATE',
         category: ContentCategory.explore,
-        imageAsset: 'assets/images/content_community.jpg',
+        imageAsset:
+            'assets/images/Announcements & Stories/How Donation Helps the Whole Community.jpg',
       ),
       ContentItem(
         id: 'CNT-013',
@@ -3835,7 +3849,8 @@ class TabangRepository {
             'chapter if you feel faint or the site starts bleeding.',
         tag: 'AFTERCARE',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/content_aftercare.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/Plan Your Recovery After Donation.jpg',
       ),
     ]);
   }

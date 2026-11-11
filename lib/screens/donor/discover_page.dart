@@ -572,9 +572,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
   // -------------------------------------------------------------- drive card
 
   Widget _buildDriveCard(BuildContext context, BloodDrive drive, int index) {
-    final photo = index.isEven
-        ? 'assets/images/drive_community.jpg'
-        : 'assets/images/content_drive.jpg';
+    // Each drive ships its own photograph; the shared community shots remain a
+    // fallback if a drive has none.
+    final photo = drive.photoAsset ??
+        (index.isEven
+            ? 'assets/images/drive_community.jpg'
+            : 'assets/images/content_drive.jpg');
 
     return SurfaceCard(
       padding: EdgeInsets.zero,
@@ -950,9 +953,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   Future<void> _openDrive(BuildContext context, BloodDrive drive) {
     final index = _upcomingDrives.indexOf(drive);
-    final photo = index.isEven
-        ? 'assets/images/drive_community.jpg'
-        : 'assets/images/content_drive.jpg';
+    final photo = drive.photoAsset ??
+        (index.isEven
+            ? 'assets/images/drive_community.jpg'
+            : 'assets/images/content_drive.jpg');
     final now = DateTime.now();
     final isToday =
         drive.startsAt.year == now.year &&

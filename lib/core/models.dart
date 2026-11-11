@@ -1039,6 +1039,7 @@ class BloodDrive {
     required this.endsAt,
     required this.expectedDonors,
     this.isOpenForRegistration = true,
+    this.photoAsset,
     this.lat,
     this.lng,
   });
@@ -1051,6 +1052,10 @@ class BloodDrive {
   final DateTime endsAt;
   final int expectedDonors;
   final bool isOpenForRegistration;
+
+  /// Bundled photograph for the drive card on the Discover page. Null falls
+  /// back to the shared community photos.
+  final String? photoAsset;
 
   /// Venue coordinates, so the map pin sits on the actual site rather than the
   /// barangay centroid. Null falls back to the barangay centre.
