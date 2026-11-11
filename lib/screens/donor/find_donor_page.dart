@@ -1063,6 +1063,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
         final attending = _repo.driveInterestCount(drive.id);
         return SurfaceCard(
           padding: const EdgeInsets.all(TabangSpace.md),
+          // The card itself opens the drive; the old Details button duplicated
+          // that target and crowded the action row.
+          onTap: () => _showDriveDetails(drive),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1116,11 +1119,6 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     },
                     icon: const Icon(Icons.place_outlined, size: 15),
                     label: const Text('Show on map'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _showDriveDetails(drive),
-                    icon: const Icon(Icons.info_outline, size: 15),
-                    label: const Text('Details'),
                   ),
                   if (isDonor && widget.onOpenRequests != null)
                     FilledButton.tonalIcon(

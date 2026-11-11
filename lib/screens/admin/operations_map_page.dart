@@ -793,6 +793,9 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   Widget _requestCard(BuildContext context, BloodRequest request) {
     return SurfaceCard(
       padding: const EdgeInsets.all(TabangSpace.md),
+      // The whole card opens the request; the separate Details button was
+      // pointing at the same sheet and only crowded the action row.
+      onTap: () => _showRequestDetails(context, request),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -839,7 +842,8 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           ),
           const SizedBox(height: 2),
           // One glanceable line; hospital, units, responder counts and the
-          // requester all live behind Details so the card stays a queue row.
+          // requester all live behind a tap on the card, so the row stays a
+          // queue entry rather than a details form.
           Text(
             '${request.hospital} · ${request.unitsNeeded} unit(s)',
             style: TextStyle(fontSize: 11, color: context.textMuted),
@@ -848,10 +852,6 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           Wrap(
             spacing: 6,
             children: [
-              TextButton(
-                onPressed: () => _showRequestDetails(context, request),
-                child: const Text('Details'),
-              ),
               if (widget.user.role.canFulfillRequests &&
                   request.isAwaitingReview) ...[
                 TextButton(

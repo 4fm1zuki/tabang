@@ -21,9 +21,17 @@ import '../donor/chat_page.dart';
 /// mutate the shared repository, so a suspension immediately removes that donor
 /// from the directory and from eligibility.
 class UserManagementPage extends StatefulWidget {
-  const UserManagementPage({super.key, required this.currentUser});
+  const UserManagementPage({
+    super.key,
+    required this.currentUser,
+    this.onOpenMessages,
+  });
 
   final AppUser currentUser;
+
+  /// Opens the shell's Messages tab on one conversation. When null (a hosted
+  /// page in tests) the page falls back to pushing its own chat route.
+  final ValueChanged<String>? onOpenMessages;
 
   @override
   State<UserManagementPage> createState() => _UserManagementPageState();
@@ -1196,6 +1204,16 @@ class _UserManagementPageState extends State<UserManagementPage> {
       );
       return;
     }
+
+    // The shell owns the Messages tab: hand the thread over so the chat opens
+    // there with the same UI staff get from the rail, instead of stacking a
+    // second, differently framed chat screen on top of Users.
+    final openInShell = widget.onOpenMessages;
+    if (openInShell != null) {
+      openInShell(thread.id);
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => Scaffold(

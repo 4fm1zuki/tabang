@@ -483,9 +483,24 @@ class _RequestsPageState extends State<RequestsPage> {
             width: double.infinity,
             child: interested
                 ? OutlinedButton.icon(
-                    onPressed: () => setState(
-                      () => _repo.toggleDriveInterest(drive.id, _user.id),
-                    ),
+                    onPressed: () async {
+                      // Leaving the list is easy to do by accident and the
+                      // button sits under a thumb, so confirm first.
+                      final leave = await confirmAction(
+                        context,
+                        title: 'Leave this drive?',
+                        message:
+                            'You will be taken off the chapter list for '
+                            '${drive.title}. You can join again any time before '
+                            'the drive ends.',
+                        confirmLabel: 'Leave',
+                        destructive: true,
+                      );
+                      if (!leave || !mounted) return;
+                      setState(
+                        () => _repo.toggleDriveInterest(drive.id, _user.id),
+                      );
+                    },
                     icon: const Icon(Icons.check, size: 16),
                     label: const Text('On the list — tap to leave'),
                   )

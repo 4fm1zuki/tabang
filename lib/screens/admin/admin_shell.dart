@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/common.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/onboarding.dart';
 import '../../widgets/photo.dart';
@@ -122,8 +123,43 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   void _openHelp() {
-    _pushPage('About & Help', AboutHelpPage(onOpenMessages: () => _select(2)));
+    _pushPage(
+      'About & Help',
+      AboutHelpPage(onOpenMessages: _openMessagesFromPushedPage),
+    );
   }
+
+  /// About & Help is pushed *above* the shell, so re-selecting a rail entry only
+  /// swaps the IndexedStack underneath it and the visible page never changes.
+  /// Pop back to the shell first, then select Messages.
+  void _openMessagesFromPushedPage() {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    _openMessages();
+  }
+
+  /// Switches to the Messages tab, optionally opening one conversation. The
+  /// Users page sends staff here instead of pushing its own chat screen, so the
+  /// Messages tab and the User row share a single UI.
+  void _openMessages({String? threadId}) {
+    _repo.markTabSeen(widget.user.id, 'messages');
+    setState(() {
+      _index = 2;
+      _navHidden = false;
+      // A fresh key forces a new ChatPage state, so the deep link reliably
+      // selects the thread even if the tab was already open.
+      _chatKey = UniqueKey();
+      _pages[2] = ChatPage(
+        key: _chatKey,
+        user: widget.user,
+        allowNewConversation: true,
+        initialThreadId: threadId,
+      );
+    });
+  }
+
+  /// Key of the live Messages page; replaced on every deep link.
+  Key _chatKey = UniqueKey();
 
   /// Labels are only built after the rail finishes sliding, so the wordmark
   /// and nav labels never wrap inside a narrow, mid-animation rail.
@@ -503,9 +539,16 @@ class _AdminShellState extends State<AdminShell> {
           onOpenUsers: () => _select(3),
         );
       case 2:
-        return ChatPage(user: widget.user, allowNewConversation: true);
+        return ChatPage(
+          key: _chatKey,
+          user: widget.user,
+          allowNewConversation: true,
+        );
       case 3:
-        return UserManagementPage(currentUser: widget.user);
+        return UserManagementPage(
+          currentUser: widget.user,
+          onOpenMessages: (threadId) => _openMessages(threadId: threadId),
+        );
       case 4:
         return ChatModerationPage(currentUser: widget.user);
       default:
@@ -659,7 +702,7 @@ class _AdminPhoneHeader extends StatelessWidget {
           PopupMenuButton<String>(
             tooltip: 'Account',
             position: PopupMenuPosition.under,
-            onSelected: (value) {
+            onSelected: (value) async {
               switch (value) {
                 case 'profile':
                   onOpenProfile();
@@ -668,7 +711,17 @@ class _AdminPhoneHeader extends StatelessWidget {
                 case 'help':
                   onOpenHelp();
                 case 'signout':
-                  TabangRepository.instance.signOut();
+                  if (await confirmAction(
+                    context,
+                    title: 'Sign out?',
+                    message:
+                        'Your simulated records stay on this device. You can '
+                        'sign back in with the same account.',
+                    confirmLabel: 'Sign out',
+                    destructive: true,
+                  )) {
+                    TabangRepository.instance.signOut();
+                  }
               }
             },
             itemBuilder: (context) => accountMenuItems(context, user),
@@ -1055,9 +1108,19 @@ class _AdminSidebar extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.logout, size: 19),
               title: const Text('Sign out', style: TextStyle(fontSize: 13.5)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                TabangRepository.instance.signOut();
+                if (await confirmAction(
+                  context,
+                  title: 'Sign out?',
+                  message:
+                      'Your simulated records stay on this device. You can sign '
+                      'back in with the same account.',
+                  confirmLabel: 'Sign out',
+                  destructive: true,
+                )) {
+                  TabangRepository.instance.signOut();
+                }
               },
             ),
           ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/common.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/onboarding.dart';
 import '../../widgets/photo.dart';
@@ -312,7 +313,19 @@ class _DonorShellState extends State<DonorShell> {
   }
 
   void _openHelp() {
-    _pushPage('About & Help', AboutHelpPage(onOpenMessages: () => _select(4)));
+    _pushPage(
+      'About & Help',
+      AboutHelpPage(onOpenMessages: _openMessagesFromPushedPage),
+    );
+  }
+
+  /// About & Help is pushed *above* the shell, so re-selecting a rail entry only
+  /// swaps the IndexedStack underneath it and the visible page never changes.
+  /// Pop back to the shell first, then select Messages.
+  void _openMessagesFromPushedPage() {
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    _select(4);
   }
 
   Widget _buildPage(int index) {
@@ -711,7 +724,7 @@ class _PhoneHeader extends StatelessWidget {
           PopupMenuButton<String>(
             tooltip: 'Account',
             position: PopupMenuPosition.under,
-            onSelected: (value) {
+            onSelected: (value) async {
               switch (value) {
                 case 'profile':
                   onOpenProfile();
@@ -720,7 +733,17 @@ class _PhoneHeader extends StatelessWidget {
                 case 'help':
                   onOpenHelp();
                 case 'signout':
-                  TabangRepository.instance.signOut();
+                  if (await confirmAction(
+                    context,
+                    title: 'Sign out?',
+                    message:
+                        'Your simulated records stay on this device. You can '
+                        'sign back in with the same account.',
+                    confirmLabel: 'Sign out',
+                    destructive: true,
+                  )) {
+                    TabangRepository.instance.signOut();
+                  }
               }
             },
             itemBuilder: (context) => accountMenuItems(context, user),
@@ -1065,7 +1088,7 @@ class _Sidebar extends StatelessWidget {
       child: PopupMenuButton<String>(
         tooltip: 'Account',
         position: PopupMenuPosition.under,
-        onSelected: (value) {
+        onSelected: (value) async {
           switch (value) {
             case 'profile':
               onOpenProfile();
@@ -1074,7 +1097,17 @@ class _Sidebar extends StatelessWidget {
             case 'help':
               onOpenHelp();
             case 'signout':
-              TabangRepository.instance.signOut();
+              if (await confirmAction(
+                context,
+                title: 'Sign out?',
+                message:
+                    'Your simulated records stay on this device. You can sign '
+                    'back in with the same account.',
+                confirmLabel: 'Sign out',
+                destructive: true,
+              )) {
+                TabangRepository.instance.signOut();
+              }
           }
         },
         itemBuilder: (context) => accountMenuItems(context, user),

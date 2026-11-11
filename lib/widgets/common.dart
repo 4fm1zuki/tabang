@@ -12,6 +12,52 @@ import 'layout.dart';
 /// header in nearly every page with slightly different padding and colours.
 /// These are the single versions.
 
+/// Branded confirmation for actions that are hard to undo: signing out,
+/// leaving a blood drive's chapter list, or closing the app from a phone.
+///
+/// Returns true only when the user picks [confirmLabel]; dismissing the dialog
+/// counts as "no", so callers can always `if (!await confirmAction(...)) return;`.
+Future<bool> confirmAction(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  String cancelLabel = 'Cancel',
+  bool destructive = false,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text(
+        message,
+        style: TextStyle(
+          fontSize: 12.5,
+          height: 1.5,
+          color: dialogContext.textMuted,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text(cancelLabel),
+        ),
+        FilledButton(
+          style: destructive
+              ? FilledButton.styleFrom(
+                  backgroundColor: TabangColors.crimson,
+                  foregroundColor: Colors.white,
+                )
+              : null,
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
 /// A bordered surface used for every panel in the app.
 class SurfaceCard extends StatelessWidget {
   const SurfaceCard({

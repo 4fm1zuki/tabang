@@ -305,10 +305,6 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
       tone: toneForUnit(effective),
       dense: true,
     );
-    final details = TextButton(
-      onPressed: () => _showUnitDetails(context, unit, now),
-      child: const Text('Details', style: TextStyle(fontSize: 12)),
-    );
     final menu = PopupMenuButton<UnitStatus>(
       tooltip: 'Change status',
       icon: Icon(Icons.more_horiz, size: 18, color: context.textMuted),
@@ -391,15 +387,16 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    // Wrap rather than Row: long expiry text, a wide status
-                    // pill and the Details button can run out of width even on
-                    // the second line, and losing a staff action is worse than
-                    // wrapping it politely.
+                    // Wrap rather than Row: long expiry text and a wide status
+                    // pill can run out of width even on the second line, and
+                    // losing a staff action is worse than wrapping it politely.
+                    // Tapping the row itself opens the unit's full details, so
+                    // there is no separate Details button.
                     Wrap(
                       spacing: TabangSpace.sm,
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [timeLeft, statusPill, details],
+                      children: [timeLeft, statusPill],
                     ),
                   ],
                 );
@@ -415,7 +412,6 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     children: [timeLeft, const SizedBox(height: 4), statusPill],
                   ),
                   const SizedBox(width: 4),
-                  details,
                   menu,
                 ],
               );
