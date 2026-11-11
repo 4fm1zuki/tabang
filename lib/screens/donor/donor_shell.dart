@@ -737,8 +737,7 @@ class _PhoneHeader extends StatelessWidget {
                     context,
                     title: 'Sign out?',
                     message:
-                        'Your simulated records stay on this device. You can '
-                        'sign back in with the same account.',
+                        'You will need to sign in again to continue.',
                     confirmLabel: 'Sign out',
                     destructive: true,
                   )) {
@@ -1101,8 +1100,7 @@ class _Sidebar extends StatelessWidget {
                 context,
                 title: 'Sign out?',
                 message:
-                    'Your simulated records stay on this device. You can sign '
-                    'back in with the same account.',
+                    'You will need to sign in again to continue.',
                 confirmLabel: 'Sign out',
                 destructive: true,
               )) {

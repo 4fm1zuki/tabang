@@ -315,6 +315,37 @@ void main() {
     );
   });
 
+  testWidgets('Home quick action "Find a drive" always reaches the drive rail', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: DiscoverPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Only the Explore and Blood Drives categories mount the rail, so from the
+    // Stories view the button used to return without doing anything visible.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Stories'));
+    await tester.pumpAndSettle();
+    expect(find.text('Upcoming blood drives'), findsNothing);
+
+    await tester.tap(find.text('Find a drive'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Upcoming blood drives'),
+      findsOneWidget,
+      reason: 'Find a drive must switch to a view that carries the rail',
+    );
+  });
+
   testWidgets('every content item ships a bundled photo asset', (tester) async {
     for (final item in repo.content) {
       expect(

@@ -343,16 +343,27 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
-  /// Scrolls the feed to the blood-drive rail.
+  /// Brings the blood-drive rail into view.
+  ///
+  /// The rail only exists in the Explore and Blood Drives categories, so a tap
+  /// from Stories, Tips or Eligibility used to return without doing anything.
+  /// Switch to the drives view first when needed, then scroll on the next frame
+  /// once that section is actually mounted.
   void _jumpToDrives() {
-    final target = _drivesSectionKey.currentContext;
-    if (target == null) return;
-    Scrollable.ensureVisible(
-      target,
-      duration: const Duration(milliseconds: 420),
-      curve: Curves.easeOutCubic,
-      alignment: 0.05,
-    );
+    const railCategories = {ContentCategory.explore, ContentCategory.drives};
+    if (!railCategories.contains(_category)) {
+      setState(() => _category = ContentCategory.drives);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _drivesSectionKey.currentContext;
+      if (target == null || !mounted) return;
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.05,
+      );
+    });
   }
 
   // --------------------------------------------------------------- hero card

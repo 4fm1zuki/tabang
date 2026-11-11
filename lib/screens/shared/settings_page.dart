@@ -314,8 +314,7 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign out?'),
         content: Text(
-          'Your simulated records stay on this device. You can sign back in '
-          'with the same account.',
+          'You will need to sign in again to continue.',
           style: TextStyle(
             fontSize: 12.5,
             height: 1.5,
