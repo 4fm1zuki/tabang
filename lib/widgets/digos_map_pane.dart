@@ -36,8 +36,6 @@ class DigosMapPane extends StatefulWidget {
     this.listCollapsed = false,
     this.onToggleList,
     this.listLabel = 'list',
-    this.listTitle = 'Available donors',
-    this.listCount,
     this.listIcon = Icons.people_outline,
   });
 
@@ -84,9 +82,7 @@ class DigosMapPane extends StatefulWidget {
   /// What the chevron is collapsing, for its tooltip ("donor list").
   final String listLabel;
 
-  /// Text and count in the restore bar shown while [listCollapsed].
-  final String listTitle;
-  final int? listCount;
+  /// Icon drawn at the head of the restore bar shown while [listCollapsed].
   final IconData listIcon;
 
   @override
@@ -474,9 +470,11 @@ class _DigosMapPaneState extends State<DigosMapPane> {
               ),
             ),
 
-            // Small restore bar while the side list is collapsed. This replaces
-            // the tiny chevron in the control stack: it says what is hidden,
-            // how many items it holds, and brings the list back with one tap.
+            // Restore bar while the side list is collapsed: a single action
+            // that names the hidden list ("Show donor list") and brings it
+            // back with one tap. The list's own heading and count are not
+            // repeated here, which read as a duplicated title next to the
+            // button.
             if (widget.listCollapsed &&
                 widget.onToggleList != null &&
                 !_overlaysHidden)
@@ -517,7 +515,7 @@ class _DigosMapPaneState extends State<DigosMapPane> {
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
-                                  widget.listTitle,
+                                  'Show ${widget.listLabel}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -527,23 +525,7 @@ class _DigosMapPaneState extends State<DigosMapPane> {
                                   ),
                                 ),
                               ),
-                              if (widget.listCount != null) ...[
-                                const SizedBox(width: 6),
-                                StatusPill(
-                                  '${widget.listCount}',
-                                  tone: Tone.brand,
-                                  dense: true,
-                                ),
-                              ],
-                              const SizedBox(width: 8),
-                              Text(
-                                'Show ${widget.listLabel}',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: context.textMuted,
-                                ),
-                              ),
+                              const SizedBox(width: 4),
                               const Icon(
                                 Icons.keyboard_arrow_up,
                                 size: 17,
@@ -643,15 +625,16 @@ class DigosLegendPanel extends StatelessWidget {
           runSpacing: 3,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.3,
-                color: context.textColor,
+            if (title.isNotEmpty)
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                  color: context.textColor,
+                ),
               ),
-            ),
             if (header != null) header!,
             for (final entry in entries) _swatch(context, entry, small: true),
             if (footer != null) footer!,
@@ -666,20 +649,22 @@ class DigosLegendPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: context.textMuted,
+          if (title.isNotEmpty) ...[
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: context.textMuted,
+              ),
             ),
-          ),
+          ],
           if (header != null) ...[
-            const SizedBox(height: 4),
+            if (title.isNotEmpty) const SizedBox(height: 4),
             header!,
           ],
-          const SizedBox(height: 5),
+          if (title.isNotEmpty || header != null) const SizedBox(height: 5),
           for (final entry in entries) _swatch(context, entry),
           if (footer != null)
             Padding(padding: const EdgeInsets.only(top: 4), child: footer!),

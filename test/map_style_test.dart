@@ -73,8 +73,9 @@ void main() {
     test('light tiles keep rivers blue and parks green while staying pale', () {
       const filter = DigosMapColors.lightTileFilter;
 
-      // The base is the familiar coloured street map again, only softened.
-      // Carto's water tile colour must stay blue: B > G > R.
+      // The base is the familiar street map, softened so it sits behind the
+      // data layers rather than competing with them.
+      // Water must stay blue: B > G > R.
       final water = _apply(filter, [125, 168, 215]);
       expect(water[2], greaterThan(water[1]));
       expect(water[1], greaterThan(water[0]));
@@ -89,9 +90,21 @@ void main() {
       expect(road[0], greaterThan(road[1]));
       expect(road[1], greaterThan(road[2]));
 
+      // The OSM-France style draws trunk roads in yellow, which clashed with
+      // the app's crimson palette. After the filter the yellow stripe must land
+      // on a pale sand tone: bright, and with little channel spread.
+      final trunk = _apply(filter, [255, 224, 160]);
+      final trunkSpread =
+          trunk.reduce((a, b) => a > b ? a : b) -
+          trunk.reduce((a, b) => a < b ? a : b);
+      expect(trunkSpread, lessThanOrEqualTo(60));
+      for (final channel in trunk) {
+        expect(channel, greaterThan(180), reason: 'trunk roads stay pale');
+      }
+
       // Nothing is allowed to get darker than a light base map; the tint only
       // softens the palette instead of draining it to grey.
-      for (final colour in [water, forest, road]) {
+      for (final colour in [water, forest, road, trunk]) {
         for (final channel in colour) {
           expect(channel, greaterThan(100), reason: 'base must read pale');
         }

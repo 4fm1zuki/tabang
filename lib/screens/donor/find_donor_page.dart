@@ -749,10 +749,6 @@ class _FindDonorPageState extends State<FindDonorPage> {
         }
       }),
       listLabel: 'donor list',
-      listTitle: _selectedBarangay == null
-          ? 'Available donors'
-          : 'Donors in $_selectedBarangay',
-      listCount: _visibleDonors.length,
       listIcon: Icons.people_outline,
     );
   }

@@ -85,29 +85,29 @@ class DigosMapColors {
   static const Color chapterDark = Color(0xFFFFB4A8);
   static const Color attribution = Color(0xFF5A4F4B);
 
-  /// Light tiles keep the familiar street-map colours, softened just enough to
-  /// sit under TABANG's data layers.
-  ///
-  /// The old near-neutral wash drained every colour out of the base, which is
-  /// why the map read as dim grey. This matrix keeps ~82% saturation and lifts
-  /// the range by 6, so rivers stay blue, parks stay green and main roads keep
-  /// a warm tint while the whole raster still reads pale next to the paper
-  /// canvas. Edit these 20 numbers to retune the light base (the first three
-  /// rows are R/G/B; the fifth column is the 0–255 offset).
+  /// Light tiles are the OSM-France style, whose trunk roads are drawn in
+  /// yellow. That yellow clashed with the app's crimson palette, so this matrix
+  /// halves the saturation (a luminance-preserving mix towards grey, weights
+  /// 0.213/0.715/0.072) and lifts the range by 6. A yellow road lands on a pale
+  /// sand tone — measured on the real pane, nothing is yellow any more —
+  /// while vegetation keeps a soft green and water a faint blue, so the base
+  /// reads pale without a dim grey cast. Edit these 20 numbers to retune the
+  /// light base (the first three rows are R/G/B; the fifth column is the
+  /// 0–255 offset).
   static const List<double> lightTileFilter = <double>[
-    0.843,
-    0.143,
-    0.014,
+    0.6065,
+    0.3575,
+    0.0360,
     0,
     6,
-    0.043,
-    0.943,
-    0.014,
+    0.1065,
+    0.8575,
+    0.0360,
     0,
     6,
-    0.043,
-    0.143,
-    0.814,
+    0.1065,
+    0.3575,
+    0.5360,
     0,
     6,
     0.000,
@@ -512,7 +512,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
   /// One tile provider for the life of this map: it rewrites requested tile
   /// coordinates so the raster grid can be shifted by whole tiles. It is
   /// disposed by the [TileLayer].
-  late final _ShiftedOsmTileProvider _tileProvider = _ShiftedOsmTileProvider();
+  late final _ShiftedTileProvider _tileProvider = _ShiftedTileProvider();
 
   int? _hoveredId;
   double _zoom = 11;
@@ -716,15 +716,31 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                                 : DigosMapColors.lightTileFilter,
                           ),
                           child: TileLayer(
-                            // OSM France's Carto fork, served from the keyless
-                            // Bretagne mirror. It is the old coloured base:
-                            // blue rivers, green parks and warm main roads,
-                            // without terrain shading or peak symbols. Unlike
-                            // Stadia's grey Positron style it stays recognisable
-                            // as a street map at every zoom, and because the
-                            // mirror needs no API key the same URL works on
-                            // localhost and in a deployed build.
-                            urlTemplate: 'https://tile.openstreetmap.bzh/br/{z}/{x}/{y}.png',
+                            // OSM-France's world-wide style, served from the
+                            // keyless mirror. Unlike the Bretagne mirror used
+                            // before, it carries street and place labels outside
+                            // France, so Digos' road names, rivers and barangay
+                            // surroundings are readable. It needs no API key and
+                            // no Referer, so the same URL works on localhost, in
+                            // a deployed build and from a phone.
+                            //
+                            // Its trunk roads are drawn in yellow, which clashed
+                            // with the app's crimson palette; the colour matrix
+                            // in [DigosMapColors.lightTileFilter] removes that
+                            // (measured: no pixel in the pane is yellow after the
+                            // filter) while keeping vegetation green and water
+                            // faintly blue.
+                            //
+                            // Esri's World Topographic basemap was the other
+                            // keyless candidate with no yellow, but at mid zooms
+                            // it renders contour lines and shaded relief over the
+                            // Digos highlands, which read as grey and swamped the
+                            // barangay fills. Carto's Positron style would also
+                            // fit, but its CDN now serves an "API KEY REQUIRED"
+                            // watermark without a key, and openstreetmap.org
+                            // tiles are Referer-gated.
+                            urlTemplate:
+                                'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.digos.barangay_map',
                             maxNativeZoom: 19,
                             // The offset is re-evaluated inside the tile builder so
@@ -1075,12 +1091,22 @@ class _OutsideCityMaskPainter extends CustomPainter {
   }
 }
 
-/// OSM tile provider that fetches the tile grid shifted by whole tiles.
+/// Raster tile provider that fetches the tile grid shifted by whole tiles.
 ///
 /// Only the URL-facing coordinates change, so [NetworkTileProvider]'s retry,
 /// header and progress handling stay intact. The matching sub-tile residual is
 /// applied by the tile layer's `tileBuilder`.
-class _ShiftedOsmTileProvider extends NetworkTileProvider {
+class _ShiftedTileProvider extends NetworkTileProvider {
+  /// Tiles that are pruned during a fast zoom are allowed to finish loading
+  /// instead of being aborted: flutter_map 8.2+ cancels them by default, and a
+  /// cancelled load can leave Flutter's image cache holding a dead entry, which
+  /// renders as a permanently blank tile until the map is touched again
+  /// (fleaflet/flutter_map #2290). The cost is a few wasted requests.
+  ///
+  /// The flag is a no-op on web (Dart cannot abort in-flight `HttpClient`
+  /// requests there) and matters on the Android/iOS builds.
+  _ShiftedTileProvider() : super(abortObsoleteRequests: false);
+
   @override
   String getTileUrl(TileCoordinates coordinates, TileLayer options) {
     final shift = DigosVectorMap.baseMapTileShift(coordinates.z);

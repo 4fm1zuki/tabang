@@ -136,7 +136,8 @@ void main() {
     await tester.drag(splitHandle, const Offset(0, 300));
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.textContaining('Available donors'), findsOneWidget);
+    // The donor pane is hidden, so only the restore bubble names the list.
+    expect(find.textContaining('Available donors'), findsNothing);
     expect(find.text('Show donor list'), findsOneWidget);
     await tester.tap(find.byTooltip('Show donor list'));
     await tester.pumpAndSettle();
@@ -427,9 +428,10 @@ void main() {
     expect(find.byIcon(Icons.fit_screen), findsOneWidget);
     expect(find.text('Open requests'), findsOneWidget);
     // Staff open on the amber request-workload ramp, with a legend switch to
-    // the community donor-density ramp.
-    expect(find.text('OPEN REQUESTS'), findsOneWidget);
-    expect(find.text('DONOR DENSITY'), findsNothing);
+    // the community donor-density ramp. The switch itself names the layers,
+    // so the legend card carries no second title repeating it.
+    expect(find.text('None open'), findsOneWidget);
+    expect(find.text('No available donors'), findsNothing);
     expect(find.byKey(const ValueKey('mapSplitHandle')), findsOneWidget);
     // "Requests" is both the queue tab and the legend's layer switch.
     expect(find.text('Requests'), findsWidgets);
@@ -437,11 +439,11 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('operationsHeatDonors')));
     await tester.pumpAndSettle();
-    expect(find.text('DONOR DENSITY'), findsOneWidget);
-    expect(find.text('OPEN REQUESTS'), findsNothing);
+    expect(find.text('No available donors'), findsOneWidget);
+    expect(find.text('None open'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('operationsHeatRequests')));
     await tester.pumpAndSettle();
-    expect(find.text('OPEN REQUESTS'), findsOneWidget);
+    expect(find.text('None open'), findsOneWidget);
 
     // The old staff-only chrome is gone: no page header, inventory shortcut,
     // size menu, layer toggle or "city-wide queue" section.
@@ -491,7 +493,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(DigosVectorMap), findsOneWidget);
-    expect(find.text('Open requests'), findsOneWidget);
+    // The request pane is collapsed to its restore bubble.
+    expect(find.text('Open requests'), findsNothing);
     expect(find.text('Show request list'), findsOneWidget);
     await tester.tap(find.byTooltip('Show request list'));
     await tester.pumpAndSettle();

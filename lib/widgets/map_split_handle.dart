@@ -22,6 +22,10 @@ class MapSplitHandle extends StatelessWidget {
   /// Thickness of the handle along the drag axis.
   static const double extent = 18;
 
+  /// Length of the visible grip along the drag axis. Long enough to read as a
+  /// grab handle at a glance, on both the wide side bar and the phone bar.
+  static const double gripLength = 84;
+
   /// True for the vertical bar used beside a side panel (drag left/right);
   /// false for the horizontal bar between stacked map and list (drag up/down).
   final bool vertical;
@@ -33,8 +37,8 @@ class MapSplitHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grip = Container(
-      width: vertical ? 4 : 44,
-      height: vertical ? 44 : 4,
+      width: vertical ? 4 : gripLength,
+      height: vertical ? gripLength : 4,
       decoration: BoxDecoration(
         color: context.textMuted.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(TabangRadius.pill),

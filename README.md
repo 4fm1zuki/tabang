@@ -23,8 +23,8 @@ Requirements:
 - Flutter **3.47.0 or newer** (tested with Flutter 3.47.5)
 - Dart **3.13.0 or newer** (tested with Dart 3.13.4)
 - No map key: the barangay geometry and all photography are bundled. The
-  OpenStreetMap raster base (the keyless OSM-France Carto style, served from
-  the Bretagne mirror)
+  OpenStreetMap raster base (the keyless OSM-France world style at
+  `a.tile.openstreetmap.fr/osmfr`, no Referer required)
   loads when a
   network is available, and the complete vector map still renders on the paper
   background without it
@@ -627,15 +627,29 @@ deployment, replace the embedded data with PSA or LGU boundary data.
 
 No mapping SDK and no API key are involved. Find Donor's geometry comes from
 `lib/core/digos_geodata.dart`, and the raster tiles used as the
-base layer are the OSM-France Carto style served from the keyless Bretagne
-mirror (`tile.openstreetmap.bzh`), so the same URL works on localhost and in a
-deployed build. The required credit
+base layer are the OSM-France world style, fetched keyless from
+`a.tile.openstreetmap.fr/osmfr` — no API key, no account and no Referer header,
+so the same URL works on localhost, a deployed build and a phone. It was chosen
+because it carries street and place labels in the Philippines (the earlier
+`tile.openstreetmap.bzh` Bretagne mirror drew none outside France). Its trunk
+roads are yellow, so the tiles are drawn through a half-saturation matrix
+(`DigosMapColors.lightTileFilter`) that lands them on a pale sand tone while
+keeping vegetation green and water faintly blue; measured on the running map,
+no pixel left in the pane is yellow. The required credit
 (`© OpenStreetMap contributors`) is drawn on the map. For a fully offline
 deployment the tile layer can be switched
 off with one flag (`DigosVectorMap.tilesEnabled`), which leaves the complete
 vector map running on the paper background. The only deployment signing caveat
 left is the Android release keystore, which the research team must supply before
 distributing an APK outside the group.
+
+Other keyless sources were checked: CARTO's Positron/Light style now returns an
+"API KEY REQUIRED" watermark without a key; `tile.openstreetmap.org` blocks
+requests that arrive without a Referer; `tile.openstreetmap.de` and the OSM
+Humanitarian style (`/hot`) stop serving around zoom 14, too early for the
+street-level zooms the map uses; and Esri's World Topographic basemap, although
+yellow-free, draws contour lines and shaded relief over the Digos highlands that
+read as grey and swamp the barangay fills at mid zoom.
 
 Two map details are easy to break and are covered by tests: the initial framing
 comes from `initialCameraFit` alone (a post-frame `fitCamera` re-fit aborts every

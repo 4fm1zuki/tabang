@@ -468,10 +468,6 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
         }
       }),
       listLabel: 'request list',
-      listTitle: _paneTab == 0 ? 'Open requests' : 'Pending registrations',
-      listCount: _paneTab == 0
-          ? _visibleRequests.length
-          : _visibleApplications.length,
       listIcon: _paneTab == 0
           ? Icons.assignment_outlined
           : Icons.person_add_alt_1_outlined,
@@ -513,9 +509,9 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     // the same warm donor-density ramp the community map uses.
     final donor = _showDonorDensity;
     return DigosLegendPanel(
-      title: compact
-          ? (donor ? 'Donors' : 'Requests')
-          : (donor ? 'DONOR DENSITY' : 'OPEN REQUESTS'),
+      // No legend title: the layer chips below already name the active ramp
+      // ("Donor density" / "Requests"), so a heading repeated the switch.
+      title: '',
       compact: compact,
       header: Wrap(
         spacing: 4,
