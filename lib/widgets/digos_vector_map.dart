@@ -37,10 +37,13 @@ class DigosMapColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFFFFFFFF), Color(0xFFFFFFFF)],
   );
+  /// The dark canvas mirrors the app's warm charcoal surfaces (see
+  /// [TabangColors.darkBg]); the earlier blue-navy gradient tinted the whole
+  /// dark map blue and read as a different product next to the shell.
   static const LinearGradient paperGradientDark = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF121A22), Color(0xFF080D13)],
+    colors: [Color(0xFF201A17), Color(0xFF161110)],
   );
 
   /// Everything outside the city cutout. Also plain white; the heavy city
@@ -54,20 +57,22 @@ class DigosMapColors {
   static const LinearGradient outsideGradientDark = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF0F1822), Color(0xFF05090E)],
+    colors: [Color(0xFF1C1613), Color(0xFF120E0D)],
   );
 
   /// Barangay borders. A deeper terracotta than the old pale rose so the
   /// internal outlines stay legible over both the raster base and the heat
-  /// fills instead of washing out.
+  /// fills instead of washing out. The dark tone is much lighter and is stroked
+  /// at near-full opacity, because a faint terracotta line on a near-black
+  /// raster made the barangay cutouts disappear in dark mode.
   static const Color internalBorder = Color(0xFFB85C42);
-  static const Color internalBorderDark = Color(0xFF8E5A4B);
+  static const Color internalBorderDark = Color(0xFFDE9377);
   static const Color cityBorder = Color(0xFF5A1512);
   static const Color cityBorderDark = Color(0xFFFFDAD4);
   static const Color label = Color(0xFF2B211E);
   static const Color labelDark = Color(0xFFFBF5F2);
   static const Color halo = Color(0xFFF8FAFC);
-  static const Color haloDark = Color(0xFF101418);
+  static const Color haloDark = Color(0xFF17120F);
 
   /// Selected barangay: a subtle teal wash with a brand-teal outline, so it
   /// no longer competes with the warm donor ramp. (Polygon fills cannot take a
@@ -120,27 +125,28 @@ class DigosMapColors {
   /// Inverted, hue-rotated tiles for the dark map style.
   ///
   /// This is the classic `invert(1) hue-rotate(180deg)` recipe folded into one
-  /// matrix and dimmed to 80%, so the result lands just above the dark canvas
-  /// gradient: pale OSM land turns near-black, water stays blue, parks stay
-  /// green and roads read as dark lines. OSM place names drop to a muted grey
-  /// instead of glowing white, so TABANG's own halo labels stay the brightest
-  /// text.
+  /// matrix, then compressed and lifted so the dark map still reads as a map:
+  /// pale OSM land becomes a warm charcoal just above the canvas gradient
+  /// (rather than the near-black it used to be, which made the city interior
+  /// look empty), water stays blue, parks stay green and roads read as lighter
+  /// grey lines. OSM place names land in the mid greys instead of glowing
+  /// white, so TABANG's own halo labels stay the brightest text.
   static const List<double> darkTileFilter = <double>[
-    0.459,
-    -1.144,
-    -0.115,
+    0.360,
+    -0.897,
+    -0.090,
     0,
-    210,
-    -0.341,
-    -0.344,
-    -0.115,
+    203,
+    -0.267,
+    -0.270,
+    -0.090,
     0,
-    209,
-    -0.341,
-    -1.144,
-    0.685,
+    202,
+    -0.267,
+    -0.897,
+    0.537,
     0,
-    213,
+    200,
     0.000,
     0.000,
     0.000,
@@ -786,8 +792,9 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                       ),
 
                       // Internal boundaries. Each ring is drawn once, so a shared
-                      // edge doubles up; the half-opacity stroke keeps the result a
-                      // soft hairline instead of a heavy wall between barangays.
+                      // edge doubles up. The light map can afford a soft
+                      // hairline, but the dark map needs the cutouts to read, so
+                      // the stroke is near-opaque against the dark raster.
                       PolylineLayer(
                         polylines: [
                           for (final arc in _internalBorders)
@@ -797,7 +804,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                                   (dark
                                           ? DigosMapColors.internalBorderDark
                                           : DigosMapColors.internalBorder)
-                                      .withValues(alpha: 0.55),
+                                      .withValues(alpha: dark ? 0.92 : 0.55),
                               strokeWidth: internalWidth,
                               strokeCap: StrokeCap.round,
                               strokeJoin: StrokeJoin.round,

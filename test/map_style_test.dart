@@ -30,9 +30,14 @@ void main() {
       );
     });
 
-    test('maps pale OSM land to a near-paperDark dark surface', () {
+    test('maps pale OSM land to a dark surface that still reads as a map', () {
       final land = _apply(filter, [242, 239, 233]);
-      expect(land.reduce((a, b) => a > b ? a : b), lessThan(50));
+      final landMax = land.reduce((a, b) => a > b ? a : b);
+      // Lifted well clear of the charcoal canvas, but still dark: the old
+      // matrix took the land down to near-black, which is why the city
+      // interior looked like an empty hole in dark mode.
+      expect(landMax, greaterThan(40));
+      expect(landMax, lessThan(70));
       // Warm, not green or blue: no channel should dominate the others.
       expect((land[0] - land[2]).abs(), lessThan(15));
     });
@@ -48,9 +53,12 @@ void main() {
     });
 
     test('turns white roads dark and keeps baked-in labels muted', () {
-      // OSM roads are white; after inversion they become near-black lines.
+      // OSM roads are white; after inversion they become the darkest tone on
+      // the map, but they stay visible as lines rather than pure black.
       final road = _apply(filter, [255, 255, 255]);
-      expect(road.reduce((a, b) => a > b ? a : b), lessThan(40));
+      final roadMax = road.reduce((a, b) => a > b ? a : b);
+      expect(roadMax, lessThan(60));
+      expect(roadMax, greaterThan(20));
 
       // OSM place names are dark text; the filter must not turn them into
       // glowing white that competes with TABANG's own halo labels.
@@ -58,6 +66,31 @@ void main() {
       final labelMax = label.reduce((a, b) => a > b ? a : b);
       expect(labelMax, greaterThan(120));
       expect(labelMax, lessThan(220));
+    });
+  });
+
+  group('dark map canvas', () {
+    test('the canvas stays warm charcoal, never blue', () {
+      // The blue-navy gradient the map used before read as a different product
+      // next to the shell's warm dark surfaces, so blue must never be the
+      // strongest channel.
+      for (final gradient in [
+        DigosMapColors.paperGradientDark,
+        DigosMapColors.outsideGradientDark,
+      ]) {
+        for (final colour in gradient.colors) {
+          expect(colour.r, greaterThan(colour.b));
+          expect(colour.g, greaterThanOrEqualTo(colour.b));
+        }
+      }
+    });
+
+    test('dark barangay outlines stay legible', () {
+      // Faint terracotta on a near-black raster made the cutouts disappear, so
+      // the dark outline is a bright, opaque tone.
+      const border = DigosMapColors.internalBorderDark;
+      final luminance = 0.2126 * border.r + 0.7152 * border.g + 0.0722 * border.b;
+      expect(luminance, greaterThan(0.5));
     });
   });
 
