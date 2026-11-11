@@ -1029,6 +1029,22 @@ class DonorApplication {
 }
 
 /// A blood drive / donation event.
+/// Where a chapter blood drive sits in the approval flow.
+///
+/// Staff propose drives, an admin approves or rejects them, and an approved
+/// drive can still be cancelled later. Only [approved] drives reach the
+/// donor-facing surfaces (the Home rail, the drive list and the map pins), and
+/// every step can be undone from the snackbar that reports it.
+enum DriveApproval {
+  pending('Awaiting approval'),
+  approved('Scheduled'),
+  rejected('Rejected'),
+  cancelled('Cancelled');
+
+  const DriveApproval(this.label);
+  final String label;
+}
+
 class BloodDrive {
   const BloodDrive({
     required this.id,
@@ -1042,6 +1058,10 @@ class BloodDrive {
     this.photoAsset,
     this.lat,
     this.lng,
+    this.approval = DriveApproval.approved,
+    this.proposedById,
+    this.reviewedById,
+    this.reviewNote,
   });
 
   final String id;
@@ -1056,6 +1076,62 @@ class BloodDrive {
   /// Bundled photograph for the drive card on the Discover page. Null falls
   /// back to the shared community photos.
   final String? photoAsset;
+
+  /// Where this drive is in the chapter's approval flow. Seed drives ship
+  /// already approved; anything staff add starts as [DriveApproval.pending] and
+  /// only reaches the public surfaces once an admin approves it.
+  final DriveApproval approval;
+
+  /// Staff member who submitted a proposed drive.
+  final String? proposedById;
+
+  /// Admin who approved, rejected or cancelled it.
+  final String? reviewedById;
+
+  /// Why it was rejected, shown back to the proposer.
+  final String? reviewNote;
+
+  /// True for the drives the public surfaces may show: approved and still on.
+  bool get isLive => approval == DriveApproval.approved;
+
+  /// Copy with new values; `clearReviewNote` drops the rejection reason when a
+  /// rejection is undone.
+  BloodDrive copyWith({
+    String? title,
+    String? venue,
+    String? barangay,
+    DateTime? startsAt,
+    DateTime? endsAt,
+    int? expectedDonors,
+    bool? isOpenForRegistration,
+    String? photoAsset,
+    double? lat,
+    double? lng,
+    DriveApproval? approval,
+    String? proposedById,
+    String? reviewedById,
+    String? reviewNote,
+    bool clearReviewNote = false,
+  }) {
+    return BloodDrive(
+      id: id,
+      title: title ?? this.title,
+      venue: venue ?? this.venue,
+      barangay: barangay ?? this.barangay,
+      startsAt: startsAt ?? this.startsAt,
+      endsAt: endsAt ?? this.endsAt,
+      expectedDonors: expectedDonors ?? this.expectedDonors,
+      isOpenForRegistration:
+          isOpenForRegistration ?? this.isOpenForRegistration,
+      photoAsset: photoAsset ?? this.photoAsset,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      approval: approval ?? this.approval,
+      proposedById: proposedById ?? this.proposedById,
+      reviewedById: reviewedById ?? this.reviewedById,
+      reviewNote: clearReviewNote ? null : (reviewNote ?? this.reviewNote),
+    );
+  }
 
   /// Venue coordinates, so the map pin sits on the actual site rather than the
   /// barangay centroid. Null falls back to the barangay centre.
@@ -1218,13 +1294,14 @@ enum ActivityKind {
   /// A rejection undone from the snackbar before anything else happened to the
   /// request, so the queue entry is back where it was.
   requestReopened,
+  /// A blood drive was proposed, approved, rejected, cancelled or restored.
+  driveUpdate,
   inventory,
   readinessTargets,
 }
 
 /// One entry in the chapter activity log, newest first.
-class ActivityEvent {
-  const ActivityEvent({
+class ActivityEvent {  const ActivityEvent({
     required this.id,
     required this.kind,
     required this.actorId,

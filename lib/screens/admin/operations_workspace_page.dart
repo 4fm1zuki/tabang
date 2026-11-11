@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
+import 'drive_management_page.dart';
 import 'inventory_management.dart';
 import 'operations_map_page.dart';
 
@@ -40,13 +41,13 @@ class OperationsWorkspacePage extends StatefulWidget {
 }
 
 class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
-  late int _section = widget.initialSection.clamp(0, 1);
+  late int _section = widget.initialSection.clamp(0, 2);
 
   @override
   void didUpdateWidget(OperationsWorkspacePage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialSection != oldWidget.initialSection) {
-      _section = widget.initialSection.clamp(0, 1);
+      _section = widget.initialSection.clamp(0, 2);
     }
   }
 
@@ -83,6 +84,7 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
                 currentUser: widget.user,
                 embedded: true,
               ),
+              DriveManagementPage(currentUser: widget.user, embedded: true),
             ],
           ),
         ),
@@ -113,6 +115,11 @@ class _SectionBar extends StatelessWidget {
             value: 1,
             icon: Icon(Icons.inventory_2_outlined, size: 15),
             label: Text('Inventory', softWrap: false),
+          ),
+          ButtonSegment(
+            value: 2,
+            icon: Icon(Icons.event_outlined, size: 15),
+            label: Text('Drives', softWrap: false),
           ),
         ],
         selected: {section},

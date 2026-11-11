@@ -1756,4 +1756,135 @@ void main() {
       expect(repo.tabActivityCount('USR-001', 'requests'), greaterThan(0));
     });
   });
+
+  group('blood drive approval', () {
+    BloodDrive? propose(TabangRepository repo, {int days = 7}) {
+      final day = DateTime.now().add(Duration(days: days));
+      return repo.proposeBloodDrive(
+        actorId: 'USR-010',
+        title: 'Ruparan Community Drive',
+        venue: 'Ruparan Covered Court',
+        barangay: 'Ruparan',
+        startsAt: DateTime(day.year, day.month, day.day, 9),
+        endsAt: DateTime(day.year, day.month, day.day, 15),
+        expectedDonors: 50,
+      );
+    }
+
+    test('a proposal stays hidden until an admin approves it', () {
+      final repo = TabangRepository.instance;
+      final published = repo.drives.length;
+
+      final drive = propose(repo);
+      expect(drive, isNotNull);
+      expect(drive!.approval, DriveApproval.pending);
+      expect(
+        repo.drives.length,
+        published,
+        reason: 'a pending drive must not reach the donor surfaces',
+      );
+      expect(repo.pendingDrives.map((d) => d.id), contains(drive.id));
+
+      // Staff propose; only an admin decides.
+      expect(repo.approveDrive(drive.id, actorId: 'USR-010'), isFalse);
+      expect(repo.approveDrive(drive.id, actorId: 'USR-011'), isTrue);
+      expect(repo.drives.length, published + 1);
+      expect(repo.drives.any((d) => d.id == drive.id), isTrue);
+    });
+
+    test('propose, reject and withdraw can each be undone', () {
+      final repo = TabangRepository.instance;
+      final drive = propose(repo)!;
+
+      expect(repo.approveDrive(drive.id, actorId: 'USR-011'), isTrue);
+      expect(repo.undoDriveApproval(drive.id, actorId: 'USR-011'), isTrue);
+      expect(repo.pendingDrives.any((d) => d.id == drive.id), isTrue);
+
+      expect(
+        repo.rejectDriveProposal(
+          drive.id,
+          actorId: 'USR-011',
+          reason: 'Venue clash',
+        ),
+        isTrue,
+      );
+      expect(
+        repo.allDrives.firstWhere((d) => d.id == drive.id).reviewNote,
+        'Venue clash',
+      );
+      expect(repo.undoDriveRejection(drive.id, actorId: 'USR-011'), isTrue);
+      expect(repo.pendingDrives.any((d) => d.id == drive.id), isTrue);
+      expect(
+        repo.allDrives.firstWhere((d) => d.id == drive.id).reviewNote,
+        isNull,
+        reason: 'undoing a rejection clears the reason with it',
+      );
+
+      expect(repo.withdrawDriveProposal(drive.id, actorId: 'USR-010'), isTrue);
+      expect(repo.allDrives.any((d) => d.id == drive.id), isFalse);
+    });
+
+    test('a scheduled drive can be cancelled and restored', () {
+      final repo = TabangRepository.instance;
+      final live = repo.drives.first;
+
+      expect(
+        repo.cancelBloodDrive(live.id, actorId: 'USR-010'),
+        isFalse,
+        reason: 'staff cannot cancel a scheduled drive',
+      );
+      expect(repo.cancelBloodDrive(live.id, actorId: 'USR-011'), isTrue);
+      expect(repo.drives.any((d) => d.id == live.id), isFalse);
+      expect(repo.cancelledDrives.map((d) => d.id), contains(live.id));
+
+      expect(repo.undoDriveCancellation(live.id, actorId: 'USR-011'), isTrue);
+      expect(repo.drives.any((d) => d.id == live.id), isTrue);
+    });
+
+    test('unusable proposals are refused', () {
+      final repo = TabangRepository.instance;
+      final start = DateTime.now().add(const Duration(days: 3));
+      final end = start.add(const Duration(hours: 4));
+
+      expect(
+        repo.proposeBloodDrive(
+          actorId: 'USR-010',
+          title: 'Backwards drive',
+          venue: 'Hall',
+          barangay: 'Zone 1',
+          startsAt: start,
+          endsAt: start.subtract(const Duration(hours: 2)),
+          expectedDonors: 10,
+        ),
+        isNull,
+        reason: 'a drive cannot end before it starts',
+      );
+      expect(
+        repo.proposeBloodDrive(
+          actorId: 'USR-010',
+          title: '   ',
+          venue: 'Hall',
+          barangay: 'Zone 1',
+          startsAt: start,
+          endsAt: end,
+          expectedDonors: 10,
+        ),
+        isNull,
+        reason: 'a drive needs a title',
+      );
+      expect(
+        repo.proposeBloodDrive(
+          actorId: 'USR-001',
+          title: 'Proposed by a donor',
+          venue: 'Hall',
+          barangay: 'Zone 1',
+          startsAt: start,
+          endsAt: end,
+          expectedDonors: 10,
+        ),
+        isNull,
+        reason: 'community accounts cannot propose chapter drives',
+      );
+    });
+  });
 }

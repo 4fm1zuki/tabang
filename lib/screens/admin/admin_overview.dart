@@ -1180,6 +1180,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.requestVerified => Icons.fact_check_outlined,
     ActivityKind.requestRejected => Icons.assignment_late_outlined,
     ActivityKind.requestReopened => Icons.assignment_return_outlined,
+    ActivityKind.driveUpdate => Icons.event_available_outlined,
     ActivityKind.inventory => Icons.inventory_2_outlined,
     ActivityKind.readinessTargets => Icons.tune,
   };
@@ -1198,6 +1199,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     ActivityKind.requestVerified => TabangColors.success,
     ActivityKind.requestRejected => TabangColors.danger,
     ActivityKind.requestReopened => TabangColors.warning,
+    ActivityKind.driveUpdate => TabangColors.info,
     ActivityKind.inventory => TabangColors.warning,
     ActivityKind.readinessTargets => TabangColors.crimson,
   };

@@ -298,7 +298,8 @@ were bypassed.
   documents or not accepted. On phones and small tablets the staff console uses
   the same bottom-bar shell as the community app; the icon rail is desktop-only.
 - **Operations** — one destination for the operational work that used to be
-  split between Map and Inventory. A single **Map / Inventory** segmented control
+  split between Map and Inventory. A single **Map / Inventory / Drives**
+  segmented control
   sits above the content at every width; there is no desktop-only inner sidebar.
   The map is
   deliberately the **same surface as community Find Donor** — identical title
@@ -306,16 +307,29 @@ were bypassed.
   and side-panel anatomy — and its legend carries a **Requests / Donor
   density** switch: the default amber heat shows actionable requests per
   barangay (including **Awaiting verification**), and one tap swaps the same
-  fill to the community donor-density ramp. The divider replaces the old
+  fill to the community donor-density ramp and brings the donor directory
+  forward. The divider replaces the old
   Expand/Collapse and panel chevron: drag it to grow either side, release near
   the middle for the half split, and at map-only a **Show request list** bubble
   restores the panel. The panel tabs hold **Requests** and
-  **Registrations**; tapping a barangay scopes both lists. Requests put
+  **Donors** (the community donor card, with the account record behind a tap);
+  tapping a barangay scopes both lists. Requests put
   **Awaiting verification** first: staff open the details, inspect the uploaded
   request documents, confirm the booked slot with **Verify and open**
   (blood-bank requests also attach the compatible unit holds), or **Reject**
-  with a written reason. Staff mark requests fulfilled and jump to user
-  management, but they do not select donors — that stays with the requester.
+  with a written reason — every rejection reports itself with an **Undo** that
+  returns the request to the queue. Staff mark requests fulfilled and jump to
+  user management, but they do not select donors — that stays with the requester.
+- **Blood drives** — the third Operations view, and the only place drives are
+  created. Staff and admins tap **Add drive** and fill in title, venue,
+  barangay, date, start/end time and expected donors; the drive is saved as
+  **Awaiting approval** and a snackbar offers **Undo** to withdraw it. Only an
+  admin can decide: **Approve** publishes it to the donor Home rail, the Blood
+  Bank list and the map pins, **Reject** records a reason for the proposer, and
+  **Cancel drive** takes a scheduled drive back down. Each of those actions
+  asks for confirmation first and reports an **Undo**, and rejected or
+  cancelled drives stay in a list with **Back to the queue** / **Restore drive**
+  so nothing is lost.
 - **Inventory** — the second Operations view. Units are a compact list with a
   **Details** button and a status-menu; the full record opens with the barcode
   graphic, the holder's name (staff-only information) and a **Remove unit**

@@ -166,7 +166,28 @@ class TabangRepository {
   List<RequestResponse> get responses => List.unmodifiable(_responses);
   List<ChatThread> get threads => List.unmodifiable(_threads);
   List<UserReport> get reports => List.unmodifiable(_reports);
-  List<BloodDrive> get drives => List.unmodifiable(_drives);
+  /// Drives the donor-facing surfaces may show: approved and still scheduled.
+  /// Proposed, rejected and cancelled drives stay in [allDrives] so staff can
+  /// see and act on them.
+  List<BloodDrive> get drives =>
+      List.unmodifiable(_drives.where((d) => d.isLive));
+
+  /// Every drive on record, whatever its approval state. Staff only.
+  List<BloodDrive> get allDrives => List.unmodifiable(_drives);
+
+  /// Drives waiting for an admin decision, oldest submission first.
+  List<BloodDrive> get pendingDrives {
+    final list = _drives
+        .where((d) => d.approval == DriveApproval.pending)
+        .toList();
+    list.sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    return List.unmodifiable(list);
+  }
+
+  /// Drives an admin cancelled; they can be restored from here.
+  List<BloodDrive> get cancelledDrives => List.unmodifiable(
+    _drives.where((d) => d.approval == DriveApproval.cancelled),
+  );
   List<ContentItem> get content => List.unmodifiable(_content);
 
   AppUser? userById(String id) {
@@ -830,6 +851,184 @@ class TabangRepository {
 
   int driveInterestCount(String driveId) =>
       _driveInterests.where((key) => key.startsWith('$driveId|')).length;
+
+  // -------------------------------------------------------- drive approvals
+
+  /// Sequential id for staff-proposed drives; the seeded ones are DRV-001..005.
+  int _nextDriveNumber = 6;
+
+  /// Staff propose a drive. It stays [DriveApproval.pending] until an admin
+  /// approves it, so a proposal can never reach the donor surfaces by itself.
+  ///
+  /// Returns null when the input is unusable (blank fields, end before start,
+  /// no expected donors) so the caller can show a validation message.
+  BloodDrive? proposeBloodDrive({
+    required String actorId,
+    required String title,
+    required String venue,
+    required String barangay,
+    required DateTime startsAt,
+    required DateTime endsAt,
+    required int expectedDonors,
+    String? note,
+  }) {
+    final actor = userById(actorId);
+    if (actor == null || !actor.role.isAdminSide) return null;
+    if (title.trim().isEmpty ||
+        venue.trim().isEmpty ||
+        barangay.trim().isEmpty ||
+        expectedDonors <= 0 ||
+        !endsAt.isAfter(startsAt)) {
+      return null;
+    }
+    final drive = BloodDrive(
+      id: 'DRV-${_nextDriveNumber.toString().padLeft(3, '0')}',
+      title: title.trim(),
+      venue: venue.trim(),
+      barangay: barangay,
+      startsAt: startsAt,
+      endsAt: endsAt,
+      expectedDonors: expectedDonors,
+      approval: DriveApproval.pending,
+      proposedById: actorId,
+      reviewNote: (note ?? '').trim().isEmpty ? null : note!.trim(),
+    );
+    _nextDriveNumber++;
+    _drives.add(drive);
+    _logDrive(actor.id, 'Proposed the drive "${drive.title}" at ${drive.venue}');
+    return drive;
+  }
+
+  /// Withdraws a proposal, and is also the Undo for [proposeBloodDrive].
+  /// Refused once an admin has decided, so nothing approved can vanish.
+  bool withdrawDriveProposal(String driveId, {required String actorId}) {
+    final actor = userById(actorId);
+    final index = _drives.indexWhere((d) => d.id == driveId);
+    if (actor == null || index == -1) return false;
+    final drive = _drives[index];
+    if (drive.approval != DriveApproval.pending) return false;
+    if (drive.proposedById != actorId && !actor.role.isAdminSide) return false;
+    _drives.removeAt(index);
+    _logDrive(actorId, 'Withdrew the proposed drive "${drive.title}"');
+    return true;
+  }
+
+  /// Admin approves a proposed drive; it becomes visible to donors.
+  bool approveDrive(String driveId, {required String actorId}) {
+    return _setDriveApproval(
+      driveId,
+      actorId: actorId,
+      from: DriveApproval.pending,
+      to: DriveApproval.approved,
+      summary: 'Approved the drive',
+    );
+  }
+
+  /// Undo of [approveDrive]: the drive returns to the pending queue.
+  bool undoDriveApproval(String driveId, {required String actorId}) {
+    return _setDriveApproval(
+      driveId,
+      actorId: actorId,
+      from: DriveApproval.approved,
+      to: DriveApproval.pending,
+      summary: 'Returned the drive to the approval queue',
+    );
+  }
+
+  /// Admin rejects a proposal, with a reason the proposer can read.
+  bool rejectDriveProposal(
+    String driveId, {
+    required String actorId,
+    String? reason,
+  }) {
+    return _setDriveApproval(
+      driveId,
+      actorId: actorId,
+      from: DriveApproval.pending,
+      to: DriveApproval.rejected,
+      summary: 'Rejected the drive',
+      note: reason,
+    );
+  }
+
+  /// Undo of [rejectDriveProposal].
+  bool undoDriveRejection(String driveId, {required String actorId}) {
+    return _setDriveApproval(
+      driveId,
+      actorId: actorId,
+      from: DriveApproval.rejected,
+      to: DriveApproval.pending,
+      summary: 'Reopened the rejected drive',
+      clearNote: true,
+    );
+  }
+
+  /// Admin cancels an approved drive, e.g. a venue fell through.
+  bool cancelBloodDrive(
+    String driveId, {
+    required String actorId,
+    String? reason,
+  }) {
+    return _setDriveApproval(
+      driveId,
+      actorId: actorId,
+      from: DriveApproval.approved,
+      to: DriveApproval.cancelled,
+      summary: 'Cancelled the drive',
+      note: reason,
+    );
+  }
+
+  /// Undo of [cancelBloodDrive]: the drive is scheduled again.
+  bool undoDriveCancellation(String driveId, {required String actorId}) {
+    return _setDriveApproval(
+      driveId,
+      actorId: actorId,
+      from: DriveApproval.cancelled,
+      to: DriveApproval.approved,
+      summary: 'Restored the cancelled drive',
+      clearNote: true,
+    );
+  }
+
+  /// One guarded transition behind every approve/reject/cancel/undo action, so
+  /// they all enforce "admins only" and "only from the expected state".
+  ///
+  /// Approving, rejecting and cancelling are admin decisions: staff can propose,
+  /// but a proposal must never be able to approve itself.
+  bool _setDriveApproval(
+    String driveId, {
+    required String actorId,
+    required DriveApproval from,
+    required DriveApproval to,
+    required String summary,
+    String? note,
+    bool clearNote = false,
+  }) {
+    final actor = userById(actorId);
+    final index = _drives.indexWhere((d) => d.id == driveId);
+    if (actor == null || index == -1) return false;
+    if (!actor.role.canManageStaff) return false;
+    final drive = _drives[index];
+    if (drive.approval != from) return false;
+    _drives[index] = drive.copyWith(
+      approval: to,
+      reviewedById: actorId,
+      reviewNote: note,
+      clearReviewNote: clearNote,
+    );
+    _logDrive(actorId, '$summary "${drive.title}"');
+    return true;
+  }
+
+  void _logDrive(String actorId, String summary) {
+    _logActivity(
+      kind: ActivityKind.driveUpdate,
+      actorId: actorId,
+      summary: summary,
+    );
+    _notify();
+  }
 
   /// Adds a warning, capped at three.
   ///
