@@ -41,6 +41,30 @@ ANDROID_ICONS = {
 # the square can be cropped by the launcher), so the art is inset and padded.
 MASKABLE_INSET = 0.78
 
+# The source artwork carries a wide white margin around the mark. Trimming to
+# the mark and re-padding by this fraction makes the logo read at header sizes
+# instead of sitting small inside its tile.
+TRIM_THRESHOLD = 246
+TRIM_PADDING = 0.06
+
+
+def _trim_to_mark(image: Image.Image) -> Image.Image:
+    """Crop the white margin, then re-pad the mark by [TRIM_PADDING]."""
+    grey = image.convert("L")
+    mask = grey.point(lambda value: 255 if value < TRIM_THRESHOLD else 0)
+    box = mask.getbbox()
+    if box is None:
+        return image
+    art = image.crop(box)
+    side = max(art.size)
+    pad = int(round(side * TRIM_PADDING))
+    canvas = Image.new("RGB", (side + 2 * pad, side + 2 * pad), (255, 255, 255))
+    canvas.paste(
+        art,
+        ((canvas.width - art.width) // 2, (canvas.height - art.height) // 2),
+    )
+    return canvas
+
 
 def _square(image: Image.Image, size: int, inset: float = 1.0) -> Image.Image:
     """Resize [image] to a white square of [size], art occupying [inset]."""
@@ -59,6 +83,7 @@ def main() -> None:
         left = (art.width - side) // 2
         top = (art.height - side) // 2
         art = art.crop((left, top, left + side, top + side))
+    art = _trim_to_mark(art)
 
     os.makedirs(BRANDING, exist_ok=True)
 

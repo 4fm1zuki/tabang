@@ -650,27 +650,7 @@ class _AdminPhoneHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: TabangGradients.brand,
-              borderRadius: BorderRadius.circular(TabangRadius.xs),
-            ),
-            padding: const EdgeInsets.all(2),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: const SizedBox(
-                width: 28,
-                height: 28,
-                child: TabangPhoto(
-                  'assets/branding/app_icon.png',
-                  semanticLabel: 'TABANG',
-                  creditLabel: 'TABANG logo',
-                  fallbackIcon: Icons.water_drop,
-                  fallbackIconSize: 15,
-                ),
-              ),
-            ),
-          ),
+          const TabangLogo(),
           const SizedBox(width: TabangSpace.sm),
           // Long aliases and role labels must ellipsize, never widen the row:
           // the donor and staff headers share this rule.

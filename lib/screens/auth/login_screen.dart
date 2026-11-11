@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth.dart';
 import '../../theme.dart';
+import '../../widgets/common.dart';
 import '../../widgets/photo.dart';
 import 'register_screen.dart';
 
@@ -269,20 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(TabangRadius.sm),
-              child: const SizedBox(
-                width: 40,
-                height: 40,
-                child: TabangPhoto(
-                  'assets/branding/app_icon.png',
-                  semanticLabel: 'TABANG app icon',
-                  creditLabel: 'TABANG logo',
-                  fallbackIcon: Icons.water_drop,
-                  fallbackIconSize: 22,
-                ),
-              ),
-            ),
+            const TabangLogo(size: 44),
             const SizedBox(width: TabangSpace.md),
             Text(
               'TABANG',

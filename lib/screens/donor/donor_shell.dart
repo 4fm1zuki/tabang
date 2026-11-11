@@ -654,20 +654,7 @@ class _PhoneHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(TabangRadius.xs),
-            child: const SizedBox(
-              width: 30,
-              height: 30,
-              child: TabangPhoto(
-                'assets/branding/app_icon.png',
-                semanticLabel: 'TABANG',
-                creditLabel: 'TABANG logo',
-                fallbackIcon: Icons.water_drop,
-                fallbackIconSize: 16,
-              ),
-            ),
-          ),
+          const TabangLogo(),
           const SizedBox(width: TabangSpace.sm),
           // Matches the staff header: the identity gets the free space and
           // ellipsizes instead of pushing the actions off-screen.
@@ -881,27 +868,7 @@ class _Sidebar extends StatelessWidget {
             ? MainAxisAlignment.start
             : MainAxisAlignment.center,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: TabangGradients.brand,
-              borderRadius: BorderRadius.circular(TabangRadius.xs),
-            ),
-            padding: const EdgeInsets.all(2),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: const SizedBox(
-                width: 30,
-                height: 30,
-                child: TabangPhoto(
-                  'assets/branding/app_icon.png',
-                  semanticLabel: 'TABANG',
-                  creditLabel: 'TABANG logo',
-                  fallbackIcon: Icons.water_drop,
-                  fallbackIconSize: 16,
-                ),
-              ),
-            ),
-          ),
+          const TabangLogo(size: 36),
           if (expanded) ...[
             const SizedBox(width: TabangSpace.sm),
             Expanded(

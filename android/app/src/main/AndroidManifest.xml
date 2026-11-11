@@ -1,10 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required for Firebase and any future backend calls. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Tablets, foldables and Chromebooks: the map and lists work with a
+         mouse or trackpad as well as a finger, so a touchscreen is not
+         required. Without this Android assumes every device needs one, which
+         hides the app from some tablet and desktop-sized devices. -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false"/>
+
+    <!-- Every screen size is supported: the shells switch between the rail and
+         the phone bar at 760 px, so tablets get the wide layout. -->
+    <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true"/>
+
     <application
         android:label="TABANG"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:resizeableActivity="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

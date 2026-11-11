@@ -140,20 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(TabangRadius.sm),
-                        child: const SizedBox(
-                          width: 38,
-                          height: 38,
-                          child: TabangPhoto(
-                            'assets/branding/app_icon.png',
-                            semanticLabel: 'TABANG app icon',
-                            creditLabel: 'TABANG logo',
-                            fallbackIcon: Icons.water_drop,
-                            fallbackIconSize: 20,
-                          ),
-                        ),
-                      ),
+                      const TabangLogo(size: 42),
                       const SizedBox(width: TabangSpace.md),
                       Expanded(
                         child: Text(

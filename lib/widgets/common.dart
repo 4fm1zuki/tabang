@@ -5,12 +5,54 @@ import '../core/models.dart';
 import '../theme.dart';
 import 'illustrations.dart';
 import 'layout.dart';
+import 'photo.dart';
 
 /// Small, reusable building blocks shared by both dashboards.
 ///
 /// The previous build re-implemented a stat card, a status pill and a section
 /// header in nearly every page with slightly different padding and colours.
 /// These are the single versions.
+
+/// The TABANG mark used by every shell header.
+///
+/// One widget so the phone bar, the donor rail and the staff rail cannot drift
+/// apart again — they previously drew the logo at 28 px in one place and 30 px
+/// in another, one with a gradient frame and one without. The supplied artwork
+/// sits on its own white plate, so the tile is clipped to a rounded square at a
+/// size that keeps the drop, heart and hand legible.
+class TabangLogo extends StatelessWidget {
+  const TabangLogo({super.key, this.size = 40});
+
+  static const String asset = 'assets/branding/app_icon.png';
+
+  /// Height and width of the artwork itself; the frame adds 2 px on each side.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: TabangGradients.brand,
+        borderRadius: BorderRadius.circular(TabangRadius.sm),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(TabangRadius.xs),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: TabangPhoto(
+            asset,
+            semanticLabel: 'TABANG',
+            creditLabel: 'TABANG logo',
+            fallbackIcon: Icons.water_drop,
+            fallbackIconSize: size * 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Branded confirmation for actions that are hard to undo: signing out,
 /// leaving a blood drive's chapter list, or closing the app from a phone.

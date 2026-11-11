@@ -1176,26 +1176,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const ClipOval(
-                      child: SizedBox(
-                        width: 52,
-                        height: 52,
-                        child: TabangPhoto(
-                          'assets/branding/app_icon.png',
-                          semanticLabel: 'TABANG logo',
-                          creditLabel: 'TABANG logo',
-                          fallbackIcon: Icons.water_drop,
-                          fallbackIconSize: 22,
-                        ),
-                      ),
-                    ),
-                  ),
+                  const TabangLogo(size: 48),
                   const SizedBox(width: TabangSpace.md),
                   Expanded(
                     child: Column(
