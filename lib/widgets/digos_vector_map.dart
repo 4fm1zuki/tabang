@@ -43,7 +43,7 @@ class DigosMapColors {
   static const LinearGradient paperGradientDark = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF201A17), Color(0xFF161110)],
+    colors: [ui.Color.fromARGB(255, 41, 41, 41), Color(0xFF161110)],
   );
 
   /// Everything outside the city cutout. Also plain white; the heavy city
@@ -57,7 +57,7 @@ class DigosMapColors {
   static const LinearGradient outsideGradientDark = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF1C1613), Color(0xFF120E0D)],
+    colors: [ui.Color.fromARGB(255, 59, 59, 58), ui.Color.fromARGB(255, 24, 23, 23)],
   );
 
   /// Barangay borders. A deeper terracotta than the old pale rose so the
@@ -69,10 +69,10 @@ class DigosMapColors {
   static const Color internalBorderDark = Color(0xFFDE9377);
   static const Color cityBorder = Color(0xFF5A1512);
   static const Color cityBorderDark = Color(0xFFFFDAD4);
-  static const Color label = Color(0xFF2B211E);
+  static const Color label = ui.Color.fromARGB(255, 43, 40, 39);
   static const Color labelDark = Color(0xFFFBF5F2);
   static const Color halo = Color(0xFFF8FAFC);
-  static const Color haloDark = Color(0xFF17120F);
+  static const Color haloDark = ui.Color.fromARGB(255, 31, 30, 30);
 
   /// Selected barangay: a subtle teal wash with a brand-teal outline, so it
   /// no longer competes with the warm donor ramp. (Polygon fills cannot take a
@@ -1244,7 +1244,7 @@ class _HaloLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final halo = dark ? DigosMapColors.haloDark : DigosMapColors.halo;
+    final halo = dark ? const ui.Color.fromARGB(255, 48, 47, 47) : DigosMapColors.halo;
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -1309,7 +1309,7 @@ class _FacilityPin extends StatelessWidget {
             width: 25 * scale,
             height: 25 * scale,
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF241C1A) : Colors.white,
+              color: dark ? const ui.Color.fromARGB(255, 53, 52, 52) : Colors.white,
               shape: BoxShape.circle,
               border: Border.all(
                 color: color,
@@ -1405,7 +1405,7 @@ class _ScaleBar extends StatelessWidget {
       key: const ValueKey('mapScaleBar'),
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: (dark ? const Color(0xFF241C1A) : const Color(0xFFFFFFFF))
+        color: (dark ? const ui.Color.fromARGB(255, 54, 54, 54) : const Color(0xFFFFFFFF))
             .withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(4),
       ),
