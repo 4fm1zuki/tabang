@@ -222,10 +222,18 @@ SECTIONS: list[tuple[str, str, str, str, str, str]] = [
     (
         "6. Technical Foundations",
         "Iverson",
-        "what it is built with, briefly.",
-        "language, data store, map, privacy, builds.",
+        "what it is built with, briefly, and what it takes to run.",
+        "language, data store, map, privacy, builds, requirements.",
         "nothing collected here \u2014 just how data is stored.",
         "Flutter + Dart; no server; seeded in-memory data; OSM map; APKs and web.",
+    ),
+    (
+        "6.1 System requirements",
+        "Iverson",
+        "so the panel knows what the app needs, in plain terms.",
+        "phone, browser, connection, and what runs underneath.",
+        "nothing \u2014 these are the minimums, measured from the builds we hand out.",
+        "Phone: Android 7.0 or newer, 2 GB RAM, about 100 MB free, install the APK for the device. Browser: a current Chrome, Edge, Firefox or Safari, nothing to install, about 10 MB on first visit. Connection: internet for the map base tiles at 500 kbps; everything else works offline. No server or database, and no iOS build because there is no Apple device to compile on.",
     ),
 ]
 
