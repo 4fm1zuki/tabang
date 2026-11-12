@@ -13,7 +13,6 @@ import '../shared/profile_page.dart';
 import '../shared/settings_page.dart';
 import '../donor/chat_page.dart';
 import 'admin_overview.dart';
-import 'chat_moderation_page.dart';
 import 'operations_workspace_page.dart';
 import 'user_management_page.dart';
 
@@ -301,12 +300,13 @@ class _AdminShellState extends State<AdminShell> {
     _Destination('Overview', Icons.dashboard_outlined, Icons.dashboard),
     _Destination('Operations', Icons.map_outlined, Icons.map),
     _Destination('Messages', Icons.forum_outlined, Icons.forum),
+    // Moderation is a tab inside Users, so staff warn or suspend an account
+    // where they see it instead of in a second sidebar destination.
     _Destination('Users', Icons.people_outline, Icons.people),
-    _Destination('Moderation', Icons.gavel_outlined, Icons.gavel),
   ];
 
   /// Bottom-bar slots on phones and small tablets.
-  static const _phoneIndices = <int>[0, 1, 2, 3, 4];
+  static const _phoneIndices = <int>[0, 1, 2, 3];
 
   /// Repository "new activity" surface behind each destination. Messages keep
   /// their own unread counter instead.
@@ -314,7 +314,6 @@ class _AdminShellState extends State<AdminShell> {
     0: 'overview',
     1: 'operations',
     3: 'users',
-    4: 'moderation',
   };
 
   bool _hasNewFor(int index) {
@@ -561,8 +560,6 @@ class _AdminShellState extends State<AdminShell> {
           currentUser: widget.user,
           onOpenMessages: (threadId) => _openMessages(threadId: threadId),
         );
-      case 4:
-        return ChatModerationPage(currentUser: widget.user);
       default:
         return AdminOverviewPage(
           user: widget.user,

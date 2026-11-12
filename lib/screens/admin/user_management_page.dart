@@ -11,6 +11,7 @@ import '../../widgets/common.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/photo.dart';
 import '../donor/chat_page.dart';
+import 'chat_moderation_page.dart';
 import '../../widgets/tabang_dropdown.dart';
 
 /// User management for chapter staff.
@@ -41,6 +42,9 @@ class UserManagementPage extends StatefulWidget {
 class _UserManagementPageState extends State<UserManagementPage> {
   final TabangRepository _repo = TabangRepository.instance;
   final TextEditingController _search = TextEditingController();
+
+  /// 0 = accounts, 1 = moderation.
+  int _section = 0;
 
   AccountStatus? _statusFilter;
   UserRole? _roleFilter;
@@ -452,6 +456,57 @@ class _UserManagementPageState extends State<UserManagementPage> {
         .where((u) => u.status == AccountStatus.unverified)
         .length;
 
+    // Accounts and Moderation are two tabs of one destination: staff discipline
+    // an account where they see it, so the moderation queue no longer needs its
+    // own sidebar entry.
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            context.pagePadding.left,
+            context.pagePadding.top,
+            context.pagePadding.right,
+            TabangSpace.sm,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(
+                  value: 0,
+                  icon: Icon(Icons.people_outline, size: 15),
+                  label: Text('Accounts', softWrap: false),
+                ),
+                ButtonSegment(
+                  value: 1,
+                  icon: Icon(Icons.gavel_outlined, size: 15),
+                  label: Text('Moderation', softWrap: false),
+                ),
+              ],
+              selected: {_section},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) =>
+                  setState(() => _section = selection.first),
+            ),
+          ),
+        ),
+        Expanded(
+          child: _section == 0
+              ? _buildAccounts(context, users, pending)
+              : ChatModerationPage(
+                  currentUser: widget.currentUser,
+                  embedded: true,
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccounts(
+    BuildContext context,
+    List<AppUser> users,
+    int pending,
+  ) {
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Column(

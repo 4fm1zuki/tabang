@@ -336,7 +336,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('staff phone bar scrolls with a visible indicator', (
+  testWidgets('staff phone bar fits now that Moderation moved into Users', (
     tester,
   ) async {
     await usePhone(tester);
@@ -352,12 +352,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Five 84 px slots need more than a 360 px screen, so the staff bar
-    // scrolls and shows the same top-edge indicator as the donor bar.
-    expect(
-      find.byKey(const ValueKey('adminPhoneNavScrollbar')),
-      findsOneWidget,
-    );
+    // Four destinations fit a phone, so the bar needs no scroll indicator; the
+    // moderation queue is reached from inside Users instead.
+    expect(find.byKey(const ValueKey('adminPhoneNavScrollbar')), findsNothing);
+    expect(find.text('Users'), findsWidgets);
+    expect(find.text('Moderation'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -14,9 +14,17 @@ import '../../widgets/illustrations.dart';
 /// moderation data but every action was inert; these buttons mutate the shared
 /// repository.
 class ChatModerationPage extends StatefulWidget {
-  const ChatModerationPage({super.key, required this.currentUser});
+  const ChatModerationPage({
+    super.key,
+    required this.currentUser,
+    this.embedded = false,
+  });
 
   final AppUser currentUser;
+
+  /// True when the page is a tab inside another workspace (Users), which
+  /// supplies the surrounding padding and section switch.
+  final bool embedded;
 
   @override
   State<ChatModerationPage> createState() => _ChatModerationPageState();
