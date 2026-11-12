@@ -160,22 +160,34 @@ class _FindDonorPageState extends State<FindDonorPage> {
     _donorCounts = _repo.donorCountsByBarangay(bloodType: _bloodType);
   }
 
-  /// Open requests per barangay: the same request heat layer the staff
-  /// Operations map paints, sourced from the repository.
-  Map<String, int> get _requestCounts => _repo.openRequestsByBarangay();
+  /// Requests the community may see: the ones the requester actually broadcast
+  /// to the donor network and that still need donors.
+  ///
+  /// Deliberately NOT every open request. A blood-bank request is processed by
+  /// chapter staff and was never broadcast, so putting it on the community map
+  /// would expose a patient's need to people who were never asked to help, and
+  /// would paint workload the community cannot act on. `acceptsDonorResponses`
+  /// is the app's own definition of "open to the donor network".
+  Iterable<BloodRequest> get _broadcastRequests =>
+      _repo.requests.where((request) => request.acceptsDonorResponses);
 
-  /// Open requests shown in the pane: the same open/matched set the heat layer
-  /// paints, narrowed by the selected barangay and the search box.
+  /// Broadcast requests per barangay: the community's request heat layer.
+  Map<String, int> get _requestCounts {
+    final counts = <String, int>{};
+    for (final request in _broadcastRequests) {
+      counts[request.barangay] = (counts[request.barangay] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Broadcast requests shown in the pane, narrowed by the selected barangay
+  /// and the search box.
   ///
   /// Read-only on purpose — community users see the need, verification and
   /// fulfilment stay with chapter staff.
   List<BloodRequest> get _visibleRequests {
     final q = _query.trim().toLowerCase();
-    final list = _repo.requests.where((request) {
-      final open =
-          request.status == RequestStatus.open ||
-          request.status == RequestStatus.matched;
-      if (!open) return false;
+    final list = _broadcastRequests.where((request) {
       if (_selectedBarangay != null &&
           request.barangay != _selectedBarangay) {
         return false;

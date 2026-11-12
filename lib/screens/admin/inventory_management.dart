@@ -1242,30 +1242,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             const SizedBox(height: TabangSpace.sm),
             RequestDocumentList(documents: request.documents, dense: true),
           ],
-          if (pending && widget.currentUser.role.canFulfillRequests) ...[
-            const SizedBox(height: TabangSpace.sm),
-            Wrap(
-              spacing: TabangSpace.sm,
-              children: [
-                OutlinedButton(
-                  onPressed: () => showRejectRequestDialog(
-                    context,
-                    request,
-                    actor: widget.currentUser,
-                  ),
-                  child: const Text('Reject'),
-                ),
-                FilledButton(
-                  onPressed: () => showVerifyRequestDialog(
-                    context,
-                    request,
-                    actor: widget.currentUser,
-                  ),
-                  child: const Text('Verify slot'),
-                ),
-              ],
-            ),
-          ],
+          // Verification happens in the details, which the row opens: the old
+          // inline "Verify slot" button opened the very same dialog while
+          // sounding like a lighter action, so it is gone.
         ],
       ),
     );

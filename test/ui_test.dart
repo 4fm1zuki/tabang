@@ -670,9 +670,13 @@ void main() {
     await tester.tap(find.textContaining('Booked slots'));
     await tester.pumpAndSettle();
     // Seeded REQ-011 is still awaiting review, so its slot and the verify
-    // action are reachable. Slots now belong to requests, not appointments.
+    // action are reachable: the row opens the details, which carry the action.
     expect(find.text('Awaiting verification'), findsWidgets);
-    expect(find.text('Verify slot'), findsWidgets);
+    await tester.tap(find.textContaining('Awaiting verification').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Verify and open'), findsWidgets);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
 
     // The staff request queue carries the same card anatomy and tappable
     // requester/responder names.

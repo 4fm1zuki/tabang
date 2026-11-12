@@ -221,7 +221,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Awaiting verification'), findsWidgets);
-    expect(find.text('Verify slot'), findsWidgets);
+    // Verification lives in the row's details now, so open the first slot and
+    // check the detail offers it.
+    await tester.tap(find.textContaining('Awaiting verification').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Verify and open'), findsWidgets);
     expect(tester.takeException(), isNull);
 
     // The restyled request queue and the removed-units ledger fit too. The
