@@ -1361,6 +1361,45 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           ),
         ]),
         const SizedBox(height: TabangSpace.xl),
+        _aboutSection(
+          context,
+          'System requirements',
+          'What it actually takes to run this build.',
+          [
+            const _Pillar(
+              Icons.android_outlined,
+              'Android phone or tablet',
+              'Android 7.0 or newer (API 24). A 64-bit ARM device is the '
+                  'usual case; 32-bit ARM and x86_64 builds are also produced. '
+                  '2 GB of RAM and about 100 MB of free storage (the split APK '
+                  'is 27-31 MB, the universal one 67 MB).',
+            ),
+            const _Pillar(
+              Icons.language_outlined,
+              'Web browser',
+              'A current Chrome, Edge, Firefox or Safari, on desktop or '
+                  'mobile. Nothing to install: the whole app is about 10 MB on '
+                  'first visit and is cached afterwards.',
+            ),
+            const _Pillar(
+              Icons.wifi_outlined,
+              'Connection',
+              'Internet is needed for the map base tiles, and 500 kbps is '
+                  'enough. Everything else - accounts, requests, inventory and '
+                  'the barangay map itself - works with the network off.',
+            ),
+            const _Pillar(
+              Icons.storage_outlined,
+              'Under the hood',
+              'No server and no database are required: the records are '
+                  'simulated and held in the app for the session, so nothing is '
+                  'sent to a third party and no account has to be created. The '
+                  'backend and Cloudflare hosting noted above are the planned '
+                  'next step.',
+            ),
+          ],
+        ),
+        const SizedBox(height: TabangSpace.xl),
 
         Center(
           child: Text(
