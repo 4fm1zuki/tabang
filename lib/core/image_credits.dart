@@ -212,40 +212,6 @@ const List<ImageCredit> kImageCredits = [
         'https://kajabi-storefronts-production.kajabi-cdn.com/kajabi-storefronts-production/blogs/30933/images/30dSVaBPR7mN2PqJpkDc_sleep-supports-holistic-healing.jpg',
   ),
   ImageCredit(
-    asset: 'assets/images/content_hydration.jpg',
-    title: 'Still mineral water poured into a glass',
-    author: 'Walter J. Pilsak, Waldsassen',
-    license: 'CC BY-SA 3.0',
-    kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:Stilles_Mineralwasser.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_nutrition.jpg',
-    title: 'Salad greens and vegetables, Cambridge, MA',
-    author: 'Daderot',
-    license: 'CC0',
-    kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Salad_greens_and_vegetables_-_Cambridge,_MA.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_recovery.jpg',
-    title: 'Applying the bandage after a blood donation',
-    author: 'Tech. Sgt. Nicholas Alder, U.S. Air Force',
-    license: 'Public domain',
-    kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Ramstein_blood_donation_expands;_saves_lives_(7395803).jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_screening.jpg',
-    title: 'U.S. Naval Hospital Guam phlebotomist draws blood',
-    author:
-        'Mass Communication Specialist 2nd Class Gabrielle Blake, U.S. Navy',
-    license: 'Public domain',
-    kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:US_Navy_120126-N-GE301-042_U.S._Naval_Hospital_Guam%27s_phlebotomist_Dio_Patague_draws_blood_from_the_arm_of_Hospital_Corpsman_1st_Class_Karla_Manuel.jpg',
-  ),
-  ImageCredit(
     asset: 'assets/images/content_drive.jpg',
     title: 'Bloodletting and blood donation, Philippine Red Cross, Baliuag',
     author: 'Judgefloro',
@@ -260,58 +226,6 @@ const List<ImageCredit> kImageCredits = [
     license: 'CC0',
     kind: 'photo',
     sourceUrl: 'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_04.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_story.jpg',
-    title: 'Philippine National Red Cross blood draw, Zamboanga',
-    author: "Photographer's Mate 1st Class Michael R. McCormick, U.S. Navy",
-    license: 'Public domain',
-    kind: 'photo',
-    sourceUrl: 'https://commons.wikimedia.org/wiki/File:US_Navy_060531-N-3931M-035_Jennifer_E._Marcos,_a_medical_technician_and_chapter_service_representative_for_the_Philippine_National_Red_Cross,_draws_blood.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_privacy.jpg',
-    title: 'Blood donor registration desk, Philippine Red Cross, Baliuag',
-    author: 'Judgefloro',
-    license: 'CC0',
-    kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_08.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_tattoo.jpg',
-    title: 'Tattooed upper arm',
-    author: 'Tony Alter',
-    license: 'CC BY 2.0',
-    kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:Arm_tattoo_of_Neptune.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_donation_day.jpg',
-    title: 'Blood donation beds at a Philippine Red Cross drive, Baliuag',
-    author: 'Judgefloro',
-    license: 'CC0',
-    kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_03.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_community.jpg',
-    title: 'Registration and screening at a community blood drive, Baliuag',
-    author: 'Judgefloro',
-    license: 'CC0',
-    kind: 'photo',
-    sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_14.jpg',
-  ),
-  ImageCredit(
-    asset: 'assets/images/content_aftercare.jpg',
-    title: 'Dugtong Buhay Caravan blood donation, Bulacan',
-    author: 'Philippine Red Cross',
-    license: '© Philippine Red Cross — used with attribution',
-    kind: 'photo',
-    sourceUrl: 'https://redcross.org.ph/2023/05/30/prc-and-rmns-dugtong-buhay-caravan-draws-blood-donors-in-bulacan/',
   ),
   ImageCredit(
     asset: 'assets/branding/app_icon.png',

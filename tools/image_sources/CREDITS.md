@@ -12,18 +12,8 @@ licence and source link.
 | Bundled asset | Source (Wikimedia Commons) | Licence | Author / credit |
 | --- | --- | --- | --- |
 | `assets/images/hero_donation.jpg` | [Ramstein blood donation expands; saves lives (7395800)](https://commons.wikimedia.org/wiki/File:Ramstein_blood_donation_expands;_saves_lives_(7395800).jpg) | Public domain | U.S. Air Force photo by Tech. Sgt. Nicholas Alder |
-| `assets/images/content_hydration.jpg` | [Stilles Mineralwasser](https://commons.wikimedia.org/wiki/File:Stilles_Mineralwasser.jpg) | CC BY-SA 3.0 | Walter J. Pilsak, Waldsassen |
-| `assets/images/content_nutrition.jpg` | [Salad greens and vegetables – Cambridge, MA](https://commons.wikimedia.org/wiki/File:Salad_greens_and_vegetables_-_Cambridge,_MA.jpg) | CC0 | Daderot |
-| `assets/images/content_recovery.jpg` | [Ramstein blood donation expands; saves lives (7395803)](https://commons.wikimedia.org/wiki/File:Ramstein_blood_donation_expands;_saves_lives_(7395803).jpg) | Public domain | U.S. Air Force photo by Tech. Sgt. Nicholas Alder |
-| `assets/images/content_screening.jpg` | [U.S. Naval Hospital Guam phlebotomist draws blood](https://commons.wikimedia.org/wiki/File:US_Navy_120126-N-GE301-042_U.S._Naval_Hospital_Guam%27s_phlebotomist_Dio_Patague_draws_blood_from_the_arm_of_Hospital_Corpsman_1st_Class_Karla_Manuel.jpg) | Public domain | U.S. Navy photo by Mass Communication Specialist 2nd Class Gabrielle Blake |
 | `assets/images/content_drive.jpg` | [Bloodletting – Blood donation, Philippine Red Cross, SM City Baliuag 07](https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_07.jpg) | CC0 | Judgefloro |
 | `assets/images/drive_community.jpg` | [Bloodletting – Blood donation, Philippine Red Cross, SM City Baliuag 04](https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_04.jpg) | CC0 | Judgefloro |
-| `assets/images/content_story.jpg` | [Philippine National Red Cross blood draw, Zamboanga](https://commons.wikimedia.org/wiki/File:US_Navy_060531-N-3931M-035_Jennifer_E._Marcos,_a_medical_technician_and_chapter_service_representative_for_the_Philippine_National_Red_Cross,_draws_blood.jpg) | Public domain | U.S. Navy photo by Photographer's Mate 1st Class Michael R. McCormick |
-| `assets/images/content_privacy.jpg` | [Bloodletting – Blood donation, Philippine Red Cross, SM City Baliuag 08](https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_08.jpg) | CC0 | Judgefloro |
-| `assets/images/content_tattoo.jpg` | [Arm tattoo of Neptune](https://commons.wikimedia.org/wiki/File:Arm_tattoo_of_Neptune.jpg) | CC BY 2.0 | Tony Alter |
-| `assets/images/content_donation_day.jpg` | [Bloodletting – Blood donation, Philippine Red Cross, SM City Baliuag 03](https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_03.jpg) | CC0 | Judgefloro |
-| `assets/images/content_community.jpg` | [Bloodletting – Blood donation, Philippine Red Cross, SM City Baliuag 14](https://commons.wikimedia.org/wiki/File:09104jfBloodletting_Blood_donation_Philippine_Red_Cross_SM_City_Baliuagfvf_14.jpg) | CC0 | Judgefloro |
-| `assets/images/content_aftercare.jpg` | [PRC and RMN’s Dugtong Buhay Caravan draws blood donors in Bulacan](https://redcross.org.ph/2023/05/30/prc-and-rmns-dugtong-buhay-caravan-draws-blood-donors-in-bulacan/) | © Philippine Red Cross — used with attribution | Philippine Red Cross |
 
 ## Discover page photography
 
