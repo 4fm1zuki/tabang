@@ -49,11 +49,15 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     if (mounted) setState(() {});
   }
 
-  /// Makes the staff/admin split visible instead of implicit: the two roles
-  /// share day-to-day chapter work, and only an admin manages accounts.
+  /// Shows all three positions on the platform, not just the staff/admin pair:
+  /// a Community User is a full role (requesting, messaging, donor sign-up),
+  /// and the chapter console is two roles on top of it. The signed-in role is
+  /// highlighted so the card still answers "what can I do here?".
   Widget _buildPermissionsCard(BuildContext context) {
-    final role = widget.user?.role ?? UserRole.staff;
-    final other = role == UserRole.admin ? UserRole.staff : UserRole.admin;
+    final current = widget.user?.role ?? UserRole.staff;
+    // Donors keep every community capability; they are described inside the
+    // Community User column rather than as a fourth console role.
+    const roles = [UserRole.user, UserRole.staff, UserRole.admin];
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,9 +65,10 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           const SectionLabel('Roles & permissions'),
           const SizedBox(height: 4),
           Text(
-            'You are signed in as ${role.label}. Clinical Personnel run the '
-            'day-to-day chapter work; System Administrators add everything on '
-            'top, including account and staff management.',
+            'You are signed in as ${current.label}. Community Users request '
+            'blood, message the network and can register as donors. Clinical '
+            'Personnel run the chapter, and System Administrators add account '
+            'and staff management on top.',
             style: TextStyle(
               fontSize: 12,
               height: 1.45,
@@ -74,24 +79,41 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           LayoutBuilder(
             builder: (context, constraints) {
               final columns = [
-                _permissionColumn(context, role, highlight: true),
-                _permissionColumn(context, other, highlight: false),
+                for (final role in roles)
+                  _permissionColumn(
+                    context,
+                    role,
+                    highlight: role == current,
+                  ),
               ];
-              if (constraints.maxWidth >= 640) {
+              if (constraints.maxWidth >= 840) {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: columns[0]),
-                    const SizedBox(width: TabangSpace.lg),
-                    Expanded(child: columns[1]),
+                    for (var i = 0; i < columns.length; i++) ...[
+                      if (i > 0) const SizedBox(width: TabangSpace.md),
+                      Expanded(child: columns[i]),
+                    ],
+                  ],
+                );
+              }
+              if (constraints.maxWidth >= 560) {
+                final width = (constraints.maxWidth - TabangSpace.md) / 2;
+                return Wrap(
+                  spacing: TabangSpace.md,
+                  runSpacing: TabangSpace.md,
+                  children: [
+                    for (final column in columns)
+                      SizedBox(width: width, child: column),
                   ],
                 );
               }
               return Column(
                 children: [
-                  columns[0],
-                  const SizedBox(height: TabangSpace.md),
-                  columns[1],
+                  for (var i = 0; i < columns.length; i++) ...[
+                    if (i > 0) const SizedBox(height: TabangSpace.md),
+                    columns[i],
+                  ],
                 ],
               );
             },
@@ -123,9 +145,11 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           Row(
             children: [
               Icon(
-                role == UserRole.admin
-                    ? Icons.admin_panel_settings_outlined
-                    : Icons.medical_services_outlined,
+                switch (role) {
+                  UserRole.admin => Icons.admin_panel_settings_outlined,
+                  UserRole.staff => Icons.medical_services_outlined,
+                  _ => Icons.people_outline,
+                },
                 size: 16,
                 color: highlight ? TabangColors.crimson : context.textMuted,
               ),

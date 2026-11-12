@@ -18,18 +18,25 @@ import 'photo.dart';
 /// One widget so the phone bar, the donor rail and the staff rail cannot drift
 /// apart again. The artwork is transparent, so it is drawn directly on the
 /// surface with no plate and no frame — the old white tile and its border are
-/// gone, which also lets the drop, heart and hand fill the space.
+/// gone, which also lets the drop, heart and hand fill the space. Surfaces
+/// where the red-and-blue mark would disappear (the crimson About panel, the
+/// dark theme) pass [plate] to add the white circular backdrop.
 class TabangLogo extends StatelessWidget {
-  const TabangLogo({super.key, this.size = 44});
+  const TabangLogo({super.key, this.size = 44, this.plate = false});
 
   static const String asset = 'assets/branding/app_icon.png';
 
   /// Width and height of the mark.
   final double size;
 
+  /// Draws a white circular plate behind the mark. The artwork is red and blue
+  /// on transparency, so it disappears against a crimson panel and reads muddy
+  /// on a dark surface; the plate keeps it legible in both.
+  final bool plate;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final art = SizedBox(
       width: size,
       height: size,
       child: TabangPhoto(
@@ -39,6 +46,15 @@ class TabangLogo extends StatelessWidget {
         fallbackIcon: Icons.water_drop,
         fallbackIconSize: size * 0.7,
       ),
+    );
+    if (!plate) return art;
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
+      child: art,
     );
   }
 }

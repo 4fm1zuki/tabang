@@ -1631,11 +1631,28 @@ void main() {
       expect(latest.sentAsChapter, isFalse);
     });
 
-    test('reading the staff room clears the badge only for that member', () {
+    test('reading the staff room clears the badge only for that member', () async {
+      // USR-010 posted first, so USR-011's later seed message is unread for
+      // them. USR-011 wrote the latest message, so their row starts read.
       expect(repo.staffRoom!.hasUnreadFor('USR-010'), isTrue);
+      expect(repo.staffRoom!.hasUnreadFor('USR-011'), isFalse);
+
       repo.markThreadRead(TabangRepository.staffRoomId, 'USR-010');
       expect(repo.staffRoom!.hasUnreadFor('USR-010'), isFalse);
-      expect(repo.staffRoom!.hasUnreadFor('USR-011'), isTrue);
+
+      // DateTime.now() can resolve to the same tick under load; without a gap
+      // the new message would carry the read marker's timestamp and read as
+      // already seen.
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+
+      // A new message only re-lights the badge for the other member.
+      repo.sendMessage(
+        TabangRepository.staffRoomId,
+        'USR-011',
+        'Please review the verification queue.',
+      );
+      expect(repo.staffRoom!.hasUnreadFor('USR-010'), isTrue);
+      expect(repo.staffRoom!.hasUnreadFor('USR-011'), isFalse);
     });
   });
 

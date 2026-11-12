@@ -431,7 +431,14 @@ class _ChatPageState extends State<ChatPage> {
     final last = thread.lastMessage;
     final other = _otherUser(thread);
     final type = other?.bloodType;
-    final unread = thread.unreadCountFor(widget.user.id);
+    // Sending a message implies the thread has been seen up to that point
+    // (TabangRepository.sendMessage stamps the sender's read marker), so when
+    // the latest message is the reader's own there is nothing left unread. The
+    // model already discounts own messages; this also stops a stale earlier
+    // message from lighting a badge on a row that reads "You".
+    final unread = last != null && last.senderId == widget.user.id
+        ? 0
+        : thread.unreadCountFor(widget.user.id);
 
     // A left accent bar marks the open thread. The old full-row pink fill made
     // every conversation look selected once the page had focus.
@@ -505,6 +512,7 @@ class _ChatPageState extends State<ChatPage> {
                         Flexible(
                           child: Text(
                             _displayName(thread),
+                            maxLines: 1,
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -546,42 +554,51 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                         ],
                         const Spacer(),
-                        if (unread > 0) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: TabangColors.crimson,
-                              borderRadius: BorderRadius.circular(
-                                TabangRadius.pill,
+                        // The unread pill and the timestamp form one trailing
+                        // cluster so they always sit side by side. As separate
+                        // children of this flexible row they could be squeezed
+                        // into each other on a narrow tile.
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (unread > 0) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: TabangColors.crimson,
+                                  borderRadius: BorderRadius.circular(
+                                    TabangRadius.pill,
+                                  ),
+                                ),
+                                child: Text(
+                                  unread > 99 ? '99+' : '$unread',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              unread > 99 ? '99+' : '$unread',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                              const SizedBox(width: 6),
+                            ],
+                            if (last != null)
+                              Text(
+                                formatRelative(last.sentAt),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: unread > 0
+                                      ? TabangColors.crimson
+                                      : context.textMuted,
+                                  fontWeight: unread > 0
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        if (last != null)
-                          Text(
-                            formatRelative(last.sentAt),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: unread > 0
-                                  ? TabangColors.crimson
-                                  : context.textMuted,
-                              fontWeight: unread > 0
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                            ),
-                          ),
+                          ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 3),
@@ -607,25 +624,37 @@ class _ChatPageState extends State<ChatPage> {
                     const SizedBox(height: 7),
                     Row(
                       children: [
-                        if (type != null) ...[
-                          BloodTypeChip(type, size: 20),
-                          const SizedBox(width: 6),
-                        ],
-                        StatusPill(
-                          thread.isGroup
-                              ? 'Staff only'
-                              : thread.identityRevealed
-                              ? 'Identities shared'
-                              : 'Identity protected',
-                          tone: thread.isGroup
-                              ? Tone.info
-                              : thread.identityRevealed
-                              ? Tone.success
-                              : Tone.neutral,
-                          dense: true,
+                        // The chip and the status pill form a shrinkable left
+                        // group: at phone widths the pill ellipsizes rather
+                        // than pushing "You" off the row.
+                        Expanded(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (type != null) ...[
+                                BloodTypeChip(type, size: 20),
+                                const SizedBox(width: 6),
+                              ],
+                              Flexible(
+                                child: StatusPill(
+                                  thread.isGroup
+                                      ? 'Staff only'
+                                      : thread.identityRevealed
+                                      ? 'Identities shared'
+                                      : 'Identity protected',
+                                  tone: thread.isGroup
+                                      ? Tone.info
+                                      : thread.identityRevealed
+                                      ? Tone.success
+                                      : Tone.neutral,
+                                  dense: true,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        const Spacer(),
-                        if (last != null && last.senderId == widget.user.id)
+                        if (last != null && last.senderId == widget.user.id) ...[
+                          const SizedBox(width: 6),
                           Text(
                             'You',
                             style: TextStyle(
@@ -634,6 +663,7 @@ class _ChatPageState extends State<ChatPage> {
                               color: context.textMuted,
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ],

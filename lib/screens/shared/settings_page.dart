@@ -124,7 +124,7 @@ class _SettingsPageState extends State<SettingsPage> {
             help:
                 'Light is the default. Dark pins the darker theme on this '
                 'session. The map follows the active theme too, with a '
-                'per-visit override from the map style button on desktop.',
+                'per-visit override from the map style button.',
             children: [
               _themeOption(
                 context,

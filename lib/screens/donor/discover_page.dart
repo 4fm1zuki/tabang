@@ -1059,6 +1059,16 @@ class _DiscoverPageState extends State<DiscoverPage> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
           ),
+          // The venue also carries a pin on the Find Donor map, so a drive can
+          // be located without retyping the venue into a search field.
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onNavigate?.call(2);
+            },
+            icon: const Icon(Icons.map_outlined, size: 16),
+            label: const Text('View drives on map'),
+          ),
           FilledButton.icon(
             onPressed: () {
               Navigator.pop(context);

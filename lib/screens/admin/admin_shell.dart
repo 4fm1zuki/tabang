@@ -639,10 +639,9 @@ class _AdminPhoneHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // A 58 px baseline, not a hard height: on a 360 px phone a long role
-      // such as "System Administrator" wraps to a second line, and the old
-      // fixed height clipped it. The bar grows to keep the position readable
-      // in full instead of ellipsising it.
+      // A 58 px baseline, not a hard height: the identity is one scaled line
+      // now, and the 52 px mark plus its dark-mode white plate is 60 px tall,
+      // so the bar grows by a couple of pixels instead of clipping the plate.
       constraints: const BoxConstraints(minHeight: 58),
       padding: const EdgeInsets.symmetric(horizontal: TabangSpace.md),
       decoration: BoxDecoration(
@@ -651,11 +650,12 @@ class _AdminPhoneHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const TabangLogo(),
+          // 52 reads properly beside the wordmark; the plate keeps the red and
+          // blue artwork legible when the header sits on the dark surface.
+          TabangLogo(size: 52, plate: context.isDark),
           const SizedBox(width: TabangSpace.sm),
-          // Long aliases may ellipsize, never widen the row: the donor and
-          // staff headers share this rule. Role labels get their own line so
-          // the position is always readable in full, wrapping if needed.
+          // The identity never widens the row: the alias and position share a
+          // single scaled line, so the role stays readable in full on a phone.
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -673,18 +673,18 @@ class _AdminPhoneHeader extends StatelessWidget {
                     color: context.textColor,
                   ),
                 ),
-                Text(
-                  user.alias,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
-                ),
-                Text(
-                  user.role.label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: context.textMuted,
+                // The alias and the position share one line. A scale-down
+                // FittedBox shrinks the pair on a 360 px phone instead of
+                // ellipsising it or wrapping to a second line, so the full
+                // position ("System Administrator") still reads.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${user.alias} · ${user.role.label}',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
                   ),
                 ),
               ],
@@ -984,28 +984,23 @@ class _AdminSidebar extends StatelessWidget {
                       ),
                       if (expanded) ...[
                         const SizedBox(width: TabangSpace.sm),
+                        // Alias and position share one scaled line, matching
+                        // the phone header. The FittedBox keeps the whole
+                        // position readable in the 232 px rail.
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                user.alias,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '${user.alias} · ${user.role.label}',
+                              maxLines: 1,
+                              softWrap: false,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
                               ),
-                              Text(
-                                user.role.label,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ],

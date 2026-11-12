@@ -220,9 +220,22 @@ const List<DigosFacilityPin> digosFacilityPins = [
 ///
 /// The fills used to be fully opaque, which hid the street layer completely:
 /// the base map was there but no road ever showed. Empty barangays are almost
-/// transparent and every band stays below 0.8 so the streets remain readable
-/// even in the densest part of the city proper.
-double digosHeatOpacity(int count) {
+/// transparent and every band stays below 0.8 on the light map so the streets
+/// remain readable even in the densest part of the city proper.
+///
+/// The dark map needs more coverage: its charcoal raster is close in tone to
+/// the heat ramp, and the old alphas left the fills looking like a slightly
+/// dirtier patch of road. [dark] raises every band and lifts the empty wash so
+/// the city's barangays read as filled at a glance while the street grid still
+/// shows through the lower bands.
+double digosHeatOpacity(int count, {bool dark = false}) {
+  if (dark) {
+    if (count == 0) return 0.12;
+    if (count <= 2) return 0.48;
+    if (count <= 5) return 0.60;
+    if (count <= 9) return 0.72;
+    return 0.84;
+  }
   if (count == 0) return 0.04;
   if (count <= 2) return 0.30;
   if (count <= 5) return 0.48;
@@ -231,13 +244,18 @@ double digosHeatOpacity(int count) {
 }
 
 /// Sequential donor-density ramp, re-tuned to sit on the warm paper base.
+///
+/// The dark ramp is deliberately lighter and more saturated than a literal
+/// darkening of the light one. On the dark tiles the old muted browns landed
+/// almost on the canvas colour, so the community heat layer was hard to see;
+/// these bands stay warm but step clearly from charcoal to coral.
 Color digosHeatColor(int count, {required bool dark}) {
   if (dark) {
-    if (count == 0) return const Color(0xFF241C1A);
-    if (count <= 2) return const Color(0xFF5B2D26);
-    if (count <= 5) return const Color(0xFF8E3A2E);
-    if (count <= 9) return const Color(0xFFC24C3B);
-    return const Color(0xFFE76B56);
+    if (count == 0) return const Color(0xFF3A2C27);
+    if (count <= 2) return const Color(0xFF8F3A2C);
+    if (count <= 5) return const Color(0xFFC4472F);
+    if (count <= 9) return const Color(0xFFE85E43);
+    return const Color(0xFFFF8B6C);
   }
   if (count == 0) return const Color(0xFFEDE4DF);
   if (count <= 2) return const Color(0xFFF2C0A6);
@@ -248,13 +266,17 @@ Color digosHeatColor(int count, {required bool dark}) {
 
 /// Staff operations ramp for the open-request layer. Amber → deep red so it
 /// reads as workload rather than donor density.
+///
+/// As with the donor ramp, the dark bands are brighter and more golden so the
+/// amber layer is distinct from both the charcoal base and the coral donor
+/// ramp instead of disappearing into the map.
 Color digosRequestColor(int count, {required bool dark}) {
   if (dark) {
-    if (count == 0) return const Color(0xFF241C1A);
-    if (count <= 1) return const Color(0xFF5B4316);
-    if (count <= 3) return const Color(0xFF8E6420);
-    if (count <= 6) return const Color(0xFFC0842E);
-    return const Color(0xFFE5A94B);
+    if (count == 0) return const Color(0xFF3A3022);
+    if (count <= 1) return const Color(0xFF8A651F);
+    if (count <= 3) return const Color(0xFFC08A24);
+    if (count <= 6) return const Color(0xFFE8AC3A);
+    return const Color(0xFFFFCB66);
   }
   if (count == 0) return const Color(0xFFEDE4DF);
   if (count <= 1) return const Color(0xFFF7DFA8);
@@ -1012,16 +1034,20 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
           )
         : base;
 
+    // Request fills keep a faint wash even at zero so the amber workload layer
+    // reads as "nothing open here" at a glance; the donor ramp lets empty
+    // barangays stay close to the streets. Both layers get slightly more
+    // coverage in dark mode for the same reason: the charcoal raster is close
+    // in tone to the fills, so the old alphas hid the heat.
+    final alpha = requestCounts != null
+        ? (count == 0
+              ? (dark ? 0.16 : 0.10)
+              : digosHeatOpacity(count, dark: dark) + (dark ? 0.05 : 0.08))
+        : digosHeatOpacity(count, dark: dark) + (hovered ? 0.10 : 0);
+
     return Polygon(
       points: feature.ring,
-      // Request fills keep a faint wash even at zero so the amber workload
-      // layer reads as "nothing open here" at a glance; the donor ramp lets
-      // empty barangays fall back to the streets.
-      color: fill.withValues(
-        alpha: requestCounts != null
-            ? (count == 0 ? 0.10 : digosHeatOpacity(count) + 0.08)
-            : digosHeatOpacity(count) + (hovered ? 0.10 : 0),
-      ),
+      color: fill.withValues(alpha: alpha.clamp(0.0, 0.94).toDouble()),
       borderColor: hovered
           ? (dark
                 ? Colors.white.withValues(alpha: 0.9)

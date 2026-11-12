@@ -1177,7 +1177,9 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
             children: [
               Row(
                 children: [
-                  const TabangLogo(size: 48),
+                  // The mark sits on the crimson brand gradient, where its red
+                  // and blue artwork disappears; the plate keeps it legible.
+                  const TabangLogo(size: 56, plate: true),
                   const SizedBox(width: TabangSpace.md),
                   Expanded(
                     child: Column(

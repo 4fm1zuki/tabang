@@ -297,9 +297,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     );
   }
 
-  /// One inventory row, kept to a single glance: blood type chip, product,
-  /// time left and status. The barcode, storage bay, collected date and the
-  /// person holding the unit all live in the detail sheet the row opens.
+  /// One inventory row: blood type chip, product, time left and status on the
+  /// first line, the unit ID barcode and its holder (when reserved) beneath it,
+  /// and the status menu on the right. The barcode graphic, storage bay and
+  /// collected date stay behind the row tap in the unit sheet.
   Widget _buildUnitRow(
     BuildContext context,
     BloodUnit unit,
@@ -309,6 +310,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     final days = unit.daysUntilExpiry(now);
     final effective = unit.effectiveStatus(now);
     final expiring = days >= 0 && days <= 5 && unit.isUsableAt(now);
+    final holder = unit.reservedBy == null
+        ? null
+        : _repo.userById(unit.reservedBy!);
 
     final timeLeft = Text(
       unit.timeLeft(now),
@@ -348,15 +352,32 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           )
           .toList(),
     );
-    final identity = Text(
-      unit.product,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        fontSize: 13.5,
-        fontWeight: FontWeight.w700,
-        color: context.textColor,
-      ),
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          unit.product,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: context.textColor,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'ID ${unit.barcode}'
+          '${holder == null ? '' : ' · held by ${holder.alias}'}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontFamily: 'monospace',
+            color: context.textMuted,
+          ),
+        ),
+      ],
     );
 
     return DecoratedBox(
@@ -860,9 +881,12 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   /// The full record behind a request or booked-slot row.
   ///
   /// Rows stay a one-glance queue entry; opening one brings up everything the
-  /// chapter knows about the request. Staff verification runs from here through
-  /// [showVerifyRequestDialog] and [showRejectRequestDialog], the same dialogs
-  /// the Operations map uses, so the app keeps a single verification flow.
+  /// chapter knows about the request, including every attached file through the
+  /// shared [RequestDocumentList] viewer. Staff verification runs from here
+  /// through [showVerifyRequestDialog] and [showRejectRequestDialog], and staff
+  /// can close the request out with the map's `Mark fulfilled` action — the same
+  /// dialogs and action the Operations map uses, so the app keeps one flow.
+  /// Both the Requests tab and the Booked-slots tab open this one dialog.
   void _showRequestDetails(BuildContext context, BloodRequest request) {
     final responses = _repo.responsesFor(request.id);
     final selected = responses
@@ -871,6 +895,15 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     final requester = _repo.userById(request.requesterId);
     final canReview =
         widget.currentUser.role.canFulfillRequests && request.isAwaitingReview;
+    // Same fulfil window as the Operations map: staff close out any request
+    // that is no longer in review and has not already reached a terminal
+    // state.
+    final canFulfil =
+        widget.currentUser.role.canFulfillRequests &&
+        !request.isAwaitingReview &&
+        request.status != RequestStatus.fulfilled &&
+        request.status != RequestStatus.rejected &&
+        request.status != RequestStatus.cancelled;
 
     showDialog<void>(
       context: context,
@@ -949,22 +982,25 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     'Held units',
                     request.assignedUnitIds.join(', '),
                   ),
-                if (request.documents.isNotEmpty) ...[
-                  const SizedBox(height: TabangSpace.sm),
-                  Text(
-                    'Attached documents',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: dialogContext.textColor,
-                    ),
+                // Always render the shared document list, even when nothing was
+                // uploaded: the widget's "No documents attached." line tells
+                // staff the verification packet is empty, and every uploaded
+                // image opens full size from here — the same viewer the map
+                // uses, rather than a bare file name.
+                const SizedBox(height: TabangSpace.sm),
+                Text(
+                  'Attached documents',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: dialogContext.textColor,
                   ),
-                  const SizedBox(height: 4),
-                  RequestDocumentList(
-                    documents: request.documents,
-                    dense: true,
-                  ),
-                ],
+                ),
+                const SizedBox(height: 4),
+                RequestDocumentList(
+                  documents: request.documents,
+                  dense: true,
+                ),
                 if (request.reviewNote != null &&
                     request.reviewNote!.trim().isNotEmpty)
                   _detail(dialogContext, 'Review note', request.reviewNote!),
@@ -1008,7 +1044,37 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               child: const Text('Verify and open'),
             ),
           ],
+          // The map's fulfil action, under the map's conditions: available
+          // whenever staff can fulfil and the request is no longer awaiting
+          // review.
+          if (canFulfil)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _fulfilRequest(context, request);
+              },
+              child: const Text('Mark fulfilled'),
+            ),
         ],
+      ),
+    );
+  }
+
+  /// Closes out a request once the donation is recorded — the same action the
+  /// Operations map offers from its request card.
+  void _fulfilRequest(BuildContext context, BloodRequest request) {
+    final ok = _repo.markRequestFulfilled(
+      request.id,
+      actorId: widget.currentUser.id,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          ok
+              ? 'Request ${request.id} marked fulfilled.'
+              : 'Request ${request.id} cannot be fulfilled yet — a '
+                    'donor-network request must be matched first.',
+        ),
       ),
     );
   }

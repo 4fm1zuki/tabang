@@ -280,6 +280,90 @@ class _DonorHubPageState extends State<DonorHubPage> {
               ],
             ),
           ),
+          const SizedBox(height: TabangSpace.lg),
+          _buildCapabilityComparison(context),
+        ],
+      ),
+    );
+  }
+
+  /// What a community account can do now, and what staff verification adds.
+  ///
+  /// Registration only ever adds donor capabilities: a verified donor still
+  /// requests blood and messages people as a community member. Showing the two
+  /// sides together answers "what do I get from this?" without making the
+  /// visitor read the five-step visit checklist first.
+  Widget _buildCapabilityComparison(BuildContext context) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionLabel('Your capabilities'),
+          Text(
+            'Donating and needing blood are not mutually exclusive. '
+            'Verification adds donor tools on top of the community ones you '
+            'already have.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.5,
+              color: context.textMuted,
+            ),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const before = _CapabilityPanel(
+                icon: Icons.person_outline,
+                title: 'Community User',
+                caption: 'Available now',
+                lines: [
+                  'Request blood for yourself or a patient',
+                  'Message donors and chapter staff',
+                  'Browse facilities, drives and open requests',
+                  'Apply to become a donor from this page',
+                ],
+              );
+              const after = _CapabilityPanel(
+                icon: Icons.verified_user_outlined,
+                title: 'Voluntary Donor',
+                caption: 'Unlocks after verification',
+                highlighted: true,
+                lines: [
+                  'Appear in the donor directory by blood type',
+                  'Receive compatible donor-network requests',
+                  'Set availability or take a break',
+                  'Track eligibility, donations and patients helped',
+                ],
+              );
+              if (constraints.maxWidth >= 620) {
+                return const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: before),
+                    SizedBox(width: TabangSpace.md),
+                    Expanded(child: after),
+                  ],
+                );
+              }
+              return const Column(
+                children: [
+                  before,
+                  SizedBox(height: TabangSpace.md),
+                  after,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: TabangSpace.sm),
+          Text(
+            'The position on your profile stays "Community User" until staff '
+            'verify your donor card; it then changes to "Voluntary Donor".',
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.45,
+              color: context.textMuted,
+            ),
+          ),
         ],
       ),
     );
@@ -1102,6 +1186,96 @@ class _Benefit extends StatelessWidget {
               color: context.textColor,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CapabilityPanel extends StatelessWidget {
+  const _CapabilityPanel({
+    required this.icon,
+    required this.title,
+    required this.caption,
+    required this.lines,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String caption;
+  final List<String> lines;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(TabangSpace.md),
+      decoration: BoxDecoration(
+        color: context.surfaceAlt,
+        borderRadius: BorderRadius.circular(TabangRadius.sm),
+        border: Border.all(
+          color: highlighted
+              ? TabangColors.crimson.withValues(alpha: 0.45)
+              : context.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: highlighted ? TabangColors.crimson : context.textMuted,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+              StatusPill(
+                caption,
+                tone: highlighted ? Tone.brand : Tone.neutral,
+                dense: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final line in lines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    highlighted ? Icons.add_circle_outline : Icons.check,
+                    size: 13,
+                    color: highlighted
+                        ? TabangColors.crimson
+                        : TabangColors.success,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      line,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.4,
+                        color: context.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

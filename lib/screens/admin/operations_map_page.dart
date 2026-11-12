@@ -76,8 +76,9 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   bool _draggingSplit = false;
 
   /// Staff can switch the heat ramp between the amber request-workload view
-  /// (default) and the community donor-density view. The legend switch drives
-  /// both this flag and the map fill.
+  /// (default) and the community donor-density view. The legend switch and the
+  /// panel tab both drive it through [_selectPaneTab]; this flag and `_paneTab`
+  /// are set together there so they cannot disagree.
   bool _showDonorDensity = false;
 
   /// 0 = requests, 1 = donors.
@@ -510,6 +511,18 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     );
   }
 
+  /// Selecting a panel tab also picks the heat layer, mirroring Find Donor's
+  /// `_selectPaneTab`: the Requests tab paints the amber request ramp and the
+  /// Donors tab donor density, so the legend switch and the tab cannot
+  /// disagree. Both controls route through here.
+  void _selectPaneTab(int tab) {
+    setState(() {
+      _paneTab = tab;
+      // 0 = requests, 1 = donors.
+      _showDonorDensity = tab == 1;
+    });
+  }
+
   Widget _buildLegend(BuildContext context, {required bool compact}) {
     // Staff get both ramps through one two-state switch: the amber
     // request-workload heat (the default, matching the old operations map) and
@@ -592,13 +605,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
         donor ? 'operationsHeatDonors' : 'operationsHeatRequests',
       ),
       borderRadius: BorderRadius.circular(TabangRadius.xs),
-      onTap: () => setState(() {
-        _showDonorDensity = donor;
-        // The panel follows the heat: choosing the donor ramp brings the donor
-        // directory forward, choosing the request ramp brings the queue back,
-        // so the list always describes the layer that is painted.
-        _paneTab = donor ? 1 : 0;
-      }),
+      onTap: () => _selectPaneTab(donor ? 1 : 0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
@@ -742,7 +749,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
                     textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
                   ),
                   onSelectionChanged: (selection) =>
-                      setState(() => _paneTab = selection.first),
+                      _selectPaneTab(selection.first),
                 ),
               ),
               const SizedBox(height: TabangSpace.sm),

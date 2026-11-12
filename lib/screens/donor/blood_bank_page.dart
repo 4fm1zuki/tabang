@@ -1091,6 +1091,34 @@ class _BloodBankPageState extends State<BloodBankPage> {
                     style: TextStyle(fontSize: 12, color: context.textMuted),
                   ),
                   const SizedBox(height: TabangSpace.lg),
+                  // Column captions: the left arrow alone read as "this
+                  // recipient gives to these donors", the opposite of the
+                  // rule the rows encode. The two labels make the direction
+                  // explicit without repeating it on every row.
+                  Row(
+                    children: [
+                      Text(
+                        'Recipient',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                          color: context.textMuted,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Can receive from',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                          color: context.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   ...BloodType.values.map((recipient) {
                     final donors = Compatibility.donorsForComponent(
                       recipient,
@@ -1102,10 +1130,14 @@ class _BloodBankPageState extends State<BloodBankPage> {
                         children: [
                           BloodTypeChip(recipient, size: 28),
                           const SizedBox(width: TabangSpace.md),
-                          Icon(
-                            Icons.arrow_back,
-                            size: 13,
-                            color: context.textMuted,
+                          Tooltip(
+                            message: 'These donor types can give to '
+                                '${recipient.label}',
+                            child: Icon(
+                              Icons.arrow_back,
+                              size: 13,
+                              color: context.textMuted,
+                            ),
                           ),
                           const SizedBox(width: TabangSpace.md),
                           Expanded(

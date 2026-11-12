@@ -270,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Row(
           children: [
-            const TabangLogo(size: 44),
+            TabangLogo(size: 52, plate: context.isDark),
             const SizedBox(width: TabangSpace.md),
             Text(
               'TABANG',

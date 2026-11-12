@@ -646,7 +646,10 @@ class _PhoneHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
+      // A 58 px baseline, not a hard height: the 52 px mark plus its dark-mode
+      // white plate is 60 px tall, so the bar grows by a couple of pixels
+      // instead of squashing the plate on the dark surface.
+      constraints: const BoxConstraints(minHeight: 58),
       padding: const EdgeInsets.symmetric(horizontal: TabangSpace.md),
       decoration: BoxDecoration(
         color: context.surface,
@@ -654,7 +657,9 @@ class _PhoneHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const TabangLogo(),
+          // 52 reads properly beside the wordmark; the plate keeps the red and
+          // blue artwork legible when the header sits on the dark surface.
+          TabangLogo(size: 52, plate: context.isDark),
           const SizedBox(width: TabangSpace.sm),
           // Matches the staff header: the identity gets the free space and
           // ellipsizes instead of pushing the actions off-screen.
@@ -674,11 +679,19 @@ class _PhoneHeader extends StatelessWidget {
                     color: context.textColor,
                   ),
                 ),
-                Text(
-                  user.alias,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: context.textMuted),
+                // Alias and position share one scaled line, matching the
+                // staff header and the rail. The FittedBox shrinks the pair
+                // instead of ellipsising, so "Voluntary Donor" always reads in
+                // full on a 360 px phone.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${user.alias} · ${user.role.label}',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                  ),
                 ),
               ],
             ),
@@ -849,7 +862,10 @@ class _Sidebar extends StatelessWidget {
             ? MainAxisAlignment.start
             : MainAxisAlignment.center,
         children: [
-          const TabangLogo(size: 36),
+          // 44 matches the phone header's new weight. The rail is crimson in
+          // light mode and near-black in dark mode, so the mark always needs
+          // its white plate here — without it the red artwork disappears.
+          const TabangLogo(size: 44, plate: true),
           if (expanded) ...[
             const SizedBox(width: TabangSpace.sm),
             Expanded(
@@ -1082,30 +1098,24 @@ class _Sidebar extends StatelessWidget {
                 ),
                 if (expanded) ...[
                   const SizedBox(width: TabangSpace.sm),
+                  // Alias and position share one scaled line, matching the
+                  // phone header and the staff rail. The FittedBox shrinks the
+                  // pair rather than ellipsising the role, so "Voluntary Donor"
+                  // always reads in full.
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          user.alias,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: context.textColor,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${user.alias} · ${user.role.label}',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: context.textColor,
                         ),
-                        // The position wraps instead of ellipsising so the
-                        // rail never cuts a role label mid-word.
-                        Text(
-                          user.role.label,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: context.textMuted,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ],

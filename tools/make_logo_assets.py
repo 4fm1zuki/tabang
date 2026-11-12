@@ -50,18 +50,32 @@ MASKABLE_INSET = 0.78
 TRIM_THRESHOLD = 246
 TRIM_PADDING = 0.06
 
+# The cut-out PNG carries a near-invisible 1–15/255 halo around the mark (the
+# remains of the white-plate shadow). A plain alpha bbox keeps it, which leaves
+# the visible mark occupying barely half of its square and shows as a grey haze
+# on dark surfaces, so trim and clear anything at or below this alpha.
+TRIM_ALPHA = 16
+
 
 def _trim_to_mark(image: Image.Image) -> Image.Image:
-    """Crop to the artwork itself, then re-pad by [TRIM_PADDING]."""
+    """Crop to the visible artwork, then re-pad by [TRIM_PADDING]."""
     if image.mode != "RGBA":
         grey = image.convert("L")
         mask = grey.point(lambda value: 255 if value < TRIM_THRESHOLD else 0)
         box = mask.getbbox()
     else:
-        box = image.split()[3].getbbox()
+        alpha = image.split()[3]
+        mask = alpha.point(lambda value: 255 if value > TRIM_ALPHA else 0)
+        box = mask.getbbox()
     if box is None:
         return image
     art = image.crop(box)
+    if art.mode == "RGBA":
+        # Drop the residual sub-threshold halo; it is invisible on white but
+        # reads as a dirty square on the dark theme.
+        art.putalpha(
+            art.split()[3].point(lambda value: 0 if value <= TRIM_ALPHA else value)
+        )
     side = max(art.size)
     pad = int(round(side * TRIM_PADDING))
     canvas = Image.new("RGBA", (side + 2 * pad, side + 2 * pad), (0, 0, 0, 0))

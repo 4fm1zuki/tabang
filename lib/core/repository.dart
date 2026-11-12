@@ -3816,6 +3816,26 @@ class TabangRepository {
         .map((user) => user.id)
         .toList(growable: false);
     if (staffMembers.isNotEmpty) {
+      final staffMessages = [
+        ChatMessage(
+          id: 'MSG-STF-001',
+          senderId: 'USR-010',
+          senderAlias: 'Staff Marco',
+          text:
+              'Staff room — use this for shift swaps, verification '
+              'hand-offs and anything the community thread should not see.',
+          sentAt: now.subtract(const Duration(hours: 6)),
+        ),
+        ChatMessage(
+          id: 'MSG-STF-002',
+          senderId: 'USR-011',
+          senderAlias: 'Admin',
+          text:
+              'Noted. Keep request verification and slot confirmation '
+              'before 5 PM so donors have time to confirm.',
+          sentAt: now.subtract(const Duration(hours: 5, minutes: 20)),
+        ),
+      ];
       _threads.insert(
         0,
         ChatThread(
@@ -3826,26 +3846,25 @@ class TabangRepository {
           participantBAlias: 'Staff room',
           groupName: 'Staff room',
           memberIds: staffMembers,
-          messages: [
-            ChatMessage(
-              id: 'MSG-STF-001',
-              senderId: 'USR-010',
-              senderAlias: 'Staff Marco',
-              text:
-                  'Staff room — use this for shift swaps, verification '
-                  'hand-offs and anything the community thread should not see.',
-              sentAt: now.subtract(const Duration(hours: 6)),
-            ),
-            ChatMessage(
-              id: 'MSG-STF-002',
-              senderId: 'USR-011',
-              senderAlias: 'Admin',
-              text:
-                  'Noted. Keep request verification and slot confirmation '
-                  'before 5 PM so donors have time to confirm.',
-              sentAt: now.subtract(const Duration(hours: 5, minutes: 20)),
-            ),
-          ],
+          // Seeded history is read up to each member's own last message,
+          // matching `sendMessage` ("sending implies reading"). Without this
+          // the admin started with an unread badge on a room whose latest
+          // message they wrote, and the navigation badge disagreed with the
+          // row.
+          memberReadAt: {
+            for (final id in staffMembers)
+              id: staffMessages
+                  .where((message) => message.senderId == id)
+                  .fold<DateTime?>(
+                    null,
+                    (latest, message) =>
+                        latest == null || message.sentAt.isAfter(latest)
+                        ? message.sentAt
+                        : latest,
+                  ) ??
+                  now.subtract(const Duration(days: 30)),
+          },
+          messages: staffMessages,
         ),
       );
     }
