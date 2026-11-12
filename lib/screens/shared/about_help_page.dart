@@ -1340,26 +1340,24 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           const _Pillar(
             Icons.key_outlined,
             'Production authentication',
-            'Google OAuth 2.0 and production password KDF/release signing '
-                'are not wired in this build.',
+            'Sign-in is local to the device. Google OAuth 2.0 and a '
+                'production password KDF, plus release signing, are the next '
+                'step.',
           ),
           const _Pillar(
             Icons.cloud_outlined,
-            'Backend services',
-            'Supabase/PostgreSQL, push notifications and multi-facility '
-                'inventory require a deployed service.',
+            'Backend and hosting',
+            'There is no server yet: records live in the app. A backend '
+                '(Supabase/PostgreSQL) and Cloudflare hosting for the web '
+                'build are planned, and push notifications and multi-facility '
+                'inventory need that service.',
           ),
           const _Pillar(
-            Icons.mic_none_outlined,
-            'Voice calls',
-            'Chat is text-only. Voice calling is out of scope for the '
-                'prototype.',
-          ),
-          const _Pillar(
-            Icons.photo_camera_outlined,
-            'Profile uploads',
-            'Profile pictures are original bundled illustrations; user upload '
-                'and moderation are not implemented.',
+            Icons.phone_iphone_outlined,
+            'iOS',
+            'No iOS build is produced because the team has no Apple device to '
+                'compile and test on. Android and web are both built and '
+                'handed out.',
           ),
         ]),
         const SizedBox(height: TabangSpace.xl),
