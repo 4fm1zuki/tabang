@@ -674,6 +674,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
     final heading = _paneTab == 0
         ? (_selected == null ? 'Open requests' : 'Requests in $_selected')
         : (_selected == null ? 'Donors' : 'Donors in $_selected');
+    final count = _paneTab == 0 ? requests.length : donors.length;
 
     return Column(
       children: [
@@ -691,17 +692,34 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               // is now the draggable divider below the map), then the
               // segmented tabs, then the search field.
               Row(
+                // Same anatomy as Find Donor: the count sits beside the
+                // heading, the clear-filter action stays at the far right.
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Text(
-                      heading,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.15,
-                        color: context.textColor,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            heading,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.15,
+                              color: context.textColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: TabangSpace.sm),
+                        CountBadge(
+                          count,
+                          semanticLabel:
+                              '$count '
+                              '${_paneTab == 0 ? 'open requests' : 'donors'}',
+                        ),
+                      ],
                     ),
                   ),
                   if (_selected != null)

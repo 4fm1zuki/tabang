@@ -424,6 +424,58 @@ class StatusPill extends StatelessWidget {
   }
 }
 
+/// A compact, filled count marker for panel headers.
+///
+/// Counts are numbers, not statuses, so this deliberately uses the solid brand
+/// fill instead of [StatusPill]'s soft tint: the tinted version blended into the
+/// dark map panel and read as an unlabelled notification dot. The zero state
+/// falls back to the quiet surface colour so an empty queue does not look like
+/// an alert.
+class CountBadge extends StatelessWidget {
+  const CountBadge(this.count, {super.key, this.semanticLabel});
+
+  final int count;
+
+  /// Spoken description, such as "14 available donors".
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = count == 0;
+    final dark = context.isDark;
+    final background = empty
+        ? context.surfaceAlt
+        : (dark ? TabangColors.brandOnDark : TabangColors.crimson);
+    final foreground = empty
+        ? context.textMuted
+        : (dark ? const Color(0xFF56100B) : Colors.white);
+    return Semantics(
+      label: semanticLabel ?? '$count',
+      excludeSemantics: true,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 22),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(TabangRadius.pill),
+          border: empty ? Border.all(color: context.border) : null,
+        ),
+        child: Text(
+          count > 99 ? '99+' : '$count',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.2,
+            height: 1.1,
+            color: foreground,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Blood type rendered as a compact token.
 class BloodTypeChip extends StatelessWidget {
   const BloodTypeChip(this.type, {super.key, this.size = 34});

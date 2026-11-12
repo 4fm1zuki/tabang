@@ -1507,24 +1507,6 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
         ),
         const SizedBox(height: TabangSpace.md),
         const _ResearchGroupCard(),
-        const SizedBox(height: TabangSpace.md),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(TabangSpace.md),
-          decoration: BoxDecoration(
-            color: context.surfaceAlt,
-            borderRadius: BorderRadius.circular(TabangSpace.sm),
-          ),
-          child: Text(
-            'Educational illustrations are original TABANG artwork, so there is '
-            'no external credit to list.',
-            style: TextStyle(
-              fontSize: 12.5,
-              height: 1.5,
-              color: context.textMuted,
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -1870,19 +1852,19 @@ class _AuthorNameState extends State<_AuthorName>
     final text = _alternate ? widget.alternate : widget.name;
     const style = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700);
 
+    // The swapped name fades instead of popping. The key is what tells
+    // AnimatedSwitcher the label changed; the rainbow colour animation keeps
+    // running underneath.
+    final Widget label;
     if (!_rainbow) {
-      return InkWell(
-        onTap: _tap,
-        child: Text(
-          text,
-          style: style.copyWith(color: context.textColor),
-        ),
+      label = Text(
+        text,
+        key: ValueKey(text),
+        style: style.copyWith(color: context.textColor),
       );
-    }
-
-    return InkWell(
-      onTap: _tap,
-      child: AnimatedBuilder(
+    } else {
+      label = AnimatedBuilder(
+        key: ValueKey(text),
         animation: _colour,
         builder: (context, _) => Text(
           text,
@@ -1895,6 +1877,28 @@ class _AuthorNameState extends State<_AuthorName>
             ).toColor(),
           ),
         ),
+      );
+    }
+
+    return InkWell(
+      onTap: _tap,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        // Keep both labels left-aligned while they cross-fade; the default
+        // centred Stack shifts the name sideways when the strings differ in
+        // width.
+        layoutBuilder: (currentChild, previousChildren) => Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            ...previousChildren,
+            if (currentChild != null) currentChild,
+          ],
+        ),
+        transitionBuilder: (child, animation) =>
+            FadeTransition(opacity: animation, child: child),
+        child: label,
       ),
     );
   }

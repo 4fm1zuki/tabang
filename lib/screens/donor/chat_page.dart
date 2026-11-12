@@ -294,32 +294,47 @@ class _ChatPageState extends State<ChatPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // The two-pane layout gives this list a fixed 300 px, so
-                    // the title has to flex instead of pushing the sort and
-                    // compose controls past the edge.
+                    // The two-pane layout gives this list a fixed 300 px. The
+                    // thread count moved under the title and the sort control
+                    // became icon-only: count + "Recent" + compose in one row
+                    // crowded the controls into each other.
                     Expanded(
-                      child: Text(
-                        'Conversations',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
-                          color: context.textColor,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Conversations',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              color: context.textColor,
+                            ),
+                          ),
+                          if (threads.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: Text(
+                                '${threads.length} conversation'
+                                '${threads.length == 1 ? '' : 's'}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: context.textMuted,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    if (threads.isNotEmpty)
-                      StatusPill(
-                        '${threads.length}',
-                        tone: Tone.neutral,
-                        dense: true,
-                      ),
-                    const SizedBox(width: 4),
                     PopupMenuButton<_ThreadSort>(
-                      tooltip: 'Sort conversations',
+                      tooltip: _sort == _ThreadSort.recent
+                          ? 'Sorted by most recent — change'
+                          : 'Sorted alphabetically — change',
                       initialValue: _sort,
                       onSelected: (v) => setState(() => _sort = v),
                       itemBuilder: (context) => const [
@@ -338,19 +353,16 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                         ),
                       ],
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.sort, size: 15, color: context.textMuted),
-                          const SizedBox(width: 3),
-                          Text(
-                            _sort == _ThreadSort.recent ? 'Recent' : 'A–Z',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: context.textMuted,
-                            ),
+                      child: SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: Center(
+                          child: Icon(
+                            Icons.sort,
+                            size: 18,
+                            color: context.textMuted,
                           ),
-                        ],
+                        ),
                       ),
                     ),
                     if (widget.allowNewConversation) ...[

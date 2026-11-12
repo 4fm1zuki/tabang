@@ -1039,21 +1039,37 @@ class _FindDonorPageState extends State<FindDonorPage> {
               // Facilities and Drives because it lived inside the Donors-only
               // block.
               Row(
+                // The count belongs beside its heading, not floating at the
+                // panel edge where it read as an unlabelled notification.
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Text(
-                      heading,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.15,
-                        color: context.textColor,
-                      ),
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            heading,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.15,
+                              color: context.textColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: TabangSpace.sm),
+                        CountBadge(
+                          count,
+                          semanticLabel:
+                              '$count result${count == 1 ? '' : 's'} for '
+                              '${heading.toLowerCase()}',
+                        ),
+                      ],
                     ),
                   ),
-                  StatusPill('$count', tone: Tone.brand, dense: true),
                   if (_selectedBarangay != null)
                     Tooltip(
                       message: 'Clear barangay filter',

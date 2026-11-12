@@ -246,7 +246,9 @@ enum UserRole {
       'Moderate chat, warnings and reports',
     ],
     _ => const [
-      'Request blood and message donors',
+      'Request blood for yourself or a patient',
+      'Message donors and chapter staff',
+      'Browse facilities, drives and open requests',
       'Register as a donor from Donor Hub',
     ],
   };
