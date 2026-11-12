@@ -37,6 +37,11 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
   String? _selectedThreadId;
   bool _onlyFlagged = true;
 
+  /// Warn and suspend live here rather than on the Users rows: this is the
+  /// discipline surface, so staff find a person by typing their name.
+  final TextEditingController _peopleSearch = TextEditingController();
+  String _peopleQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +52,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
   void dispose() {
     _repo.removeListener(_refresh);
     _reply.dispose();
+    _peopleSearch.dispose();
     super.dispose();
   }
 
@@ -195,6 +201,29 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                       ],
                     ),
                     const SizedBox(height: TabangSpace.sm),
+                    // Disciplining an account happens here: type a name to pull
+                    // that person up with Warn and Suspend.
+                    TextField(
+                      controller: _peopleSearch,
+                      onChanged: (value) => setState(() => _peopleQuery = value),
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Find a person to warn or suspend',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.search, size: 16),
+                        suffixIcon: _peopleQuery.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.close, size: 15),
+                                tooltip: 'Clear',
+                                onPressed: () {
+                                  _peopleSearch.clear();
+                                  setState(() => _peopleQuery = '');
+                                },
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: TabangSpace.sm),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -285,7 +314,9 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
 
         // Detail
         Expanded(
-          child: active == null
+          child: _peopleQuery.trim().isNotEmpty
+              ? _buildPeopleResults(context)
+              : active == null
               ? const EmptyState(
                   art: TabangArt.messages,
                   title: 'Select a conversation',
@@ -296,6 +327,175 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
               : _buildDetail(context, active),
         ),
       ],
+    );
+  }
+
+  /// People matching the moderation search, with the discipline actions.
+  ///
+  /// Warn and Suspend used to sit on every row of the Users page, where they
+  /// were one mis-tap away from an unrelated account. They live here now, so
+  /// the same page that shows the flagged history is the one that acts on it.
+  Widget _buildPeopleResults(BuildContext context) {
+    final query = _peopleQuery.trim().toLowerCase();
+    final people = _repo.users
+        .where(
+          (user) =>
+              user.mapHandle.toLowerCase().contains(query) ||
+              user.fullName.toLowerCase().contains(query) ||
+              user.barangay.toLowerCase().contains(query),
+        )
+        .toList()
+      ..sort((a, b) => a.mapHandle.compareTo(b.mapHandle));
+
+    if (people.isEmpty) {
+      return const EmptyState(
+        art: TabangArt.search,
+        title: 'No account matches',
+        message: 'Search by alias, real name or barangay.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(TabangSpace.lg),
+      itemCount: people.length,
+      separatorBuilder: (_, __) => const SizedBox(height: TabangSpace.sm),
+      itemBuilder: (context, index) {
+        final user = people[index];
+        final suspended = user.status == AccountStatus.suspended;
+        return SurfaceCard(
+          padding: const EdgeInsets.all(TabangSpace.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${user.alias} · ${user.role.label}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  StatusPill(user.status.label, dense: true),
+                ],
+              ),
+              Text(
+                '${user.fullName} · ${user.barangay} · '
+                '${user.warningCount} warning'
+                '${user.warningCount == 1 ? '' : 's'}',
+                style: TextStyle(fontSize: 11.5, color: context.textMuted),
+              ),
+              const SizedBox(height: TabangSpace.sm),
+              Wrap(
+                spacing: TabangSpace.sm,
+                children: [
+                  if (!suspended)
+                    OutlinedButton(
+                      onPressed: () => _warnPerson(user),
+                      child: const Text('Warn'),
+                    ),
+                  TextButton(
+                    onPressed: () => _toggleSuspension(user),
+                    child: Text(suspended ? 'Reinstate' : 'Suspend'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _warnPerson(AppUser user) async {
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Warn ${user.alias}?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Three warnings suspend the account automatically.',
+              style: TextStyle(fontSize: 12.5, color: dialogContext.textMuted),
+            ),
+            const SizedBox(height: TabangSpace.sm),
+            TextField(
+              controller: reason,
+              autofocus: true,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Warn'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final warned = _repo.warnUser(user.id, reason: reason.text);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          warned
+              ? 'Warning recorded for ${user.alias}.'
+              : 'That account cannot be warned.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleSuspension(AppUser user) async {
+    final suspended = user.status == AccountStatus.suspended;
+    final ok = await confirmAction(
+      context,
+      title: suspended ? 'Reinstate this account?' : 'Suspend this account?',
+      message: suspended
+          ? '${user.alias} regains access and reappears in the donor directory.'
+          : '${user.alias} loses access and is removed from the donor '
+                'directory immediately.',
+      confirmLabel: suspended ? 'Reinstate' : 'Suspend',
+      destructive: !suspended,
+    );
+    if (!ok || !mounted) return;
+    _repo.setUserStatus(
+      user.id,
+      suspended ? AccountStatus.verified : AccountStatus.suspended,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          suspended
+              ? '${user.alias} was reinstated.'
+              : '${user.alias} was suspended.',
+        ),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => _repo.setUserStatus(
+            user.id,
+            suspended ? AccountStatus.suspended : AccountStatus.verified,
+          ),
+        ),
+      ),
     );
   }
 

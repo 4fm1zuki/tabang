@@ -1183,44 +1183,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
               ),
             ),
           ),
-        if (user.status != AccountStatus.suspended)
-          OutlinedButton.icon(
-            onPressed: () => _confirmWarn(context, user),
-            icon: const Icon(Icons.flag_outlined, size: 14),
-            label: const Text('Warn'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: TabangSpace.md,
-                vertical: TabangSpace.sm,
-              ),
-            ),
-          ),
+        // Warn and Suspend are issued from Moderation (the Users page has a
+        // Moderation tab), so a mis-tap on an unrelated account row cannot
+        // discipline someone. The account's state is still shown here.
         if (user.status == AccountStatus.suspended)
-          ElevatedButton.icon(
-            onPressed: () =>
-                _repo.setUserStatus(user.id, AccountStatus.verified),
-            icon: const Icon(Icons.lock_open, size: 14),
-            label: const Text('Reinstate'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: TabangSpace.md,
-                vertical: TabangSpace.sm,
-              ),
-            ),
-          )
-        else
-          OutlinedButton.icon(
-            onPressed: () => _confirmSuspend(context, user),
-            icon: const Icon(Icons.block, size: 14),
-            label: const Text('Suspend'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: TabangColors.danger,
-              padding: const EdgeInsets.symmetric(
-                horizontal: TabangSpace.md,
-                vertical: TabangSpace.sm,
-              ),
-            ),
-          ),
+          const StatusPill('Suspended', tone: Tone.danger, dense: true),
       ],
     ];
 
@@ -1723,118 +1690,5 @@ class _UserManagementPageState extends State<UserManagementPage> {
   /// Staff enter the reason, the count is capped at three, and the account is
   /// suspended automatically on the third. Suspended accounts cannot be warned
   /// again until they are reinstated, which resets the count.
-  void _confirmWarn(BuildContext context, AppUser user) {
-    final reasonController = TextEditingController();
-    final next = (user.warningCount + 1).clamp(1, 3);
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Warn ${user.fullName}?'),
-        content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                next >= 3
-                    ? 'This is warning 3 of 3. The account is suspended '
-                          'automatically.'
-                    : 'This adds warning $next of 3. The warning is recorded '
-                          'on the account and shown to staff.',
-                style: const TextStyle(fontSize: 12.5, height: 1.5),
-              ),
-              const SizedBox(height: TabangSpace.md),
-              TextField(
-                controller: reasonController,
-                autofocus: true,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Reason (recorded on the account)',
-                  hintText: 'e.g. Asked for payment in a coordination thread',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final ok = _repo.warnUser(user.id, reason: reasonController.text);
-              Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(context).showSnackBar(
-                TabangSnackBar(
-                  content: Text(
-                    ok
-                        ? 'Warning $next issued to ${user.alias}.'
-                        : 'That account can no longer be warned.',
-                  ),
-                ),
-              );
-            },
-            child: const Text('Issue warning'),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _confirmSuspend(BuildContext context, AppUser user) {
-    final reasonController = TextEditingController();
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Suspend ${user.fullName}?'),
-        content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'A suspended account cannot sign in, appear in the donor '
-                'directory, or respond to requests.',
-                style: TextStyle(fontSize: 12.5, height: 1.5),
-              ),
-              const SizedBox(height: TabangSpace.md),
-              TextField(
-                controller: reasonController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Reason (recorded on the account)',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _repo.setUserStatus(
-                user.id,
-                AccountStatus.suspended,
-                reason: reasonController.text.trim().isEmpty
-                    ? 'Suspended by chapter staff.'
-                    : reasonController.text.trim(),
-              );
-              Navigator.pop(dialogContext);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: TabangColors.danger,
-            ),
-            child: const Text('Suspend account'),
-          ),
-        ],
-      ),
-    );
-  }
 }
