@@ -48,13 +48,20 @@ class TabangLogo extends StatelessWidget {
       ),
     );
     if (!plate) return art;
+    // The source PNG is square, but the visible drop-and-hand mark only fills
+    // about 89% of its height and 74% of its width. A padded plate therefore
+    // framed a mostly empty transparent square and read as a thick white
+    // background. Scale the artwork to its visible bounds and clip it to a
+    // circle the same size as the requested mark, so the plate hugs the logo.
     return Container(
-      padding: const EdgeInsets.all(4),
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
       ),
-      child: art,
+      child: Transform.scale(scale: 1.08, child: art),
     );
   }
 }

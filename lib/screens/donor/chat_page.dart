@@ -521,7 +521,11 @@ class _ChatPageState extends State<ChatPage> {
                   children: [
                     Row(
                       children: [
-                        Flexible(
+                        // `Expanded`, not `Flexible` + `Spacer`: those two
+                        // split the free space evenly, and the name's unused
+                        // half showed up as a ~39 px gap that pushed the
+                        // unread badge and timestamp away from the right edge.
+                        Expanded(
                           child: Text(
                             _displayName(thread),
                             maxLines: 1,
@@ -565,15 +569,28 @@ class _ChatPageState extends State<ChatPage> {
                             color: context.textMuted,
                           ),
                         ],
-                        const Spacer(),
-                        // The unread pill and the timestamp form one trailing
-                        // cluster so they always sit side by side. As separate
-                        // children of this flexible row they could be squeezed
-                        // into each other on a narrow tile.
+                        // The unread badge is the outermost trailing marker,
+                        // after the timestamp, so it sits on the tile's edge
+                        // instead of crowding "5h ago". Keeping both in one
+                        // cluster stops a narrow tile squeezing them together.
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (last != null)
+                              Text(
+                                formatRelative(last.sentAt),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: unread > 0
+                                      ? TabangColors.crimson
+                                      : context.textMuted,
+                                  fontWeight: unread > 0
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                ),
+                              ),
                             if (unread > 0) ...[
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
@@ -594,21 +611,7 @@ class _ChatPageState extends State<ChatPage> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
                             ],
-                            if (last != null)
-                              Text(
-                                formatRelative(last.sentAt),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: unread > 0
-                                      ? TabangColors.crimson
-                                      : context.textMuted,
-                                  fontWeight: unread > 0
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                ),
-                              ),
                           ],
                         ),
                       ],
