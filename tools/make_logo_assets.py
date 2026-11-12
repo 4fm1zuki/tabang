@@ -1,9 +1,9 @@
-"""Generate TABANG's logo assets from the supplied `assets/logo.jpg`.
+"""Generate TABANG's logo assets from the supplied `assets/logo.png`.
 
-The source is a 1024x1024 artwork (blood drop, heart and hand) on a plain white
-square, so every output keeps that white plate: the design's own white outline
-around the mark is part of the drawing, and knocking the background out would
-eat it.
+The preferred source is the team's cut-out PNG (`assets/logo.png`); the original
+`assets/logo.jpg` on a white plate is only a fallback. Some exports of the
+cut-out are flattened onto a half-opaque white plate (alpha ~128), which reads
+as a grey square on the dark theme, so the plate is inverted and removed here.
 
 Run from the repository root:
 
@@ -87,6 +87,63 @@ def _trim_to_mark(image: Image.Image) -> Image.Image:
     return canvas
 
 
+def _is_near_white(pixel: tuple[int, int, int, int], tolerance: int = 12) -> bool:
+    return all(channel >= 255 - tolerance for channel in pixel[:3])
+
+
+def _strip_translucent_plate(image: Image.Image) -> Image.Image:
+    """Recover real transparency from a cut-out flattened onto a white plate.
+
+    `assets/logo.png` is the mark composited over white at roughly 50% alpha:
+    the artwork is opaque, while the surrounding plate is
+    ``(255, 255, 255, 128)``. Blended straight through, that plate shows as a
+    grey square on the dark theme. This inverts the "over white" composite so
+    the plate becomes fully transparent and the mark keeps clean edges.
+
+    Sources that are already transparent (an opaque border is not white) are
+    returned untouched.
+    """
+    rgba = image.convert("RGBA")
+    corner = rgba.getpixel((0, 0))
+    if corner[3] >= 250 or not _is_near_white(corner):
+        return rgba
+
+    width, height = rgba.size
+    plate_alpha = corner[3] / 255
+    plate_color = sum(corner[:3]) / 3
+    pixels = rgba.load()
+    for y in range(height):
+        for x in range(width):
+            red, green, blue, alpha = pixels[x, y]
+            out_alpha = alpha / 255
+            coverage = (
+                0.0
+                if out_alpha <= plate_alpha
+                else (out_alpha - plate_alpha) / (1 - plate_alpha)
+            )
+            if coverage <= 0.0:
+                pixels[x, y] = (0, 0, 0, 0)
+                continue
+            if coverage >= 1.0:
+                pixels[x, y] = (red, green, blue, 255)
+                continue
+
+            def unblend(channel: int) -> int:
+                value = (
+                    channel * out_alpha
+                    - plate_color * plate_alpha * (1 - coverage)
+                ) / coverage
+                return max(0, min(255, int(round(value))))
+
+            pixels[x, y] = (
+                unblend(red),
+                unblend(green),
+                unblend(blue),
+                int(round(coverage * 255)),
+            )
+    return rgba
+
+
 def _square(image: Image.Image, size: int, inset: float = 1.0) -> Image.Image:
     """Fit [image] into a transparent square of [size], art occupying [inset]."""
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -136,6 +193,9 @@ def main() -> None:
     if not cut_out:
         # The plate is opaque; clear the outer background before trimming.
         art = _cut_out_background(art)
+    else:
+        # Some exports leave a half-opaque white plate behind the mark.
+        art = _strip_translucent_plate(art)
     art = _trim_to_mark(art)
 
     os.makedirs(BRANDING, exist_ok=True)
