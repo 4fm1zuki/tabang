@@ -25,7 +25,10 @@ import os
 from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCE = os.path.join(ROOT, "assets", "logo.jpg")
+# Two sources: the team's cut-out PNG (already transparent, preferred) and the
+# original JPEG on a white plate, which is cut out here if the PNG is missing.
+SOURCE_CUT = os.path.join(ROOT, "assets", "logo.png")
+SOURCE_PLATE = os.path.join(ROOT, "assets", "logo.jpg")
 BRANDING = os.path.join(ROOT, "assets", "branding")
 
 # Standard launcher icon sizes per density bucket.
@@ -108,15 +111,17 @@ def _cut_out_background(image: Image.Image) -> Image.Image:
 
 
 def main() -> None:
-    art = Image.open(SOURCE).convert("RGBA")
+    cut_out = os.path.exists(SOURCE_CUT)
+    source = SOURCE_CUT if cut_out else SOURCE_PLATE
+    art = Image.open(source).convert("RGBA")
     if art.width != art.height:
         side = min(art.size)
         left = (art.width - side) // 2
         top = (art.height - side) // 2
         art = art.crop((left, top, left + side, top + side))
-    # The supplied plate is opaque; the mark is drawn frameless in the app, so
-    # the outer background is cleared and the artwork trimmed to its own edge.
-    art = _cut_out_background(art)
+    if not cut_out:
+        # The plate is opaque; clear the outer background before trimming.
+        art = _cut_out_background(art)
     art = _trim_to_mark(art)
 
     os.makedirs(BRANDING, exist_ok=True)
@@ -150,7 +155,7 @@ def main() -> None:
             continue
         _square(art, size).save(os.path.join(target, "ic_launcher.png"), "PNG")
 
-    print("Logo assets written from", SOURCE)
+    print("Logo assets written from", source)
 
 
 if __name__ == "__main__":

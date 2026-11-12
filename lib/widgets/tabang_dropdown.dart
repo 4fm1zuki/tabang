@@ -151,26 +151,44 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
         final chosen = widget.items.where((item) => item.value == current);
         final label = chosen.isEmpty ? null : chosen.first.child;
         final hasError = field.errorText != null;
+        final caption = decoration.labelText;
 
+        // The field is built by hand rather than with InputDecorator: feeding a
+        // floating label and a custom child to that widget drew the label and
+        // the value on top of each other, which is what produced the doubled
+        // "Allbloodtype" text. A caption above a plain bordered box cannot
+        // overlap, and it matches the design better.
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (caption != null && caption.isNotEmpty) ...[
+              Text(
+                caption,
+                style: TextStyle(fontSize: 11.5, color: context.textMuted),
+              ),
+              const SizedBox(height: 4),
+            ],
             InkWell(
               onTap: widget.enabled ? () => _pick(field) : null,
               borderRadius: BorderRadius.circular(TabangRadius.sm),
-              child: InputDecorator(
-                isEmpty: current == null,
-                decoration: decoration.copyWith(
-                  enabled: widget.enabled,
-                  isDense: widget.isDense ?? decoration.isDense,
-                  errorText: field.errorText,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TabangSpace.md,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  color: widget.enabled ? context.surface : context.surfaceAlt,
+                  borderRadius: BorderRadius.circular(TabangRadius.sm),
+                  border: Border.all(
+                    color: hasError ? TabangColors.danger : context.border,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: DefaultTextStyle.merge(
-                        style: (widget.style ?? const TextStyle(fontSize: 14))
+                        style: (widget.style ?? const TextStyle(fontSize: 13.5))
                             .copyWith(
                               color: current == null
                                   ? context.textMuted
@@ -185,12 +203,13 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
                             ),
                       ),
                     ),
+                    const SizedBox(width: 6),
                     AnimatedRotation(
                       turns: _open ? 0.5 : 0,
                       duration: const Duration(milliseconds: 160),
                       child: Icon(
                         Icons.keyboard_arrow_down,
-                        size: 20,
+                        size: 19,
                         color: context.textMuted,
                       ),
                     ),
@@ -198,9 +217,20 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
                 ),
               ),
             ),
-            if (decoration.helperText != null && !hasError)
+            if (field.errorText != null)
               Padding(
-                padding: const EdgeInsets.only(top: 4, left: 4),
+                padding: const EdgeInsets.only(top: 4, left: 2),
+                child: Text(
+                  field.errorText!,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: TabangColors.danger,
+                  ),
+                ),
+              )
+            else if (decoration.helperText != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 2),
                 child: Text(
                   decoration.helperText!,
                   style: TextStyle(fontSize: 11.5, color: context.textMuted),

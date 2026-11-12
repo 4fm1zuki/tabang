@@ -160,16 +160,20 @@ class _FindDonorPageState extends State<FindDonorPage> {
     _donorCounts = _repo.donorCountsByBarangay(bloodType: _bloodType);
   }
 
-  /// Requests the community may see: the ones the requester actually broadcast
-  /// to the donor network and that still need donors.
+  /// Requests the community may see: the district's own donor-network requests
+  /// that still need donors.
   ///
-  /// Deliberately NOT every open request. A blood-bank request is processed by
-  /// chapter staff and was never broadcast, so putting it on the community map
-  /// would expose a patient's need to people who were never asked to help, and
-  /// would paint workload the community cannot act on. `acceptsDonorResponses`
-  /// is the app's own definition of "open to the donor network".
-  Iterable<BloodRequest> get _broadcastRequests =>
-      _repo.requests.where((request) => request.acceptsDonorResponses);
+  /// Blood-bank requests are excluded on purpose — the chapter processes those
+  /// itself and they were never offered to the community. The earlier filter
+  /// also demanded `postToDonorNetwork`, which emptied the list and its heat
+  /// because most seeded requests do not carry that flag; the source is what
+  /// decides whether a need belongs on the community map.
+  Iterable<BloodRequest> get _broadcastRequests => _repo.requests.where(
+    (request) =>
+        request.source == RequestSource.donorNetwork &&
+        (request.status == RequestStatus.open ||
+            request.status == RequestStatus.matched),
+  );
 
   /// Broadcast requests per barangay: the community's request heat layer.
   Map<String, int> get _requestCounts {
