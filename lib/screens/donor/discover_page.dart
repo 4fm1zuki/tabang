@@ -585,7 +585,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
   Widget _buildDriveCard(BuildContext context, BloodDrive drive, int index) {
     // Each drive ships its own photograph; the shared community shots remain a
     // fallback if a drive has none.
-    final photo = drive.photoAsset ??
+    final photo =
+        drive.photoAsset ??
         (index.isEven
             ? 'assets/images/drive_community.jpg'
             : 'assets/images/content_drive.jpg');
@@ -883,56 +884,78 @@ class _DiscoverPageState extends State<DiscoverPage> {
             ],
           ),
           const SizedBox(height: TabangSpace.sm),
-          Wrap(
-            spacing: TabangSpace.md,
-            runSpacing: TabangSpace.sm,
-            children: [
-              for (final fact in facts)
-                SizedBox(
-                  width: context.isPhone ? 140 : 210,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        alignment: Alignment.center,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = TabangSpace.md;
+              // A steady 2x2 block: four short facts read as a checklist, not
+              // as a ragged single row that leaves one tile stranded.
+              final columns = constraints.maxWidth >= 320 ? 2 : 1;
+              final width =
+                  (constraints.maxWidth - gap * (columns - 1)) / columns;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final fact in facts)
+                    SizedBox(
+                      width: width,
+                      child: Container(
+                        padding: const EdgeInsets.all(TabangSpace.sm),
                         decoration: BoxDecoration(
                           color: context.surfaceAlt,
                           borderRadius: BorderRadius.circular(TabangRadius.xs),
                         ),
-                        child: Icon(
-                          fact.icon,
-                          size: 17,
-                          color: TabangColors.crimson,
-                        ),
-                      ),
-                      const SizedBox(width: TabangSpace.sm),
-                      Expanded(
-                        child: Column(
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              fact.title,
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: context.textColor,
+                            Container(
+                              width: 34,
+                              height: 34,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: context.surface,
+                                borderRadius: BorderRadius.circular(
+                                  TabangRadius.xs,
+                                ),
+                              ),
+                              child: Icon(
+                                fact.icon,
+                                size: 17,
+                                color: TabangColors.crimson,
                               ),
                             ),
-                            Text(
-                              fact.detail,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: context.textMuted,
+                            const SizedBox(width: TabangSpace.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    fact.title,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.textColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    fact.detail,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      height: 1.35,
+                                      color: context.textMuted,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-            ],
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: TabangSpace.sm),
           Container(
@@ -964,7 +987,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   Future<void> _openDrive(BuildContext context, BloodDrive drive) {
     final index = _upcomingDrives.indexOf(drive);
-    final photo = drive.photoAsset ??
+    final photo =
+        drive.photoAsset ??
         (index.isEven
             ? 'assets/images/drive_community.jpg'
             : 'assets/images/content_drive.jpg');

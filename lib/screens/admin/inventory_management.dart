@@ -616,265 +616,163 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
       );
     }
 
+    final canAct = widget.currentUser.role.canFulfillRequests;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Fulfilment is staff-only. Donor responses are offers; the '
-          'requester selects a donor in the community app, and staff mark the '
-          'request fulfilled after the donation is recorded.',
+          'Cards show the essentials. Open one for the attachments, donor '
+          'responses and full record. Staff can reject any active request; '
+          'mark it fulfilled after the donation is recorded.',
           style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
         ),
         const SizedBox(height: TabangSpace.md),
-        ...requests.map((request) {
-          final compatibleDonors = _repo
-              .findDonors(
-                compatibleWith: request.bloodType,
-                component: request.component,
-              )
-              .length;
-          final compatibleUnits = _repo
-              .compatibleUnitsFor(
-                recipientType: request.bloodType,
-                component: request.component,
-              )
-              .length;
-          final responses = _repo.responsesFor(request.id);
-          final selected = responses
-              .where((r) => r.status == ResponseStatus.selected)
-              .length;
-          final requester = _repo.userById(request.requesterId);
-
-          void updateStatus(RequestStatus status) {
-            final ok = switch (status) {
-              RequestStatus.fulfilled => _repo.markRequestFulfilled(
-                request.id,
-                actorId: widget.currentUser.id,
-              ),
-              RequestStatus.cancelled => _repo.cancelRequest(
-                request.id,
-                actorId: widget.currentUser.id,
-              ),
-              RequestStatus.matched ||
-              RequestStatus.open ||
-              RequestStatus.pendingReview ||
-              RequestStatus.rejected => false,
-            };
-            ScaffoldMessenger.of(context).showSnackBar(
-              TabangSnackBar(
-                content: Text(
-                  ok
-                      ? 'Request ${request.id} marked ${status.label.toLowerCase()}.'
-                      : 'Could not update ${request.id}.',
-                ),
-              ),
-            );
-          }
-
-          // Same card anatomy as the booked-slot queue: identity row, slot
-          // row, uploaded files, then the response summary. The two queues
-          // describe one record, so they must not read like two products.
-          return Padding(
+        for (final request in requests)
+          Padding(
             padding: const EdgeInsets.only(bottom: TabangSpace.md),
-            child: SurfaceCard(
-              onTap: () => _showRequestDetails(context, request),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      BloodTypeChip(request.bloodType, size: 34),
-                      const SizedBox(width: TabangSpace.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Wrap, not Row: on a phone the urgency pill is
-                            // wider than the space left beside a long alias.
-                            Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  request.patientAlias,
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.2,
-                                    color: context.textColor,
-                                  ),
-                                ),
-                                StatusPill(
-                                  request.urgency.label,
-                                  tone: toneForUrgency(request.urgency),
-                                  dense: true,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${request.component.label} · '
-                              '${request.unitsNeeded} unit'
-                              '${request.unitsNeeded == 1 ? '' : 's'} · '
-                              '${request.hospital}',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: context.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Status and the update menu sit on their own row so the
-                  // long "Awaiting verification" pill cannot squeeze the
-                  // alias column at phone width.
-                  Wrap(
-                    spacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      StatusPill(
-                        request.status.label,
-                        tone: toneForRequest(request.status),
-                        dense: true,
-                      ),
-                      if (request.status == RequestStatus.open ||
-                          request.status == RequestStatus.matched)
-                        PopupMenuButton<RequestStatus>(
-                          tooltip: 'Update request',
-                          icon: Icon(
-                            Icons.more_vert,
-                            size: 17,
-                            color: context.textMuted,
-                          ),
-                          onSelected: updateStatus,
-                          itemBuilder: (context) => [
-                            if (request.status == RequestStatus.matched ||
-                                request.source == RequestSource.bloodBank)
-                              const PopupMenuItem(
-                                value: RequestStatus.fulfilled,
-                                child: Text(
-                                  'Mark fulfilled (staff only)',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            const PopupMenuItem(
-                              value: RequestStatus.cancelled,
-                              child: Text(
-                                'Cancel request',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: TabangSpace.sm),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.event_available_outlined,
-                        size: 15,
-                        color: TabangColors.crimson,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          request.scheduledFor == null
-                              ? 'No slot booked'
-                              : formatDateTime(request.scheduledFor!),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: context.textColor,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${request.id} · ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: context.textMuted,
-                        ),
-                      ),
-                      UserMention(
-                        userId: request.requesterId,
-                        fallback: requester?.alias,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: context.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (request.documents.isNotEmpty) ...[
-                    const SizedBox(height: TabangSpace.sm),
-                    RequestDocumentList(
-                      documents: request.documents,
-                      dense: true,
-                    ),
-                  ],
-                  const SizedBox(height: TabangSpace.sm),
-                  Text(
-                    '${request.source == RequestSource.bloodBank ? 'Blood bank' : 'Donor network'}'
-                    ' · ${request.barangay} · posted '
-                    '${formatRelative(request.createdAt)}',
-                    style: TextStyle(fontSize: 12, color: context.textMuted),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    request.source == RequestSource.bloodBank
-                        ? '$compatibleUnits compatible units in stock · '
-                              '${responses.length} donor responses'
-                        : '$compatibleDonors eligible compatible donors · '
-                              '${responses.length} responses '
-                              '($selected selected)',
-                    style: TextStyle(fontSize: 12, color: context.textMuted),
-                  ),
-                  if (responses.isNotEmpty) ...[
-                    const SizedBox(height: 5),
+            child: _buildRequestCard(context, request, canAct: canAct),
+          ),
+      ],
+    );
+  }
+
+  /// A compact queue card. Details are deliberately kept in the dialog so the
+  /// list stays scannable; actions remain one tap away.
+  Widget _buildRequestCard(
+    BuildContext context,
+    BloodRequest request, {
+    required bool canAct,
+  }) {
+    final requester = _repo.userById(request.requesterId);
+    return SurfaceCard(
+      onTap: () => _showRequestDetails(context, request),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BloodTypeChip(request.bloodType, size: 34),
+              const SizedBox(width: TabangSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       spacing: 6,
-                      runSpacing: 3,
+                      runSpacing: 4,
                       children: [
                         Text(
-                          'Responders:',
+                          request.patientAlias,
                           style: TextStyle(
-                            fontSize: 12,
-                            color: context.textMuted,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: context.textColor,
                           ),
                         ),
-                        for (final response in responses)
-                          UserMention(
-                            userId: response.donorId,
-                            fallback: response.donorAlias,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textMuted,
-                            ),
-                          ),
+                        StatusPill(
+                          request.urgency.label,
+                          tone: toneForUrgency(request.urgency),
+                          dense: true,
+                        ),
                       ],
                     ),
-                  ],
-                  if (request.unitsNeeded > 1) ...[
-                    const SizedBox(height: TabangSpace.md),
-                    ProportionBar(
-                      value: request.unitsFulfilled.toDouble(),
-                      max: request.unitsNeeded.toDouble(),
-                      color: TabangColors.success,
+                    const SizedBox(height: 3),
+                    Text(
+                      '${request.component.label} · '
+                      '${request.unitsNeeded} unit'
+                      '${request.unitsNeeded == 1 ? '' : 's'} · '
+                      '${request.hospital}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: context.textMuted,
+                      ),
                     ),
                   ],
-                ],
+                ),
               ),
+              const SizedBox(width: TabangSpace.sm),
+              StatusPill(
+                request.status.label,
+                tone: toneForRequest(request.status),
+                dense: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: TabangSpace.sm),
+          Row(
+            children: [
+              const Icon(
+                Icons.event_available_outlined,
+                size: 15,
+                color: TabangColors.crimson,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  request.scheduledFor == null
+                      ? 'No slot booked'
+                      : formatDateTime(request.scheduledFor!),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.textColor,
+                  ),
+                ),
+              ),
+              Text(
+                '${request.id} · ',
+                style: TextStyle(fontSize: 11, color: context.textMuted),
+              ),
+              UserMention(
+                userId: request.requesterId,
+                fallback: requester?.alias,
+                style: TextStyle(fontSize: 11, color: context.textMuted),
+              ),
+            ],
+          ),
+          if (canAct && request.canBeRejected) ...[
+            const SizedBox(height: TabangSpace.sm),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                TextButton(
+                  onPressed: () => showRejectRequestDialog(
+                    context,
+                    request,
+                    actor: widget.currentUser,
+                  ),
+                  child: const Text('Reject'),
+                ),
+                if (request.isAwaitingReview)
+                  FilledButton(
+                    onPressed: () => showVerifyRequestDialog(
+                      context,
+                      request,
+                      actor: widget.currentUser,
+                    ),
+                    child: const Text('Verify'),
+                  )
+                else if (request.canBeFulfilled)
+                  FilledButton(
+                    onPressed: () => _fulfilRequest(context, request),
+                    child: const Text('Mark fulfilled'),
+                  )
+                else
+                  TextButton(
+                    onPressed: () => _showRequestDetails(context, request),
+                    child: const Text('Waiting for donor'),
+                  ),
+              ],
             ),
-          );
-        }),
-      ],
+          ],
+        ],
+      ),
     );
   }
 
@@ -882,28 +780,16 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   ///
   /// Rows stay a one-glance queue entry; opening one brings up everything the
   /// chapter knows about the request, including every attached file through the
-  /// shared [RequestDocumentList] viewer. Staff verification runs from here
-  /// through [showVerifyRequestDialog] and [showRejectRequestDialog], and staff
-  /// can close the request out with the map's `Mark fulfilled` action — the same
+  /// shared [RequestDocumentList] viewer and every donor response with its
+  /// status. Staff verification runs from here through
+  /// [showVerifyRequestDialog] and [showRejectRequestDialog], and staff can
+  /// close the request out with the map's `Mark fulfilled` action — the same
   /// dialogs and action the Operations map uses, so the app keeps one flow.
   /// Both the Requests tab and the Booked-slots tab open this one dialog.
   void _showRequestDetails(BuildContext context, BloodRequest request) {
     final responses = _repo.responsesFor(request.id);
-    final selected = responses
-        .where((r) => r.status == ResponseStatus.selected)
-        .length;
     final requester = _repo.userById(request.requesterId);
-    final canReview =
-        widget.currentUser.role.canFulfillRequests && request.isAwaitingReview;
-    // Same fulfil window as the Operations map: staff close out any request
-    // that is no longer in review and has not already reached a terminal
-    // state.
-    final canFulfil =
-        widget.currentUser.role.canFulfillRequests &&
-        !request.isAwaitingReview &&
-        request.status != RequestStatus.fulfilled &&
-        request.status != RequestStatus.rejected &&
-        request.status != RequestStatus.cancelled;
+    final canAct = widget.currentUser.role.canFulfillRequests;
 
     showDialog<void>(
       context: context,
@@ -916,7 +802,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           ],
         ),
         content: SizedBox(
-          width: 440,
+          width: 460,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -971,11 +857,6 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     'Booked slot',
                     formatDateTime(request.scheduledFor!),
                   ),
-                _detail(
-                  dialogContext,
-                  'Responses',
-                  '$selected selected · ${responses.length} total',
-                ),
                 if (request.assignedUnitIds.isNotEmpty)
                   _detail(
                     dialogContext,
@@ -984,9 +865,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                   ),
                 // Always render the shared document list, even when nothing was
                 // uploaded: the widget's "No documents attached." line tells
-                // staff the verification packet is empty, and every uploaded
-                // image opens full size from here — the same viewer the map
-                // uses, rather than a bare file name.
+                // staff the verification packet is empty, and seeded or
+                // uploaded files open full size from here.
                 const SizedBox(height: TabangSpace.sm),
                 Text(
                   'Attached documents',
@@ -997,10 +877,118 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                RequestDocumentList(
-                  documents: request.documents,
-                  dense: true,
+                RequestDocumentList(documents: request.documents, dense: true),
+                const SizedBox(height: TabangSpace.sm),
+                Text(
+                  'Donor responses',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: dialogContext.textColor,
+                  ),
                 ),
+                const SizedBox(height: 4),
+                if (responses.isEmpty)
+                  Text(
+                    request.source == RequestSource.bloodBank
+                        ? 'Blood-bank requests are processed by staff and do '
+                              'not collect donor offers.'
+                        : 'No donor has responded yet.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: dialogContext.textMuted,
+                    ),
+                  )
+                else
+                  for (final response in responses)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TabangSpace.sm,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: dialogContext.surfaceAlt,
+                        borderRadius: BorderRadius.circular(TabangRadius.xs),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: UserMention(
+                                  userId: response.donorId,
+                                  fallback: response.donorAlias,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: dialogContext.textColor,
+                                  ),
+                                ),
+                              ),
+                              StatusPill(
+                                response.status.label,
+                                tone: response.status == ResponseStatus.selected
+                                    ? Tone.success
+                                    : response.status == ResponseStatus.declined
+                                    ? Tone.neutral
+                                    : Tone.warning,
+                                dense: true,
+                              ),
+                            ],
+                          ),
+                          if (response.message != null &&
+                              response.message!.trim().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 3),
+                              child: Text(
+                                response.message!,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  height: 1.4,
+                                  color: dialogContext.textMuted,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                if (request.staffFulfilmentNote != null) ...[
+                  const SizedBox(height: TabangSpace.sm),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(TabangSpace.sm),
+                    decoration: BoxDecoration(
+                      color: dialogContext.infoBg,
+                      borderRadius: BorderRadius.circular(TabangRadius.xs),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 15,
+                          color: dialogContext.isDark
+                              ? TabangColors.infoOnDark
+                              : TabangColors.info,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            request.staffFulfilmentNote!,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              height: 1.45,
+                              color: dialogContext.textColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (request.reviewNote != null &&
                     request.reviewNote!.trim().isNotEmpty)
                   _detail(dialogContext, 'Review note', request.reviewNote!),
@@ -1020,7 +1008,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
-          if (canReview) ...[
+          if (canAct && request.canBeRejected)
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
@@ -1032,6 +1020,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               },
               child: const Text('Reject'),
             ),
+          if (canAct && request.isAwaitingReview)
             FilledButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
@@ -1043,12 +1032,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               },
               child: const Text('Verify and open'),
             ),
-          ],
-          // The map's fulfil action, under the map's conditions: available
-          // whenever staff can fulfil and the request is no longer awaiting
-          // review.
-          if (canFulfil)
-            TextButton(
+          if (canAct && request.canBeFulfilled)
+            FilledButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
                 _fulfilRequest(context, request);
@@ -1072,8 +1057,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
         content: Text(
           ok
               ? 'Request ${request.id} marked fulfilled.'
-              : 'Request ${request.id} cannot be fulfilled yet — a '
-                    'donor-network request must be matched first.',
+              : request.staffFulfilmentNote ??
+                    'Request ${request.id} cannot be fulfilled in its current '
+                        'state.',
         ),
       ),
     );
@@ -1233,7 +1219,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
 
   Widget _buildBookedSlotCard(BuildContext context, BloodRequest request) {
     final requester = _repo.userById(request.requesterId);
-    final pending = request.status == RequestStatus.pendingReview;
+    final pending = request.isAwaitingReview;
+    final canAct = widget.currentUser.role.canFulfillRequests;
     return SurfaceCard(
       onTap: () => _showRequestDetails(context, request),
       child: Column(
@@ -1260,6 +1247,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                       '${request.unitsNeeded} unit'
                       '${request.unitsNeeded == 1 ? '' : 's'} · '
                       '${request.hospital}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: context.textMuted),
                     ),
                   ],
@@ -1304,13 +1293,21 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               ),
             ],
           ),
-          if (request.documents.isNotEmpty) ...[
+          if (canAct && (pending || request.canBeFulfilled)) ...[
             const SizedBox(height: TabangSpace.sm),
-            RequestDocumentList(documents: request.documents, dense: true),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: pending
+                  ? FilledButton(
+                      onPressed: () => _showRequestDetails(context, request),
+                      child: const Text('Review slot'),
+                    )
+                  : OutlinedButton(
+                      onPressed: () => _fulfilRequest(context, request),
+                      child: const Text('Mark fulfilled'),
+                    ),
+            ),
           ],
-          // Verification happens in the details, which the row opens: the old
-          // inline "Verify slot" button opened the very same dialog while
-          // sounding like a lighter action, so it is gone.
         ],
       ),
     );

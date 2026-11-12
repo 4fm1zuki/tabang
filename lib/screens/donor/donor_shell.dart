@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/account_warning.dart';
 import '../../widgets/common.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/onboarding.dart';
@@ -168,12 +169,17 @@ class _DonorShellState extends State<DonorShell> {
     super.initState();
     _repo.addListener(_refresh);
     _pages[0] = _buildPage(0);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       // Home is already on screen at startup, so its dot would never clear.
       _repo.markTabSeen(widget.user.id, 'home');
-      final user = _repo.userById(widget.user.id) ?? widget.user;
-      if (!user.onboardingCompleted) showWelcomeGuide(context, user);
+      var user = _repo.userById(widget.user.id) ?? widget.user;
+      if (!user.onboardingCompleted) {
+        await showWelcomeGuide(context, user);
+        if (!mounted) return;
+        user = _repo.userById(widget.user.id) ?? user;
+      }
+      await showSignInWarningReminder(context, user: user);
     });
   }
 
@@ -660,7 +666,8 @@ class _PhoneHeader extends StatelessWidget {
           // 52 reads properly beside the wordmark; the plate keeps the red and
           // blue artwork legible when the header sits on the dark surface.
           TabangLogo(size: 52, plate: context.isDark),
-          const SizedBox(width: TabangSpace.sm),
+          // Same lockup gap as the login header, so both read identically.
+          const SizedBox(width: kTabangWordmarkGap),
           // Matches the staff header: the identity gets the free space and
           // ellipsizes instead of pushing the actions off-screen.
           Expanded(
@@ -716,8 +723,7 @@ class _PhoneHeader extends StatelessWidget {
                   if (await confirmAction(
                     context,
                     title: 'Sign out?',
-                    message:
-                        'You will need to sign in again to continue.',
+                    message: 'You will need to sign in again to continue.',
                     confirmLabel: 'Sign out',
                     destructive: true,
                   )) {
@@ -867,7 +873,7 @@ class _Sidebar extends StatelessWidget {
           // its white plate here — without it the red artwork disappears.
           const TabangLogo(size: 44, plate: true),
           if (expanded) ...[
-            const SizedBox(width: TabangSpace.sm),
+            const SizedBox(width: kTabangWordmarkGap),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1063,8 +1069,7 @@ class _Sidebar extends StatelessWidget {
               if (await confirmAction(
                 context,
                 title: 'Sign out?',
-                message:
-                    'You will need to sign in again to continue.',
+                message: 'You will need to sign in again to continue.',
                 confirmLabel: 'Sign out',
                 destructive: true,
               )) {
@@ -1098,24 +1103,35 @@ class _Sidebar extends StatelessWidget {
                 ),
                 if (expanded) ...[
                   const SizedBox(width: TabangSpace.sm),
-                  // Alias and position share one scaled line, matching the
-                  // phone header and the staff rail. The FittedBox shrinks the
-                  // pair rather than ellipsising the role, so "Voluntary Donor"
-                  // always reads in full.
+                  // Desktop rail: the alias and the position get their own
+                  // lines. On one scaled line the longer role labels
+                  // ("Recipient / Patient Representative") shrank to a cramped
+                  // whisper; stacked, both stay at full size.
                   Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '${user.alias} · ${user.role.label}',
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: context.textColor,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          user.alias,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: context.textColor,
+                          ),
                         ),
-                      ),
+                        Text(
+                          user.role.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: context.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1137,6 +1153,7 @@ class _Sidebar extends StatelessWidget {
 List<PopupMenuEntry<String>> accountMenuItems(
   BuildContext context,
   AppUser user, {
+
   /// Phone-only: the bottom bar's pin moved off the header and into this menu.
   bool? navPinned,
 }) {

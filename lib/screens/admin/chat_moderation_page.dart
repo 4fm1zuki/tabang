@@ -205,7 +205,8 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                     // that person up with Warn and Suspend.
                     TextField(
                       controller: _peopleSearch,
-                      onChanged: (value) => setState(() => _peopleQuery = value),
+                      onChanged: (value) =>
+                          setState(() => _peopleQuery = value),
                       style: const TextStyle(fontSize: 13),
                       decoration: InputDecoration(
                         hintText: 'Find a person to warn or suspend',
@@ -337,15 +338,16 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
   /// the same page that shows the flagged history is the one that acts on it.
   Widget _buildPeopleResults(BuildContext context) {
     final query = _peopleQuery.trim().toLowerCase();
-    final people = _repo.users
-        .where(
-          (user) =>
-              user.mapHandle.toLowerCase().contains(query) ||
-              user.fullName.toLowerCase().contains(query) ||
-              user.barangay.toLowerCase().contains(query),
-        )
-        .toList()
-      ..sort((a, b) => a.mapHandle.compareTo(b.mapHandle));
+    final people =
+        _repo.users
+            .where(
+              (user) =>
+                  user.mapHandle.toLowerCase().contains(query) ||
+                  user.fullName.toLowerCase().contains(query) ||
+                  user.barangay.toLowerCase().contains(query),
+            )
+            .toList()
+          ..sort((a, b) => a.mapHandle.compareTo(b.mapHandle));
 
     if (people.isEmpty) {
       return const EmptyState(
@@ -413,50 +415,84 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
 
   Future<void> _warnPerson(AppUser user) async {
     final reason = TextEditingController();
+    String? error;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Warn ${user.alias}?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Three warnings suspend the account automatically.',
-              style: TextStyle(fontSize: 12.5, color: dialogContext.textMuted),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Warn ${user.alias}?'),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The account holder sees your message at their next sign-in '
+                  'and in Profile > Settings. Explain what happened, why it '
+                  'matters and what they should do differently. Three warnings '
+                  'suspend the account automatically.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.5,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+                const SizedBox(height: TabangSpace.md),
+                TextField(
+                  controller: reason,
+                  autofocus: true,
+                  maxLines: 4,
+                  onChanged: (_) {
+                    if (error != null) setDialogState(() => error = null);
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Warning message',
+                    hintText:
+                        'e.g. You missed a confirmed slot without messaging '
+                        'the requester. Cancel at least 12 hours ahead.',
+                    errorText: error,
+                    isDense: true,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: TabangSpace.sm),
-            TextField(
-              controller: reason,
-              autofocus: true,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                isDense: true,
-              ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (reason.text.trim().isEmpty) {
+                  setDialogState(
+                    () =>
+                        error = 'Enter the specific message the user will see.',
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Issue warning'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Warn'),
-          ),
-        ],
       ),
     );
     if (confirmed != true || !mounted) return;
-    final warned = _repo.warnUser(user.id, reason: reason.text);
+    final warned = _repo.warnUser(
+      user.id,
+      reason: reason.text,
+      actorId: widget.currentUser.id,
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       TabangSnackBar(
         content: Text(
           warned
-              ? 'Warning recorded for ${user.alias}.'
+              ? 'Warning recorded for ${user.alias}. They will see it at '
+                    'their next sign-in and in Settings.'
               : 'That account cannot be warned.',
         ),
       ),
@@ -1208,11 +1244,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
 
   /// Undo affordance for a report decision: the report returns to the open
   /// queue, so a mis-tap never silently closes someone's report.
-  void _showReportUndo(
-    BuildContext context,
-    String reportId,
-    String message,
-  ) {
+  void _showReportUndo(BuildContext context, String reportId, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       TabangSnackBar(
         content: Text(message),
@@ -1260,7 +1292,14 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
           if (!protectedSender)
             ElevatedButton(
               onPressed: () {
-                _repo.warnUser(sender.id);
+                _repo.warnUser(
+                  sender.id,
+                  reason:
+                      'A chat message you sent was flagged as inappropriate: '
+                      '"${message.text}". Keep conversations respectful and '
+                      'never ask for payment or personal details.',
+                  actorId: widget.currentUser.id,
+                );
                 _repo.flagMessage(
                   thread.id,
                   message.id,

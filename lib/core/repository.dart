@@ -124,6 +124,7 @@ class TabangRepository {
   final List<RemovedUnitRecord> _removedUnits = [];
   final List<BloodRequest> _requests = [];
   final List<RequestResponse> _responses = [];
+  final List<AccountWarning> _warnings = [];
   final List<ChatThread> _threads = [];
   final List<UserReport> _reports = [];
   final List<ActivityEvent> _activity = [];
@@ -166,6 +167,7 @@ class TabangRepository {
   List<RequestResponse> get responses => List.unmodifiable(_responses);
   List<ChatThread> get threads => List.unmodifiable(_threads);
   List<UserReport> get reports => List.unmodifiable(_reports);
+
   /// Drives the donor-facing surfaces may show: approved and still scheduled.
   /// Proposed, rejected and cancelled drives stay in [allDrives] so staff can
   /// see and act on them.
@@ -656,6 +658,30 @@ class TabangRepository {
     );
   }
 
+  /// Return a previously verified community/donor account to review.
+  ///
+  /// Staff sometimes verify the wrong walk-in record. Only non-admin-side
+  /// accounts can be unverified; internal staff and admin accounts keep their
+  /// access, and the blood-card flag is cleared with the status so the donor
+  /// leaves the matching directory until the card is checked again.
+  bool unverifyUser(String userId) {
+    final user = userById(userId);
+    if (user == null || user.role.isAdminSide) return false;
+    if (user.status != AccountStatus.verified || !user.bloodCardVerified) {
+      return false;
+    }
+    updateUser(
+      user.copyWith(status: AccountStatus.unverified, bloodCardVerified: false),
+    );
+    _logActivity(
+      kind: ActivityKind.verification,
+      actorId: currentUser?.id ?? staffAccountId,
+      subjectId: userId,
+      summary: 'Returned ${user.alias} to unverified review',
+    );
+    return true;
+  }
+
   // ------------------------------------------------- donor applications
 
   /// Every donor registration, newest first.
@@ -895,7 +921,10 @@ class TabangRepository {
     );
     _nextDriveNumber++;
     _drives.add(drive);
-    _logDrive(actor.id, 'Proposed the drive "${drive.title}" at ${drive.venue}');
+    _logDrive(
+      actor.id,
+      'Proposed the drive "${drive.title}" at ${drive.venue}',
+    );
     return drive;
   }
 
@@ -1030,17 +1059,67 @@ class TabangRepository {
     _notify();
   }
 
+  /// Every warning recorded for [userId], newest first.
+  ///
+  /// The active warning ladder on [AppUser] resets on reinstatement; this
+  /// history is retained so the user can always read the specific message a
+  /// staff member or administrator left.
+  List<AccountWarning> warningsFor(String userId) {
+    final warnings =
+        _warnings.where((warning) => warning.userId == userId).toList()
+          ..sort((a, b) => b.issuedAt.compareTo(a.issuedAt));
+    return List.unmodifiable(warnings);
+  }
+
+  /// Warnings the user has not confirmed in the sign-in reminder yet.
+  List<AccountWarning> unacknowledgedWarningsFor(String userId) {
+    return List.unmodifiable(
+      warningsFor(userId).where((warning) => warning.isUnacknowledged),
+    );
+  }
+
+  /// Marks the sign-in reminder as read for [userId].
+  void acknowledgeWarnings(String userId) {
+    var changed = false;
+    for (var i = 0; i < _warnings.length; i++) {
+      final warning = _warnings[i];
+      if (warning.userId != userId || !warning.isUnacknowledged) continue;
+      _warnings[i] = warning.copyWith(acknowledgedAt: DateTime.now());
+      changed = true;
+    }
+    if (changed) _notify();
+  }
+
   /// Adds a warning, capped at three.
   ///
   /// Repeatedly pressing Warn must not keep stacking: once an account is
   /// suspended the action is refused, and reinstating an account clears its
-  /// warning count back to zero. Each warning carries the reason staff entered.
-  bool warnUser(String userId, {String? reason}) {
+  /// warning count back to zero. Every warning stores the specific message
+  /// staff entered so the account holder can read it in Profile and Settings.
+  bool warnUser(String userId, {String? reason, String? actorId}) {
     final user = userById(userId);
     if (user == null) return false;
     if (user.status == AccountStatus.suspended) return false;
     final next = (user.warningCount + 1).clamp(1, 3);
     final note = reason?.trim();
+    final message = note == null || note.isEmpty
+        ? 'A chapter moderator flagged activity on your account. Review the '
+              'community rules in About & Help and avoid repeating it.'
+        : note;
+    final issuerId = actorId ?? currentUser?.id ?? staffAccountId;
+    final issuer = userById(issuerId);
+    _warnings.insert(
+      0,
+      AccountWarning(
+        id: 'WRN-${(_warnings.length + 1).toString().padLeft(3, '0')}',
+        userId: userId,
+        level: next,
+        message: message,
+        issuedById: issuerId,
+        issuedByAlias: issuer?.alias ?? 'Chapter staff',
+        issuedAt: DateTime.now(),
+      ),
+    );
     updateUser(
       user.copyWith(
         warningCount: next,
@@ -1052,7 +1131,7 @@ class TabangRepository {
     );
     _logActivity(
       kind: ActivityKind.warning,
-      actorId: currentUser?.id ?? staffAccountId,
+      actorId: issuerId,
       subjectId: userId,
       summary:
           'Issued warning $next to ${user.alias}'
@@ -1219,7 +1298,12 @@ class TabangRepository {
     return true;
   }
 
-  /// Staff reject a submitted request with a reason the requester can read.
+  /// Staff reject a request with a reason the requester can read.
+  ///
+  /// Rejection is available while a request is awaiting review, open, or
+  /// matched. Closing a live request also releases any blood-bank holds and
+  /// declines pending donor offers, so the record cannot leak stock or leave
+  /// donors waiting on a request that will never be fulfilled.
   bool rejectRequest(
     String requestId, {
     required String actorId,
@@ -1232,12 +1316,24 @@ class TabangRepository {
     final trimmed = reason.trim();
     if (trimmed.isEmpty) return false;
     final request = _requests[index];
-    if (request.status != RequestStatus.pendingReview) return false;
+    if (!request.canBeRejected) return false;
+
+    for (final barcode in request.assignedUnitIds) {
+      cancelReservation(barcode: barcode, userId: request.requesterId);
+    }
+    for (var i = 0; i < _responses.length; i++) {
+      final response = _responses[i];
+      if (response.requestId == request.id &&
+          response.status == ResponseStatus.pending) {
+        _responses[i] = response.copyWith(status: ResponseStatus.declined);
+      }
+    }
 
     _requests[index] = request.copyWith(
       status: RequestStatus.rejected,
       reviewedById: actorId,
       reviewNote: trimmed,
+      assignedUnitIds: const [],
     );
     _logActivity(
       kind: ActivityKind.requestRejected,
@@ -1508,17 +1604,10 @@ class TabangRepository {
     if (actor.role != UserRole.staff && actor.role != UserRole.admin) {
       return false;
     }
-    if (request.status == RequestStatus.fulfilled ||
-        request.status == RequestStatus.cancelled) {
-      return false;
-    }
     // A donor-network request must have enough selected donors before staff can
     // close it as fulfilled. Blood-bank requests are processed directly by
     // staff, so they may be fulfilled from the open state.
-    if (request.source == RequestSource.donorNetwork &&
-        request.status != RequestStatus.matched) {
-      return false;
-    }
+    if (!request.canBeFulfilled || request.unitsOutstanding == 0) return false;
     final index = _requests.indexWhere((r) => r.id == requestId);
     _requests[index] = request.copyWith(
       status: RequestStatus.fulfilled,
@@ -2470,6 +2559,7 @@ class TabangRepository {
     _units.clear();
     _requests.clear();
     _responses.clear();
+    _warnings.clear();
     _threads.clear();
     _reports.clear();
     _activity.clear();
@@ -3342,6 +3432,74 @@ class TabangRepository {
       42,
     );
 
+    // ---- moderation warnings ------------------------------------------
+    // The active ladder is stored on AppUser; the durable history here carries
+    // the exact message staff entered. USR-003 is the demo warned account, so
+    // signing in as Rogel shows the reminder, profile banner and Settings
+    // history. USR-004 is suspended and keeps the full three-step record.
+    _warnings.addAll([
+      AccountWarning(
+        id: 'WRN-001',
+        userId: 'USR-003',
+        level: 1,
+        message:
+            'Your chat message offered to donate only if the recipient paid '
+            'a processing fee. Donations must never be exchanged for money. '
+            'Do not request or accept payment for a donation.',
+        issuedById: 'USR-010',
+        issuedByAlias: 'Staff Marco',
+        issuedAt: daysAgo(22),
+        acknowledgedAt: daysAgo(21),
+      ),
+      AccountWarning(
+        id: 'WRN-002',
+        userId: 'USR-003',
+        level: 2,
+        message:
+            'You missed a confirmed donation slot without messaging the '
+            'requester or the chapter. Cancel or reschedule through Messages '
+            'at least 12 hours before the slot so another donor can be found.',
+        issuedById: 'USR-011',
+        issuedByAlias: 'Admin Reyes',
+        issuedAt: daysAgo(6),
+      ),
+      AccountWarning(
+        id: 'WRN-003',
+        userId: 'USR-004',
+        level: 1,
+        message:
+            'You confirmed a donation slot and did not attend. Message the '
+            'requester or chapter as soon as you know you cannot make it.',
+        issuedById: 'USR-010',
+        issuedByAlias: 'Staff Marco',
+        issuedAt: daysAgo(60),
+        acknowledgedAt: daysAgo(59),
+      ),
+      AccountWarning(
+        id: 'WRN-004',
+        userId: 'USR-004',
+        level: 2,
+        message:
+            'This is your second missed appointment. Repeated no-shows delay '
+            'urgent transfusions and may lead to suspension.',
+        issuedById: 'USR-010',
+        issuedByAlias: 'Staff Marco',
+        issuedAt: daysAgo(35),
+        acknowledgedAt: daysAgo(34),
+      ),
+      AccountWarning(
+        id: 'WRN-005',
+        userId: 'USR-004',
+        level: 3,
+        message:
+            'A third confirmed donation slot was missed without notice. Your '
+            'account is suspended until chapter staff review it.',
+        issuedById: 'USR-011',
+        issuedByAlias: 'Admin Reyes',
+        issuedAt: daysAgo(10),
+      ),
+    ]);
+
     // ---- requests ------------------------------------------------------
     _requests.addAll([
       BloodRequest(
@@ -3384,7 +3542,10 @@ class TabangRepository {
         barangay: 'Zone 1',
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(days: 3)),
-        status: RequestStatus.open,
+        // Seeded matched with a selected donor so staff always have one
+        // fulfilable donor-network sample alongside REQ-001, which stays open
+        // to demonstrate the donor-selection gate.
+        status: RequestStatus.matched,
         source: RequestSource.donorNetwork,
       ),
       BloodRequest(
@@ -3501,14 +3662,19 @@ class TabangRepository {
           RequestDocument(
             kind: RequestDocuments.doctorsForm,
             fileName: 'patient-055-doctor-request.pdf',
+            previewAsset:
+                'assets/images/request_documents/doctor_request_form.png',
           ),
           RequestDocument(
             kind: RequestDocuments.transfusionSlip,
             fileName: 'patient-055-transfusion-slip.pdf',
+            previewAsset:
+                'assets/images/request_documents/transfusion_slip.png',
           ),
           RequestDocument(
             kind: RequestDocuments.patientId,
             fileName: 'patient-055-hospital-id.jpg',
+            previewAsset: 'assets/images/request_documents/patient_id.png',
           ),
         ],
         scheduledFor: bloodBankSlots(days: 3).first,
@@ -3527,14 +3693,17 @@ class TabangRepository {
       RequestDocument(
         kind: RequestDocuments.doctorsForm,
         fileName: 'doctor-request-form.pdf',
+        previewAsset: 'assets/images/request_documents/doctor_request_form.png',
       ),
       RequestDocument(
         kind: RequestDocuments.transfusionSlip,
         fileName: 'blood-transfusion-slip.pdf',
+        previewAsset: 'assets/images/request_documents/transfusion_slip.png',
       ),
       RequestDocument(
         kind: RequestDocuments.patientId,
         fileName: 'hospital-patient-id.jpg',
+        previewAsset: 'assets/images/request_documents/patient_id.png',
       ),
     ];
     final seededSlots = bloodBankSlots(days: 14);
@@ -3568,6 +3737,7 @@ class TabangRepository {
         donorId: 'USR-007',
         donorAlias: 'Bea',
         createdAt: now.subtract(const Duration(days: 2, hours: 20)),
+        status: ResponseStatus.selected,
       ),
     ]);
 
@@ -3853,15 +4023,16 @@ class TabangRepository {
           // row.
           memberReadAt: {
             for (final id in staffMembers)
-              id: staffMessages
-                  .where((message) => message.senderId == id)
-                  .fold<DateTime?>(
-                    null,
-                    (latest, message) =>
-                        latest == null || message.sentAt.isAfter(latest)
-                        ? message.sentAt
-                        : latest,
-                  ) ??
+              id:
+                  staffMessages
+                      .where((message) => message.senderId == id)
+                      .fold<DateTime?>(
+                        null,
+                        (latest, message) =>
+                            latest == null || message.sentAt.isAfter(latest)
+                            ? message.sentAt
+                            : latest,
+                      ) ??
                   now.subtract(const Duration(days: 30)),
           },
           messages: staffMessages,
@@ -3898,7 +4069,8 @@ class TabangRepository {
         startsAt: _atHour(now, 8, 9),
         endsAt: _atHour(now, 8, 14),
         expectedDonors: 75,
-        photoAsset: 'assets/images/Blood Drives/Barangay Matti Health Drive.jpg',
+        photoAsset:
+            'assets/images/Blood Drives/Barangay Matti Health Drive.jpg',
       ),
       BloodDrive(
         id: 'DRV-003',
@@ -4003,8 +4175,7 @@ class TabangRepository {
             'screening. Bring a valid ID and your blood donor card if you have one.',
         tag: 'CHECKLIST',
         category: ContentCategory.eligibility,
-        imageAsset:
-            'assets/images/Learn & Prepare/Basic Requirements = Age, Weight & Health.jpg',
+        imageAsset: 'assets/images/Learn & Prepare/Basic Requirements = Age, Weight & Health.jpg',
       ),
       ContentItem(
         id: 'CNT-006',
@@ -4016,7 +4187,8 @@ class TabangRepository {
             'The screening nurse makes the final call.',
         tag: 'FAQ',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/Learn & Prepare/Can I Donate If I Got a Tattoo.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/Can I Donate If I Got a Tattoo.jpg',
       ),
       ContentItem(
         id: 'CNT-007',
@@ -4029,7 +4201,8 @@ class TabangRepository {
             'intervals automatically through the donor cooldown timer.',
         tag: 'INTERVALS',
         category: ContentCategory.eligibility,
-        imageAsset: 'assets/images/Learn & Prepare/How Often Can You Donate.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/How Often Can You Donate.jpg',
       ),
       ContentItem(
         id: 'CNT-008',
@@ -4041,8 +4214,7 @@ class TabangRepository {
             'once both parties confirm they intend to proceed with a donation.',
         tag: 'PRIVACY',
         category: ContentCategory.eligibility,
-        imageAsset:
-            'assets/images/Learn & Prepare/Why TABANG Never Shows Real Names.jpg',
+        imageAsset: 'assets/images/Learn & Prepare/Why TABANG Never Shows Real Names.jpg',
       ),
       ContentItem(
         id: 'CNT-009',
@@ -4054,8 +4226,7 @@ class TabangRepository {
             'is built to close: visibility of who is available, right now, nearby.',
         tag: 'RECIPIENT STORY',
         category: ContentCategory.stories,
-        imageAsset:
-            "assets/images/Announcements & Stories/A stranger's donation saved my daughter's life.jpg",
+        imageAsset: "assets/images/Announcements & Stories/A stranger's donation saved my daughter's life.jpg",
       ),
       ContentItem(
         id: 'CNT-010',
@@ -4067,8 +4238,7 @@ class TabangRepository {
             'emergency recruitment every time.',
         tag: 'DONOR SPOTLIGHT',
         category: ContentCategory.stories,
-        imageAsset:
-            'assets/images/Announcements & Stories/daniel-article-1000x800px.png',
+        imageAsset: 'assets/images/Announcements & Stories/daniel-article-1000x800px.png',
       ),
       ContentItem(
         id: 'CNT-011',
@@ -4082,7 +4252,8 @@ class TabangRepository {
             'identity and walk you through the questionnaire.',
         tag: 'CHECKLIST',
         category: ContentCategory.tips,
-        imageAsset: 'assets/images/Learn & Prepare/What to Bring on Donation Day.jpg',
+        imageAsset:
+            'assets/images/Learn & Prepare/What to Bring on Donation Day.jpg',
       ),
       ContentItem(
         id: 'CNT-012',
@@ -4095,8 +4266,7 @@ class TabangRepository {
             'Regular donors make planned care possible.',
         tag: 'WHY DONATE',
         category: ContentCategory.explore,
-        imageAsset:
-            'assets/images/Announcements & Stories/How Donation Helps the Whole Community.jpg',
+        imageAsset: 'assets/images/Announcements & Stories/How Donation Helps the Whole Community.jpg',
       ),
       ContentItem(
         id: 'CNT-013',
@@ -4110,8 +4280,7 @@ class TabangRepository {
             'chapter if you feel faint or the site starts bleeding.',
         tag: 'AFTERCARE',
         category: ContentCategory.tips,
-        imageAsset:
-            'assets/images/Learn & Prepare/Plan Your Recovery After Donation.jpg',
+        imageAsset: 'assets/images/Learn & Prepare/Plan Your Recovery After Donation.jpg',
       ),
     ]);
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/account_warning.dart';
 import '../../widgets/chapter_identity.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
@@ -48,6 +49,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final user = _user;
     final isDonor = user.role == UserRole.donor;
+    final warnings = _repo.warningsFor(user.id);
 
     return SingleChildScrollView(
       padding: context.pagePadding,
@@ -116,6 +118,34 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                         ),
+                        if (user.warningCount > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Tooltip(
+                              message:
+                                  '${user.warningCount} active account '
+                                  'warning${user.warningCount == 1 ? '' : 's'}',
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: warningInk(context),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: context.surface,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.priority_high_rounded,
+                                  size: 11,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -169,6 +199,11 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(height: TabangSpace.lg),
+
+          if (user.warningCount > 0) ...[
+            AccountWarningNotice(user: user, warnings: warnings),
+            const SizedBox(height: TabangSpace.lg),
+          ],
 
           if (user.role.isAdminSide) ...[
             _buildChapterAffiliationCard(context, user),
@@ -227,9 +262,13 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: TabangSpace.md),
           _detailRow(context, 'Public identity', user.alias),
           _detailRow(context, 'Account type', user.role.label),
-          _detailRow(context, 'Visibility', user.isAvailable
-              ? 'Listed in the donor directory'
-              : 'Hidden from the donor directory'),
+          _detailRow(
+            context,
+            'Visibility',
+            user.isAvailable
+                ? 'Listed in the donor directory'
+                : 'Hidden from the donor directory',
+          ),
           const SizedBox(height: TabangSpace.sm),
           Text(
             'TABANG stores simulated records on this device only. No real '

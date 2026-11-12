@@ -190,6 +190,53 @@ enum AccountStatus {
   final String label;
 }
 
+/// One formal moderation warning on an account.
+///
+/// [AppUser.warningCount] is the active ladder (it resets when an account is
+/// reinstated), while this record is the durable history the warned user can
+/// read back in Settings. [message] is the specific explanation chapter staff
+/// entered, not a generic category label.
+class AccountWarning {
+  const AccountWarning({
+    required this.id,
+    required this.userId,
+    required this.level,
+    required this.message,
+    required this.issuedById,
+    required this.issuedByAlias,
+    required this.issuedAt,
+    this.acknowledgedAt,
+  });
+
+  final String id;
+  final String userId;
+
+  /// Warning number in the active ladder, 1–3.
+  final int level;
+  final String message;
+  final String issuedById;
+  final String issuedByAlias;
+  final DateTime issuedAt;
+
+  /// When the user confirmed the sign-in reminder. Profile and Settings show
+  /// the warning regardless of acknowledgement; this only suppresses the
+  /// once-per-sign-in popup.
+  final DateTime? acknowledgedAt;
+
+  bool get isUnacknowledged => acknowledgedAt == null;
+
+  AccountWarning copyWith({DateTime? acknowledgedAt}) => AccountWarning(
+    id: id,
+    userId: userId,
+    level: level,
+    message: message,
+    issuedById: issuedById,
+    issuedByAlias: issuedByAlias,
+    issuedAt: issuedAt,
+    acknowledgedAt: acknowledgedAt ?? this.acknowledgedAt,
+  );
+}
+
 /// Role determines which dashboard a session lands on. There is no
 /// self-service path to [admin] — see `AuthService`.
 enum UserRole {
@@ -503,13 +550,14 @@ class RequestDocuments {
 ///
 /// A checkbox is not evidence: staff need the file the requester sent. [bytes]
 /// holds the uploaded payload for requests created in this session; seeded
-/// requests carry [fileName] only, representing documents already on file with
-/// the chapter.
+/// requests carry [previewAsset] instead, representing the chapter's scanned
+/// copy of a document already on file.
 class RequestDocument {
   const RequestDocument({
     required this.kind,
     required this.fileName,
     this.bytes,
+    this.previewAsset,
     this.sizeBytes = 0,
   });
 
@@ -521,9 +569,16 @@ class RequestDocument {
   /// Uploaded content, or null when the document is already on file at the
   /// chapter (seed data).
   final Uint8List? bytes;
+
+  /// Bundled scan of a chapter copy, used by seeded requests so staff can
+  /// actually open the attachment in the demo build.
+  final String? previewAsset;
   final int sizeBytes;
 
   bool get hasFile => bytes != null;
+
+  /// Whether the row can open a first-page preview.
+  bool get hasPreview => bytes != null || previewAsset != null;
 
   String get sizeLabel {
     if (sizeBytes <= 0) return '';
@@ -612,6 +667,57 @@ class BloodRequest {
       (unitsNeeded - unitsFulfilled).clamp(0, unitsNeeded);
 
   bool get isAwaitingReview => status == RequestStatus.pendingReview;
+
+  /// Whether chapter staff may close this request with a reason.
+  bool get canBeRejected =>
+      status == RequestStatus.pendingReview ||
+      status == RequestStatus.open ||
+      status == RequestStatus.matched;
+
+  /// Whether staff may record the donation and close this request.
+  ///
+  /// Blood-bank requests are processed directly by staff from `open`, while a
+  /// donor-network request must first be `matched` because the requester has
+  /// to select enough donors.
+  bool get canBeFulfilled {
+    if (status == RequestStatus.pendingReview ||
+        status == RequestStatus.fulfilled ||
+        status == RequestStatus.rejected ||
+        status == RequestStatus.cancelled) {
+      return false;
+    }
+    if (source == RequestSource.bloodBank) return true;
+    return status == RequestStatus.matched;
+  }
+
+  /// Short staff-facing explanation of what the next action can be.
+  ///
+  /// Shown beside the request actions so "cannot be fulfilled yet" is never a
+  /// bare rejection: staff can see whether verification is pending or whether
+  /// the requester still has to choose a donor.
+  String? get staffFulfilmentNote {
+    switch (status) {
+      case RequestStatus.pendingReview:
+        return 'Verify the documents and booked slot first. Fulfilment is '
+            'recorded after the donation.';
+      case RequestStatus.open:
+        if (source == RequestSource.donorNetwork) {
+          return 'Waiting for the requester to select a donor. Fulfilment '
+              'unlocks when this request becomes Matched.';
+        }
+        return 'Blood-bank stock is held for this request. Mark it fulfilled '
+            'after the transfusion is recorded.';
+      case RequestStatus.matched:
+        return 'A donor is selected. Mark the request fulfilled after the '
+            'donation is recorded.';
+      case RequestStatus.fulfilled:
+        return 'This request is complete.';
+      case RequestStatus.rejected:
+        return 'This request was rejected. The requester can read the reason.';
+      case RequestStatus.cancelled:
+        return 'This request was cancelled.';
+    }
+  }
 
   /// Only verified open donor-network requests accept new donor responses.
   /// Blood-bank requests are processed by chapter staff, not broadcast.
@@ -1293,9 +1399,11 @@ enum ActivityKind {
   requestSubmitted,
   requestVerified,
   requestRejected,
+
   /// A rejection undone from the snackbar before anything else happened to the
   /// request, so the queue entry is back where it was.
   requestReopened,
+
   /// A blood drive was proposed, approved, rejected, cancelled or restored.
   driveUpdate,
   inventory,
@@ -1303,7 +1411,8 @@ enum ActivityKind {
 }
 
 /// One entry in the chapter activity log, newest first.
-class ActivityEvent {  const ActivityEvent({
+class ActivityEvent {
+  const ActivityEvent({
     required this.id,
     required this.kind,
     required this.actorId,

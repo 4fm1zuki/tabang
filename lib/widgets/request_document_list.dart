@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -17,8 +15,9 @@ bool isImageRequestDocument(RequestDocument document) {
 ///
 /// Staff used to see only ticked checklist labels, which could not prove the
 /// requester had sent anything. This renders the actual file name, size and,
-/// when the payload is available, a thumbnail that opens full size. Seeded
-/// requests say "on file at the chapter" instead of pretending to have bytes.
+/// when a preview is available, a thumbnail that opens full size. Seeded
+/// requests use a bundled scan of the chapter copy instead of pretending to
+/// have the original upload bytes.
 class RequestDocumentList extends StatelessWidget {
   const RequestDocumentList({
     super.key,
@@ -50,7 +49,7 @@ class RequestDocumentList extends StatelessWidget {
   }
 }
 
-/// One attached file, with an inline image preview when possible.
+/// One attached file, with an inline preview when possible.
 class RequestDocumentRow extends StatelessWidget {
   const RequestDocumentRow({
     super.key,
@@ -63,28 +62,29 @@ class RequestDocumentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bytes = document.bytes;
-    final image = bytes != null && isImageRequestDocument(document);
+    final preview = _previewImage(document);
     final subtitle = document.hasFile
         ? '${document.fileName}'
               '${document.sizeLabel.isEmpty ? '' : ' · ${document.sizeLabel}'}'
-        : '${document.fileName} · on file at the chapter';
+        : '${document.fileName} · chapter copy';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (image)
+        if (preview != null)
           InkWell(
             borderRadius: BorderRadius.circular(TabangRadius.xs),
-            onTap: () => _showPreview(context, document, bytes),
+            onTap: () => _showPreview(context, preview),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(TabangRadius.xs),
-              child: Image.memory(
-                bytes,
-                width: dense ? 28 : 38,
-                height: dense ? 28 : 38,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => _icon(context),
+              child: SizedBox(
+                width: dense ? 30 : 40,
+                height: dense ? 30 : 40,
+                child: Image(
+                  image: preview,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => _icon(context),
+                ),
               ),
             ),
           )
@@ -116,9 +116,9 @@ class RequestDocumentRow extends StatelessWidget {
             ],
           ),
         ),
-        if (image)
+        if (preview != null)
           TextButton(
-            onPressed: () => _showPreview(context, document, bytes),
+            onPressed: () => _showPreview(context, preview),
             style: TextButton.styleFrom(
               visualDensity: VisualDensity.compact,
               padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -129,19 +129,32 @@ class RequestDocumentRow extends StatelessWidget {
     );
   }
 
+  /// Uploaded image bytes take priority; otherwise a bundled chapter scan.
+  ImageProvider? _previewImage(RequestDocument document) {
+    final bytes = document.bytes;
+    if (bytes != null && isImageRequestDocument(document)) {
+      return MemoryImage(bytes);
+    }
+    final asset = document.previewAsset;
+    if (asset != null) return AssetImage(asset);
+    return null;
+  }
+
   Widget _icon(BuildContext context) {
     return Icon(
-      document.hasFile ? Icons.description_outlined : Icons.verified_outlined,
+      document.hasPreview
+          ? Icons.description_outlined
+          : (document.hasFile
+                ? Icons.description_outlined
+                : Icons.verified_outlined),
       size: dense ? 16 : 18,
-      color: document.hasFile ? TabangColors.crimson : TabangColors.success,
+      color: document.hasPreview || document.hasFile
+          ? TabangColors.crimson
+          : TabangColors.success,
     );
   }
 
-  void _showPreview(
-    BuildContext context,
-    RequestDocument document,
-    Uint8List bytes,
-  ) {
+  void _showPreview(BuildContext context, ImageProvider preview) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -151,15 +164,15 @@ class RequestDocumentRow extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         content: SizedBox(
-          width: 520,
+          width: 560,
           child: InteractiveViewer(
             maxScale: 4,
-            child: Image.memory(
-              bytes,
+            child: Image(
+              image: preview,
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => const Padding(
                 padding: EdgeInsets.all(TabangSpace.lg),
-                child: Text('This image could not be previewed.'),
+                child: Text('This attachment could not be previewed.'),
               ),
             ),
           ),

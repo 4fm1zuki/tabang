@@ -49,10 +49,11 @@ class TabangLogo extends StatelessWidget {
     );
     if (!plate) return art;
     // The source PNG is square, but the visible drop-and-hand mark only fills
-    // about 89% of its height and 74% of its width. A padded plate therefore
-    // framed a mostly empty transparent square and read as a thick white
-    // background. Scale the artwork to its visible bounds and clip it to a
-    // circle the same size as the requested mark, so the plate hugs the logo.
+    // about 89% of its height and 74% of its width, so a padded plate would
+    // frame a mostly empty transparent square. Clip the artwork to a circle the
+    // same size as the requested mark instead. The art is not scaled up past
+    // 1.0: the mark's tall drop tip and the hand's right edge would be cut by
+    // the circular clip, which read as a chipped logo on the dark surface.
     return Container(
       width: size,
       height: size,
@@ -61,10 +62,16 @@ class TabangLogo extends StatelessWidget {
         color: Colors.white,
         shape: BoxShape.circle,
       ),
-      child: Transform.scale(scale: 1.08, child: art),
+      child: art,
     );
   }
 }
+
+/// Gap between the TABANG mark and its wordmark across the app lockup.
+///
+/// The login screen and both shell headers share it so the same header reads
+/// identically on every entry point instead of drifting a couple of pixels.
+const double kTabangWordmarkGap = 6;
 
 /// Every snackbar in the app, so behaviour is uniform: it clears itself after
 /// three seconds instead of four, and it can be swiped away in either
@@ -866,7 +873,8 @@ String formatDateWithAge(DateTime date, {DateTime? now}) {
 }
 
 /// Relative time such as `3h ago`, `2d ago`.
-String formatRelative(DateTime date, {DateTime? now}) {  final delta = (now ?? DateTime.now()).difference(date);
+String formatRelative(DateTime date, {DateTime? now}) {
+  final delta = (now ?? DateTime.now()).difference(date);
   if (delta.inMinutes < 1) return 'just now';
   if (delta.inMinutes < 60) return '${delta.inMinutes}m ago';
   if (delta.inHours < 24) return '${delta.inHours}h ago';

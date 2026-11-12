@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/account_warning.dart';
 import '../../widgets/common.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/onboarding.dart';
@@ -184,13 +185,18 @@ class _AdminShellState extends State<AdminShell> {
     super.initState();
     _repo.addListener(_refresh);
     _pages[0] = _buildPage(0);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       // Overview is already on screen at startup, so its dot would never
       // clear otherwise.
       _repo.markTabSeen(widget.user.id, 'overview');
-      final user = _repo.userById(widget.user.id) ?? widget.user;
-      if (!user.onboardingCompleted) showWelcomeGuide(context, user);
+      var user = _repo.userById(widget.user.id) ?? widget.user;
+      if (!user.onboardingCompleted) {
+        await showWelcomeGuide(context, user);
+        if (!mounted) return;
+        user = _repo.userById(widget.user.id) ?? user;
+      }
+      await showSignInWarningReminder(context, user: user);
     });
   }
 
@@ -653,7 +659,8 @@ class _AdminPhoneHeader extends StatelessWidget {
           // 52 reads properly beside the wordmark; the plate keeps the red and
           // blue artwork legible when the header sits on the dark surface.
           TabangLogo(size: 52, plate: context.isDark),
-          const SizedBox(width: TabangSpace.sm),
+          // Same lockup gap as the login header, so both read identically.
+          const SizedBox(width: kTabangWordmarkGap),
           // The identity never widens the row: the alias and position share a
           // single scaled line, so the role stays readable in full on a phone.
           Expanded(
@@ -717,8 +724,7 @@ class _AdminPhoneHeader extends StatelessWidget {
                   if (await confirmAction(
                     context,
                     title: 'Sign out?',
-                    message:
-                        'You will need to sign in again to continue.',
+                    message: 'You will need to sign in again to continue.',
                     confirmLabel: 'Sign out',
                     destructive: true,
                   )) {
@@ -984,23 +990,34 @@ class _AdminSidebar extends StatelessWidget {
                       ),
                       if (expanded) ...[
                         const SizedBox(width: TabangSpace.sm),
-                        // Alias and position share one scaled line, matching
-                        // the phone header. The FittedBox keeps the whole
-                        // position readable in the 232 px rail.
+                        // Desktop rail: the alias and the position get a line
+                        // each, so a long role label stays full size instead of
+                        // being squeezed onto one shared line.
                         Expanded(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              '${user.alias} · ${user.role.label}',
-                              maxLines: 1,
-                              softWrap: false,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                user.alias,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
+                              Text(
+                                user.role.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -1119,8 +1136,7 @@ class _AdminSidebar extends StatelessWidget {
                 if (await confirmAction(
                   context,
                   title: 'Sign out?',
-                  message:
-                      'You will need to sign in again to continue.',
+                  message: 'You will need to sign in again to continue.',
                   confirmLabel: 'Sign out',
                   destructive: true,
                 )) {

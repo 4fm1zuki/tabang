@@ -1183,6 +1183,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
               ),
             ),
           ),
+        if (!user.role.isAdminSide &&
+            user.status == AccountStatus.verified &&
+            user.bloodCardVerified)
+          OutlinedButton.icon(
+            onPressed: () => _unverifyUser(context, user),
+            icon: const Icon(Icons.badge_outlined, size: 14),
+            label: const Text('Unverify'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: TabangSpace.md,
+                vertical: TabangSpace.sm,
+              ),
+            ),
+          ),
         // Warn and Suspend are issued from Moderation (the Users page has a
         // Moderation tab), so a mis-tap on an unrelated account row cannot
         // discipline someone. The account's state is still shown here.
@@ -1195,6 +1209,36 @@ class _UserManagementPageState extends State<UserManagementPage> {
       spacing: TabangSpace.sm,
       runSpacing: TabangSpace.sm,
       children: actions,
+    );
+  }
+
+  Future<void> _unverifyUser(BuildContext context, AppUser user) async {
+    final ok = await confirmAction(
+      context,
+      title: 'Unverify ${user.alias}?',
+      message:
+          'The blood card returns to the review queue and the account becomes '
+          'Unverified. ${user.alias} will not appear in the donor directory or '
+          'accept new requests until staff verify the card again.',
+      confirmLabel: 'Unverify',
+      destructive: true,
+    );
+    if (!ok || !context.mounted) return;
+    final changed = _repo.unverifyUser(user.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          changed
+              ? '${user.alias} returned to unverified review.'
+              : 'Could not unverify ${user.alias}.',
+        ),
+        action: changed
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _repo.verifyUser(user.id),
+              )
+            : null,
+      ),
     );
   }
 
@@ -1436,6 +1480,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
               icon: const Icon(Icons.chat_bubble_outline, size: 15),
               label: const Text('Message'),
             ),
+            if (!user.role.isAdminSide &&
+                user.status == AccountStatus.verified &&
+                user.bloodCardVerified)
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _unverifyUser(context, user);
+                },
+                icon: const Icon(Icons.badge_outlined, size: 15),
+                label: const Text('Unverify'),
+              ),
             if (isDonor)
               ElevatedButton.icon(
                 onPressed: () {
@@ -1690,5 +1745,4 @@ class _UserManagementPageState extends State<UserManagementPage> {
   /// Staff enter the reason, the count is capped at three, and the account is
   /// suspended automatically on the third. Suspended accounts cannot be warned
   /// again until they are reinstated, which resets the count.
-
 }

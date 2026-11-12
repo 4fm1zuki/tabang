@@ -601,9 +601,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   }) {
     final selected = _showDonorDensity == donor;
     return InkWell(
-      key: ValueKey(
-        donor ? 'operationsHeatDonors' : 'operationsHeatRequests',
-      ),
+      key: ValueKey(donor ? 'operationsHeatDonors' : 'operationsHeatRequests'),
       borderRadius: BorderRadius.circular(TabangRadius.xs),
       onTap: () => _selectPaneTab(donor ? 1 : 0),
       child: Container(
@@ -924,27 +922,35 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
+            runSpacing: 4,
             children: [
-              if (widget.user.role.canFulfillRequests &&
-                  request.isAwaitingReview) ...[
-                TextButton(
-                  onPressed: () => _reject(context, request),
-                  child: const Text('Reject'),
-                ),
-                FilledButton(
-                  onPressed: () => _verify(context, request),
-                  child: const Text('Verify'),
-                ),
+              if (widget.user.role.canFulfillRequests) ...[
+                if (request.isAwaitingReview) ...[
+                  TextButton(
+                    onPressed: () => _reject(context, request),
+                    child: const Text('Reject'),
+                  ),
+                  FilledButton(
+                    onPressed: () => _verify(context, request),
+                    child: const Text('Verify'),
+                  ),
+                ] else if (request.canBeRejected) ...[
+                  TextButton(
+                    onPressed: () => _reject(context, request),
+                    child: const Text('Reject'),
+                  ),
+                  if (request.canBeFulfilled)
+                    FilledButton(
+                      onPressed: () => _fulfil(context, request),
+                      child: const Text('Mark fulfilled'),
+                    )
+                  else
+                    TextButton(
+                      onPressed: () => _showRequestDetails(context, request),
+                      child: const Text('Awaiting donor'),
+                    ),
+                ],
               ],
-              if (widget.user.role.canFulfillRequests &&
-                  !request.isAwaitingReview &&
-                  request.status != RequestStatus.fulfilled &&
-                  request.status != RequestStatus.rejected &&
-                  request.status != RequestStatus.cancelled)
-                TextButton(
-                  onPressed: () => _fulfil(context, request),
-                  child: const Text('Mark fulfilled'),
-                ),
               // Staff no longer pick donors: verification opens the request
               // and the requester selects from the people who responded.
             ],
@@ -1036,6 +1042,40 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               ],
               if (request.assignedUnitIds.isNotEmpty)
                 Text('Held units: ${request.assignedUnitIds.join(', ')}'),
+              if (request.staffFulfilmentNote != null) ...[
+                const SizedBox(height: TabangSpace.sm),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(TabangSpace.sm),
+                  decoration: BoxDecoration(
+                    color: dialogContext.infoBg,
+                    borderRadius: BorderRadius.circular(TabangRadius.xs),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 15,
+                        color: dialogContext.isDark
+                            ? TabangColors.infoOnDark
+                            : TabangColors.info,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          request.staffFulfilmentNote!,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.45,
+                            color: dialogContext.textColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (request.reviewNote != null &&
                   request.reviewNote!.trim().isNotEmpty)
                 Text('Review note: ${request.reviewNote}'),
@@ -1058,8 +1098,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
-          if (widget.user.role.canFulfillRequests &&
-              request.isAwaitingReview) ...[
+          if (widget.user.role.canFulfillRequests && request.canBeRejected) ...[
             TextButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
@@ -1067,13 +1106,22 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               },
               child: const Text('Reject'),
             ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _verify(context, request);
-              },
-              child: const Text('Verify'),
-            ),
+            if (request.isAwaitingReview)
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _verify(context, request);
+                },
+                child: const Text('Verify'),
+              )
+            else if (request.canBeFulfilled)
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _fulfil(context, request);
+                },
+                child: const Text('Mark fulfilled'),
+              ),
           ],
         ],
       ),
@@ -1087,8 +1135,8 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
         content: Text(
           ok
               ? '${request.id} marked fulfilled.'
-              : '${request.id} cannot be fulfilled yet — a donor-network '
-                    'request must be matched first.',
+              : request.staffFulfilmentNote ??
+                    '${request.id} cannot be fulfilled in its current state.',
         ),
       ),
     );

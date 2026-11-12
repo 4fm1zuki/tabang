@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
+import '../../widgets/account_warning.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
 
@@ -87,6 +88,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final user = _user;
+    final warnings = _repo.warningsFor(user.id);
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Column(
@@ -101,8 +103,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Expanded(
                 child: PageHeader(
                   title: 'Settings',
-                  subtitle:
-                      'Appearance, notifications, privacy and account controls.',
+                  subtitle: 'Appearance, notifications, privacy and account controls.',
                 ),
               ),
               SizedBox(width: TabangSpace.sm),
@@ -191,6 +192,55 @@ class _SettingsPageState extends State<SettingsPage> {
                 user.notifyNews,
                 (v) => _repo.updateUser(user.copyWith(notifyNews: v)),
               ),
+            ],
+          ),
+          const SizedBox(height: TabangSpace.lg),
+
+          _section(
+            context,
+            'Account standing',
+            warnings.isEmpty
+                ? 'No moderation warnings are on this account.'
+                : 'The warnings on this account, why they were issued and '
+                      'what happens next.',
+            help:
+                'Warnings are issued by chapter staff or administrators. '
+                'Three active warnings suspend the account automatically. '
+                'Reinstating the account clears the active count but keeps '
+                'this history for review.',
+            children: [
+              _dataRow(context, 'Status', user.status.label),
+              _dataRow(context, 'Active warnings', '${user.warningCount} of 3'),
+              if (warnings.isEmpty)
+                Text(
+                  'No warning messages have been recorded. Keep your contact '
+                  'details current and cancel a booked slot if you cannot '
+                  'attend.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: context.textMuted,
+                  ),
+                )
+              else ...[
+                const SizedBox(height: TabangSpace.sm),
+                for (final warning in warnings)
+                  AccountWarningTile(warning: warning),
+                if (user.warningCount > 0) ...[
+                  const SizedBox(height: TabangSpace.xs),
+                  const WarningGuidance(
+                    title: 'What another warning would mean',
+                    lines: warningConsequences,
+                    icon: Icons.shield_outlined,
+                  ),
+                  const SizedBox(height: TabangSpace.sm),
+                  const WarningGuidance(
+                    title: 'What you can do now',
+                    lines: warningNextSteps,
+                    icon: Icons.check_circle_outline,
+                  ),
+                ],
+              ],
             ],
           ),
           const SizedBox(height: TabangSpace.lg),

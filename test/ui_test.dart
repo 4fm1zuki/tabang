@@ -135,10 +135,7 @@ void main() {
       closeTo(scale.width, 0.01),
       reason: 'the drawn ruler must match its label',
     );
-    expect(
-      find.textContaining('© OpenStreetMap contributors'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('© OpenStreetMap contributors'), findsOneWidget);
     expect(find.textContaining('HOT style'), findsNothing);
 
     // The old four-mode dropdown and the header switches are gone. A draggable
@@ -678,12 +675,17 @@ void main() {
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
 
-    // The staff request queue carries the same card anatomy and tappable
-    // requester/responder names.
+    // Request cards stay compact, so the requester name is still tappable on
+    // the card and the attachments/responders move into the details dialog.
     await tester.tap(find.text('Requests'));
     await tester.pumpAndSettle();
     expect(find.byType(UserMention), findsWidgets);
+    expect(find.byType(RequestDocumentList), findsNothing);
+    await tester.tap(find.textContaining('REQ-').first);
+    await tester.pumpAndSettle();
     expect(find.byType(RequestDocumentList), findsWidgets);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
     // The removed-units ledger keeps a removal visible and offers a restore.

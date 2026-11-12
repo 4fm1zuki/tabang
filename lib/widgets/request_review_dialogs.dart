@@ -12,11 +12,7 @@ import 'request_document_list.dart';
 /// write to their Messages thread instead of leaving them to discover the state
 /// change on their own. The thread is created on first contact, and the message
 /// is posted as the official chapter identity.
-void notifyRequester(
-  TabangRepository repo,
-  BloodRequest request,
-  String text,
-) {
+void notifyRequester(TabangRepository repo, BloodRequest request, String text) {
   repo.startConversation(
     initiatorId: TabangRepository.chapterAccountId,
     otherId: request.requesterId,
@@ -171,6 +167,7 @@ Future<void> showRejectRequestDialog(
 }) {
   final repo = TabangRepository.instance;
   final reasonController = TextEditingController();
+  final allowUndo = request.isAwaitingReview;
   return showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -181,10 +178,15 @@ Future<void> showRejectRequestDialog(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'The requester sees this reason, so be specific about the '
-              'document or detail that needs fixing.',
-              style: TextStyle(fontSize: 12.5, height: 1.5),
+            Text(
+              request.isAwaitingReview
+                  ? 'The requester sees this reason, so be specific about the '
+                        'document or detail that needs fixing.'
+                  : 'This request is already ${request.status.label.toLowerCase()}. '
+                        'Rejecting it closes the request, releases any held '
+                        'units and declines pending donor offers. The requester '
+                        'sees this reason.',
+              style: const TextStyle(fontSize: 12.5, height: 1.5),
             ),
             const SizedBox(height: TabangSpace.md),
             TextField(
@@ -215,8 +217,11 @@ Future<void> showRejectRequestDialog(
               notifyRequester(
                 repo,
                 request,
-                'Your request ${request.id} was reviewed and could not be '
-                'approved. Reason: ${reasonController.text.trim()}',
+                request.isAwaitingReview
+                    ? 'Your request ${request.id} was reviewed and could not '
+                          'be approved. Reason: ${reasonController.text.trim()}'
+                    : 'Your request ${request.id} was closed after review. '
+                          'Reason: ${reasonController.text.trim()}',
               );
             }
             Navigator.pop(dialogContext);
@@ -228,7 +233,7 @@ Future<void> showRejectRequestDialog(
                       : 'Enter a reason before rejecting.',
                 ),
                 duration: const Duration(seconds: 6),
-                action: ok
+                action: ok && allowUndo
                     ? SnackBarAction(
                         label: 'Undo',
                         onPressed: () {

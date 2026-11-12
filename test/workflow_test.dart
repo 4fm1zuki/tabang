@@ -739,6 +739,148 @@ void main() {
       expect(repo.userById('USR-019')!.warningCount, 0);
     });
 
+    test('each warning keeps the staff message in a durable history', () {
+      repo.currentUser = repo.userById('USR-010');
+      addTearDown(() => repo.currentUser = null);
+
+      expect(repo.warnUser('USR-019', reason: 'Missed a booked slot'), isTrue);
+      final history = repo.warningsFor('USR-019');
+      expect(history, hasLength(1));
+      expect(history.single.level, 1);
+      expect(history.single.message, 'Missed a booked slot');
+      expect(history.single.issuedByAlias, isNotEmpty);
+      expect(repo.unacknowledgedWarningsFor('USR-019'), hasLength(1));
+
+      // Confirming the sign-in reminder clears the popup only; the record stays
+      // readable in Profile and Settings.
+      repo.acknowledgeWarnings('USR-019');
+      expect(repo.unacknowledgedWarningsFor('USR-019'), isEmpty);
+      expect(repo.warningsFor('USR-019'), hasLength(1));
+
+      // Reinstatement resets the ladder but never erases the message.
+      repo.setUserStatus('USR-019', AccountStatus.verified);
+      expect(repo.userById('USR-019')!.warningCount, 0);
+      expect(repo.warningsFor('USR-019'), hasLength(1));
+    });
+
+    test('a warning without a typed message still records guidance', () {
+      repo.warnUser('USR-019');
+      final warning = repo.warningsFor('USR-019').single;
+      expect(warning.message, isNotEmpty);
+      expect(warning.message.toLowerCase(), contains('account'));
+    });
+
+    test('a verified donor can be returned to unverified review', () {
+      final donor = repo.userById('USR-001')!;
+      expect(donor.status, AccountStatus.verified);
+      expect(donor.bloodCardVerified, isTrue);
+
+      expect(repo.unverifyUser('USR-001'), isTrue);
+      final unverified = repo.userById('USR-001')!;
+      expect(unverified.status, AccountStatus.unverified);
+      expect(unverified.bloodCardVerified, isFalse);
+      // Nothing is left to unverify the second time.
+      expect(repo.unverifyUser('USR-001'), isFalse);
+    });
+
+    test('staff and admin accounts cannot be unverified', () {
+      expect(repo.unverifyUser('USR-010'), isFalse); // staff
+      expect(repo.unverifyUser('USR-011'), isFalse); // admin
+    });
+
+    test('open and matched requests can be rejected, releasing holds', () {
+      // A verified blood-bank request holds a unit; rejecting it returns the
+      // bag to stock instead of leaving it reserved forever.
+      final bank = submit(source: RequestSource.bloodBank)!;
+      final compatible = repo.compatibleUnitsFor(
+        recipientType: bank.bloodType,
+        component: bank.component,
+      );
+      expect(
+        repo.verifyRequest(
+          bank.id,
+          actorId: 'USR-010',
+          unitIds: [compatible.first.barcode],
+        ),
+        isTrue,
+      );
+      expect(
+        repo.units
+            .firstWhere((u) => u.barcode == compatible.first.barcode)
+            .status,
+        UnitStatus.reserved,
+      );
+
+      expect(
+        repo.rejectRequest(
+          bank.id,
+          actorId: 'USR-010',
+          reason: 'Patient transferred hospitals',
+        ),
+        isTrue,
+      );
+      final released = repo.units.firstWhere(
+        (u) => u.barcode == compatible.first.barcode,
+      );
+      expect(released.status, UnitStatus.available);
+      expect(released.reservedBy, isNull);
+
+      // An open donor-network request can also be closed out.
+      final open = addRequest(repo, patientAlias: 'Reject open');
+      expect(open.status, RequestStatus.open);
+      expect(
+        repo.rejectRequest(open.id, actorId: 'USR-010', reason: 'Duplicate'),
+        isTrue,
+      );
+
+      // A matched request closes the same way.
+      final matched = addRequest(
+        repo,
+        patientAlias: 'Reject matched',
+        bloodType: BloodType.bPos,
+      );
+      final response = repo.respondToRequest(
+        requestId: matched.id,
+        donorId: 'USR-001', // O+ is compatible with B+
+      )!;
+      repo.selectResponse(responseId: response.id, selectedById: 'USR-009');
+      expect(
+        repo.requests.firstWhere((r) => r.id == matched.id).status,
+        RequestStatus.matched,
+      );
+      expect(
+        repo.rejectRequest(
+          matched.id,
+          actorId: 'USR-010',
+          reason: 'Donor no longer needed',
+        ),
+        isTrue,
+      );
+      expect(
+        repo.requests.firstWhere((r) => r.id == matched.id).status,
+        RequestStatus.rejected,
+      );
+    });
+
+    test('the seeded matched request can be fulfilled by staff', () {
+      final request = repo.requests.firstWhere((r) => r.id == 'REQ-003');
+      expect(request.status, RequestStatus.matched);
+      expect(request.canBeFulfilled, isTrue);
+
+      expect(repo.markRequestFulfilled('REQ-003', actorId: 'USR-010'), isTrue);
+      final fulfilled = repo.requests.firstWhere((r) => r.id == 'REQ-003');
+      expect(fulfilled.status, RequestStatus.fulfilled);
+      expect(fulfilled.unitsFulfilled, fulfilled.unitsNeeded);
+    });
+
+    test('an open donor-network request cannot be fulfilled yet', () {
+      final open = repo.requests.firstWhere((r) => r.id == 'REQ-001');
+      expect(open.status, RequestStatus.open);
+      expect(open.canBeFulfilled, isFalse);
+      expect(repo.markRequestFulfilled('REQ-001', actorId: 'USR-010'), isFalse);
+      expect(open.staffFulfilmentNote, contains('Matched'));
+    });
+
     test('only donors can join a drive', () {
       expect(
         repo.toggleDriveInterest('DRV-001', 'USR-038'), // community user
@@ -1631,29 +1773,32 @@ void main() {
       expect(latest.sentAsChapter, isFalse);
     });
 
-    test('reading the staff room clears the badge only for that member', () async {
-      // USR-010 posted first, so USR-011's later seed message is unread for
-      // them. USR-011 wrote the latest message, so their row starts read.
-      expect(repo.staffRoom!.hasUnreadFor('USR-010'), isTrue);
-      expect(repo.staffRoom!.hasUnreadFor('USR-011'), isFalse);
+    test(
+      'reading the staff room clears the badge only for that member',
+      () async {
+        // USR-010 posted first, so USR-011's later seed message is unread for
+        // them. USR-011 wrote the latest message, so their row starts read.
+        expect(repo.staffRoom!.hasUnreadFor('USR-010'), isTrue);
+        expect(repo.staffRoom!.hasUnreadFor('USR-011'), isFalse);
 
-      repo.markThreadRead(TabangRepository.staffRoomId, 'USR-010');
-      expect(repo.staffRoom!.hasUnreadFor('USR-010'), isFalse);
+        repo.markThreadRead(TabangRepository.staffRoomId, 'USR-010');
+        expect(repo.staffRoom!.hasUnreadFor('USR-010'), isFalse);
 
-      // DateTime.now() can resolve to the same tick under load; without a gap
-      // the new message would carry the read marker's timestamp and read as
-      // already seen.
-      await Future<void>.delayed(const Duration(milliseconds: 2));
+        // DateTime.now() can resolve to the same tick under load; without a gap
+        // the new message would carry the read marker's timestamp and read as
+        // already seen.
+        await Future<void>.delayed(const Duration(milliseconds: 2));
 
-      // A new message only re-lights the badge for the other member.
-      repo.sendMessage(
-        TabangRepository.staffRoomId,
-        'USR-011',
-        'Please review the verification queue.',
-      );
-      expect(repo.staffRoom!.hasUnreadFor('USR-010'), isTrue);
-      expect(repo.staffRoom!.hasUnreadFor('USR-011'), isFalse);
-    });
+        // A new message only re-lights the badge for the other member.
+        repo.sendMessage(
+          TabangRepository.staffRoomId,
+          'USR-011',
+          'Please review the verification queue.',
+        );
+        expect(repo.staffRoom!.hasUnreadFor('USR-010'), isTrue);
+        expect(repo.staffRoom!.hasUnreadFor('USR-011'), isFalse);
+      },
+    );
   });
 
   group('Undo and the removed-units ledger', () {
@@ -1815,7 +1960,8 @@ void main() {
     });
   });
 
-  group('blood drive approval', () {    BloodDrive? propose(TabangRepository repo, {int days = 7}) {
+  group('blood drive approval', () {
+    BloodDrive? propose(TabangRepository repo, {int days = 7}) {
       final day = DateTime.now().add(Duration(days: days));
       return repo.proposeBloodDrive(
         actorId: 'USR-010',
