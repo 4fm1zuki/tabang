@@ -5,6 +5,7 @@ import 'package:tabang/core/auth.dart';
 import 'package:tabang/core/eligibility.dart';
 import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
+import 'package:tabang/widgets/request_review_dialogs.dart';
 
 /// Three required uploads with real bytes, as the request dialog supplies.
 List<RequestDocument> uploadedDocuments() => [
@@ -1757,8 +1758,47 @@ void main() {
     });
   });
 
-  group('blood drive approval', () {
-    BloodDrive? propose(TabangRepository repo, {int days = 7}) {
+  group('request notifications', () {
+    test('the requester gets a chapter message about their request', () {
+      final repo = TabangRepository.instance;
+      final request = addRequest(repo, patientAlias: 'Notify Check');
+      final before = repo.threadsFor(request.requesterId).length;
+
+      notifyRequester(
+        repo,
+        request,
+        'Your request ${request.id} has been verified.',
+      );
+
+      final threads = repo.threadsFor(request.requesterId);
+      expect(
+        threads.length,
+        before + 1,
+        reason: 'the first message to a requester opens the thread',
+      );
+      final thread = threads.firstWhere(
+        (t) => t.lastMessage?.text.contains(request.id) ?? false,
+      );
+      expect(thread.lastMessage!.text, contains('verified'));
+      // Posted as the chapter, so the requester sees the official identity.
+      expect(
+        thread.messages.any(
+          (m) => m.senderId == TabangRepository.chapterAccountId,
+        ),
+        isTrue,
+      );
+
+      // A second notice reuses the same thread rather than opening another.
+      notifyRequester(repo, request, 'A second notice.');
+      expect(
+        repo.threadsFor(request.requesterId).length,
+        before + 1,
+        reason: 'the chapter keeps one thread with each requester',
+      );
+    });
+  });
+
+  group('blood drive approval', () {    BloodDrive? propose(TabangRepository repo, {int days = 7}) {
       final day = DateTime.now().add(Duration(days: days));
       return repo.proposeBloodDrive(
         actorId: 'USR-010',
