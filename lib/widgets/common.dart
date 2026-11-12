@@ -16,46 +16,28 @@ import 'photo.dart';
 /// The TABANG mark used by every shell header.
 ///
 /// One widget so the phone bar, the donor rail and the staff rail cannot drift
-/// apart again — they previously drew the logo at 28 px in one place and 30 px
-/// in another, one with a gradient frame and one without. The supplied artwork
-/// sits on its own white plate, so the tile is clipped to a squircle: the radius
-/// scales with [size], which keeps the corners properly rounded at every size
-/// instead of reading as a square with nicked corners at 28 px and a circle at
-/// 60 px.
+/// apart again. The artwork is transparent, so it is drawn directly on the
+/// surface with no plate and no frame — the old white tile and its border are
+/// gone, which also lets the drop, heart and hand fill the space.
 class TabangLogo extends StatelessWidget {
-  const TabangLogo({super.key, this.size = 40});
+  const TabangLogo({super.key, this.size = 44});
 
   static const String asset = 'assets/branding/app_icon.png';
 
-  /// How much of the tile the corner radius takes. 0.3 matches the rounding
-  /// Android and iOS apply to a launcher icon.
-  static const double _cornerRatio = 0.3;
-
-  /// Height and width of the artwork itself; the frame adds 2 px on each side.
+  /// Width and height of the mark.
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final outerRadius = (size + 4) * _cornerRatio;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: TabangGradients.brand,
-        borderRadius: BorderRadius.circular(outerRadius),
-      ),
-      padding: const EdgeInsets.all(2),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(outerRadius - 2),
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: TabangPhoto(
-            asset,
-            semanticLabel: 'TABANG',
-            creditLabel: 'TABANG logo',
-            fallbackIcon: Icons.water_drop,
-            fallbackIconSize: size * 0.5,
-          ),
-        ),
+    return SizedBox(
+      width: size,
+      height: size,
+      child: TabangPhoto(
+        asset,
+        semanticLabel: 'TABANG',
+        creditLabel: 'TABANG logo',
+        fallbackIcon: Icons.water_drop,
+        fallbackIconSize: size * 0.7,
       ),
     );
   }

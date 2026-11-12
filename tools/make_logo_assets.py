@@ -22,7 +22,7 @@ android/app/src/main/res/mipmap-*/ic_launcher.png   launcher icons
 from __future__ import annotations
 
 import os
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE = os.path.join(ROOT, "assets", "logo.jpg")
@@ -49,40 +49,74 @@ TRIM_PADDING = 0.06
 
 
 def _trim_to_mark(image: Image.Image) -> Image.Image:
-    """Crop the white margin, then re-pad the mark by [TRIM_PADDING]."""
-    grey = image.convert("L")
-    mask = grey.point(lambda value: 255 if value < TRIM_THRESHOLD else 0)
-    box = mask.getbbox()
+    """Crop to the artwork itself, then re-pad by [TRIM_PADDING]."""
+    if image.mode != "RGBA":
+        grey = image.convert("L")
+        mask = grey.point(lambda value: 255 if value < TRIM_THRESHOLD else 0)
+        box = mask.getbbox()
+    else:
+        box = image.split()[3].getbbox()
     if box is None:
         return image
     art = image.crop(box)
     side = max(art.size)
     pad = int(round(side * TRIM_PADDING))
-    canvas = Image.new("RGB", (side + 2 * pad, side + 2 * pad), (255, 255, 255))
+    canvas = Image.new("RGBA", (side + 2 * pad, side + 2 * pad), (0, 0, 0, 0))
     canvas.paste(
         art,
         ((canvas.width - art.width) // 2, (canvas.height - art.height) // 2),
+        art,
     )
     return canvas
 
 
 def _square(image: Image.Image, size: int, inset: float = 1.0) -> Image.Image:
-    """Resize [image] to a white square of [size], art occupying [inset]."""
-    canvas = Image.new("RGB", (size, size), (255, 255, 255))
+    """Fit [image] into a transparent square of [size], art occupying [inset]."""
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     inner = max(1, int(round(size * inset)))
     art = image.resize((inner, inner), Image.LANCZOS)
     offset = (size - inner) // 2
-    canvas.paste(art, (offset, offset))
+    canvas.paste(art, (offset, offset), art)
     return canvas
 
 
+def _cut_out_background(image: Image.Image) -> Image.Image:
+    """Make the flat outer background transparent.
+
+    The artwork sits on a plain light plate. A flood fill from the four edges
+    clears only the *outer* background: interior white areas (the heart, the
+    highlight) are not connected to the border, so they survive.
+    """
+    rgba = image.convert("RGBA")
+    grey = rgba.convert("L")
+    mask = grey.point(lambda value: 255 if value > 244 else 0)
+    width, height = mask.size
+    for seed in (
+        (0, 0),
+        (width - 1, 0),
+        (0, height - 1),
+        (width - 1, height - 1),
+        (width // 2, 0),
+        (width // 2, height - 1),
+        (0, height // 2),
+        (width - 1, height // 2),
+    ):
+        if mask.getpixel(seed) == 255:
+            ImageDraw.floodfill(mask, seed, 128, thresh=0)
+    rgba.putalpha(mask.point(lambda value: 0 if value == 128 else 255))
+    return rgba
+
+
 def main() -> None:
-    art = Image.open(SOURCE).convert("RGB")
+    art = Image.open(SOURCE).convert("RGBA")
     if art.width != art.height:
         side = min(art.size)
         left = (art.width - side) // 2
         top = (art.height - side) // 2
         art = art.crop((left, top, left + side, top + side))
+    # The supplied plate is opaque; the mark is drawn frameless in the app, so
+    # the outer background is cleared and the artwork trimmed to its own edge.
+    art = _cut_out_background(art)
     art = _trim_to_mark(art)
 
     os.makedirs(BRANDING, exist_ok=True)

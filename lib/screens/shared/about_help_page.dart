@@ -382,7 +382,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
             children: [
               Expanded(
                 child: PageHeader(
-                  title: 'Guides & Help',
+                  title: 'About & Help',
                   subtitle: 'Task walkthroughs, quick answers and the story behind TABANG.',
                 ),
               ),
@@ -1474,8 +1474,8 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
             borderRadius: BorderRadius.circular(TabangSpace.sm),
           ),
           child: Text(
-            'Profile portraits and educational illustrations are original '
-            'TABANG artwork, so there is no external credit to list.',
+            'Educational illustrations are original TABANG artwork, so there is '
+            'no external credit to list.',
             style: TextStyle(
               fontSize: 12.5,
               height: 1.5,

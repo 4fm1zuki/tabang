@@ -158,7 +158,7 @@ class _TabangAppState extends State<TabangApp> {
         if (didPop) return;
         final leave = await confirmAction(
           context,
-          title: 'Leave TABANG?',
+          title: 'Exit app?',
           message:
               'You are about to close the app. You stay signed in on this '
               'device and can pick up where you left off.',
