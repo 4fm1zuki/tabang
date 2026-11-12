@@ -6,6 +6,24 @@ import '../theme.dart';
 import 'common.dart';
 import 'request_document_list.dart';
 
+/// Sends the requester a chapter message about their request.
+///
+/// Verification and rejection change what the requester can expect, so both
+/// write to their Messages thread instead of leaving them to discover the state
+/// change on their own. The thread is created on first contact, and the message
+/// is posted as the official chapter identity.
+void notifyRequester(
+  TabangRepository repo,
+  BloodRequest request,
+  String text,
+) {
+  repo.startConversation(
+    initiatorId: TabangRepository.chapterAccountId,
+    otherId: request.requesterId,
+    firstMessage: text,
+  );
+}
+
 /// Staff verification for a submitted blood request.
 ///
 /// This is also where a booked slot is confirmed: the request's
@@ -92,6 +110,17 @@ Future<void> showVerifyRequestDialog(
               actorId: actor.id,
               unitIds: assignable.map((unit) => unit.barcode).toList(),
             );
+            // Tell the requester, in their own Messages thread, so a verified
+            // request does not sit silently waiting for them to check the app.
+            if (ok) {
+              notifyRequester(
+                repo,
+                request,
+                'Your request ${request.id} (${request.bloodType.label} '
+                '${request.component.label}) has been verified. '
+                '${request.scheduledFor == null ? 'The chapter will confirm the details here.' : 'Your appointment is confirmed; please open Requests for the details.'}',
+              );
+            }
             Navigator.pop(dialogContext);
             ScaffoldMessenger.of(context).showSnackBar(
               TabangSnackBar(
@@ -182,6 +211,14 @@ Future<void> showRejectRequestDialog(
               actorId: actor.id,
               reason: reasonController.text,
             );
+            if (ok) {
+              notifyRequester(
+                repo,
+                request,
+                'Your request ${request.id} was reviewed and could not be '
+                'approved. Reason: ${reasonController.text.trim()}',
+              );
+            }
             Navigator.pop(dialogContext);
             ScaffoldMessenger.of(context).showSnackBar(
               TabangSnackBar(
