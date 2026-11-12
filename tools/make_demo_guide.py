@@ -353,7 +353,7 @@ def build() -> None:
         ("Lloyd", "2.7 Profile; 2.8 Settings; 2.9 Guides & Help."),
         ("Aeron", "3.1 Overview; 3.2 Map; 3.3 Inventory; 3.7 Drives."),
         ("Kath", "3.4 Messages; 3.5 Users; 3.6 Moderation."),
-        ("Iverson", "4. Admin; 5. Role Matrix; 6. Technical; 7. Final answers."),
+        ("Iverson", "4. Admin; 5. Role Matrix; 6. Technical; 8. Final answers."),
     ):
         bullet(f"{name} \u2014", parts)
 
@@ -381,8 +381,48 @@ def build() -> None:
         bullet("How to collect data:", data)
         bullet("How it's made:", made)
 
+    # -------------------------------------------------------------- ethics
+    heading("7. Ethical considerations")
+    for label, value in (
+        (
+            "No real patient data \u2014",
+            "every record shown is simulated; no hospital, Red Cross or EHR "
+            "system is connected (RA 10173).",
+        ),
+        (
+            "Informed consent \u2014",
+            "respondents are told what the study is, what is recorded, and that "
+            "they can stop at any time.",
+        ),
+        (
+            "Voluntary and unpaid \u2014",
+            "TABANG never pays for blood and never ranks donors by money "
+            "(RA 7719).",
+        ),
+        (
+            "Anonymity \u2014",
+            "donors and patients appear as aliases; identities are revealed "
+            "only when both sides agree.",
+        ),
+        (
+            "No medical advice \u2014",
+            "the app organises coordination; the screening nurse and the "
+            "physician decide.",
+        ),
+        (
+            "Reviewed before testing \u2014",
+            "field testing follows the school's research ethics review.",
+        ),
+        (
+            "Study-only data \u2014",
+            "SUS and SEIPS answers are kept for this study and stored without "
+            "names where possible.",
+        ),
+    ):
+        bullet(label, value)
+
     # --------------------------------------------------------- final answers
-    heading("7. Demonstration Targets \u2014 Final Answers (Iverson)")
+    heading("8. Demonstration Targets \u2014 Final Answers (Iverson)")
     note("Read these last, after everyone has shown their part.")
     for label, value in FINAL_ANSWERS:
         bullet(label, value)
