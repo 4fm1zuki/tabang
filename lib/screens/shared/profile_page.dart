@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/eligibility.dart';
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
@@ -26,12 +25,6 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final TabangRepository _repo = TabangRepository.instance;
-
-  /// Eligibility is component-specific (whole blood/RBC 84 days, platelets
-  /// 14 days, plasma 28 days). The donor can select several components at once
-  /// and see each interval side by side; packed RBC is selected first because
-  /// it is the most common donation.
-  final Set<BloodComponent> _eligibilityComponents = {BloodComponent.packedRbc};
 
   @override
   void initState() {
@@ -183,8 +176,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
 
           if (isDonor) ...[
-            _buildEligibilityCard(context, user),
-            const SizedBox(height: TabangSpace.lg),
             _buildStatsRow(context, user),
             const SizedBox(height: TabangSpace.lg),
           ],
@@ -297,179 +288,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.45,
-                    color: context.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEligibilityCard(BuildContext context, AppUser user) {
-    final results = <BloodComponent, EligibilityResult>{
-      for (final component in BloodComponent.values)
-        component: EligibilityEngine.evaluate(user, component: component),
-    };
-    final selected = _eligibilityComponents.toList()
-      ..sort((a, b) => a.index.compareTo(b.index));
-    final eligibleCount = selected.where((c) => results[c]!.isEligible).length;
-    final allEligible = eligibleCount == selected.length;
-    final tone = allEligible
-        ? Tone.success
-        : eligibleCount == 0
-        ? Tone.warning
-        : Tone.info;
-
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                allEligible ? Icons.check_circle_outline : Icons.schedule,
-                size: 17,
-                color: allEligible
-                    ? TabangColors.success
-                    : eligibleCount == 0
-                    ? TabangColors.warning
-                    : TabangColors.info,
-              ),
-              const SizedBox(width: TabangSpace.sm),
-              Expanded(
-                child: Text(
-                  'Donation eligibility',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: context.textColor,
-                  ),
-                ),
-              ),
-              StatusPill(
-                '$eligibleCount of ${selected.length} eligible',
-                tone: tone,
-                dense: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: TabangSpace.md),
-          Text(
-            'Donation types',
-            style: TextStyle(fontSize: 12.5, color: context.textMuted),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final component in BloodComponent.values)
-                FilterChip(
-                  label: Text(component.label),
-                  selected: _eligibilityComponents.contains(component),
-                  visualDensity: VisualDensity.compact,
-                  onSelected: (on) => setState(() {
-                    if (on) {
-                      _eligibilityComponents.add(component);
-                    } else if (_eligibilityComponents.length > 1) {
-                      // Keep at least one type selected: the card is a
-                      // comparison, not an empty multi-select.
-                      _eligibilityComponents.remove(component);
-                    }
-                  }),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Select every type you want to check. Each has its own cooldown.',
-            style: TextStyle(
-              fontSize: 11.5,
-              height: 1.45,
-              color: context.textMuted,
-            ),
-          ),
-          if (user.lastDonationDate != null) ...[
-            const SizedBox(height: TabangSpace.sm),
-            Text(
-              'Last donation: ${formatDate(user.lastDonationDate!)}'
-              '${user.lastDonationComponent == null ? '' : ' · '
-                        '${user.lastDonationComponent!.label}'}',
-              style: TextStyle(fontSize: 12.5, color: context.textMuted),
-            ),
-          ],
-          const SizedBox(height: TabangSpace.md),
-          for (final component in selected) ...[
-            _buildEligibilityRow(context, component, results[component]!),
-            if (component != selected.last) const SizedBox(height: 6),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEligibilityRow(
-    BuildContext context,
-    BloodComponent component,
-    EligibilityResult result,
-  ) {
-    final tone = toneForEligibility(result);
-    final color = tone == Tone.success
-        ? TabangColors.success
-        : tone == Tone.warning
-        ? TabangColors.warning
-        : TabangColors.danger;
-
-    return Container(
-      padding: const EdgeInsets.all(TabangSpace.sm),
-      decoration: BoxDecoration(
-        color: context.surfaceAlt,
-        borderRadius: BorderRadius.circular(TabangRadius.xs),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            result.isEligible ? Icons.check_circle_outline : Icons.schedule,
-            size: 15,
-            color: color,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        component.label,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: context.textColor,
-                        ),
-                      ),
-                    ),
-                    StatusPill(result.summary, tone: tone, dense: true),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  result.eligibleFrom != null
-                      ? 'Eligible again '
-                            '${formatDate(result.eligibleFrom!)} · '
-                            '${result.daysRemaining} '
-                            'day${result.daysRemaining == 1 ? '' : 's'} left'
-                      : result.isEligible
-                      ? 'Meets every rule for this donation type.'
-                      : 'Not available for matching right now.',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.4,
                     color: context.textMuted,
                   ),
                 ),

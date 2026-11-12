@@ -297,9 +297,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     );
   }
 
-  /// One inventory row. The list shows only what staff scan for — product,
-  /// ID, expiry and status. Selecting the row opens the full record, including
-  /// the barcode graphic and the name of the person holding the unit.
+  /// One inventory row, kept to a single glance: blood type chip, product,
+  /// time left and status. The barcode, storage bay, collected date and the
+  /// person holding the unit all live in the detail sheet the row opens.
   Widget _buildUnitRow(
     BuildContext context,
     BloodUnit unit,
@@ -309,9 +309,6 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     final days = unit.daysUntilExpiry(now);
     final effective = unit.effectiveStatus(now);
     final expiring = days >= 0 && days <= 5 && unit.isUsableAt(now);
-    final holder = unit.reservedBy == null
-        ? null
-        : _repo.userById(unit.reservedBy!);
 
     final timeLeft = Text(
       unit.timeLeft(now),
@@ -351,32 +348,15 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           )
           .toList(),
     );
-    final identity = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          unit.product,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'ID ${unit.barcode}'
-          '${holder == null ? '' : ' · held by ${holder.alias}'}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12,
-            fontFamily: 'monospace',
-            color: context.textMuted,
-          ),
-        ),
-      ],
+    final identity = Text(
+      unit.product,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w700,
+        color: context.textColor,
+      ),
     );
 
     return DecoratedBox(
@@ -392,9 +372,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // The single row cannot hold the chip, identity, expiry, status,
-              // Details and menu at phone width. Split it into two rows instead
-              // of hiding the staff actions.
+              // At phone width the chip, product, expiry, status and menu
+              // cannot share one line, so expiry and status drop to a second
+              // row instead of squeezing the product name.
               if (constraints.maxWidth < 480) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,11 +388,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    // Wrap rather than Row: long expiry text and a wide status
-                    // pill can run out of width even on the second line, and
-                    // losing a staff action is worse than wrapping it politely.
-                    // Tapping the row itself opens the unit's full details, so
-                    // there is no separate Details button.
+                    // Wrap rather than Row: a long expiry string and a wide
+                    // status pill can still run out of width on the second
+                    // line. Tapping the row itself opens the unit's full
+                    // record, so the row carries no separate Details button.
                     Wrap(
                       spacing: TabangSpace.sm,
                       runSpacing: 4,
@@ -677,6 +656,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           return Padding(
             padding: const EdgeInsets.only(bottom: TabangSpace.md),
             child: SurfaceCard(
+              onTap: () => _showRequestDetails(context, request),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -877,6 +857,162 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     );
   }
 
+  /// The full record behind a request or booked-slot row.
+  ///
+  /// Rows stay a one-glance queue entry; opening one brings up everything the
+  /// chapter knows about the request. Staff verification runs from here through
+  /// [showVerifyRequestDialog] and [showRejectRequestDialog], the same dialogs
+  /// the Operations map uses, so the app keeps a single verification flow.
+  void _showRequestDetails(BuildContext context, BloodRequest request) {
+    final responses = _repo.responsesFor(request.id);
+    final selected = responses
+        .where((r) => r.status == ResponseStatus.selected)
+        .length;
+    final requester = _repo.userById(request.requesterId);
+    final canReview =
+        widget.currentUser.role.canFulfillRequests && request.isAwaitingReview;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            BloodTypeChip(request.bloodType, size: 32),
+            const SizedBox(width: TabangSpace.md),
+            Expanded(child: Text('Request ${request.id}')),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    StatusPill(
+                      request.urgency.label,
+                      tone: toneForUrgency(request.urgency),
+                      dense: true,
+                    ),
+                    StatusPill(
+                      request.status.label,
+                      tone: toneForRequest(request.status),
+                      dense: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: TabangSpace.md),
+                _detail(dialogContext, 'Patient', request.patientAlias),
+                _detail(
+                  dialogContext,
+                  'Need',
+                  '${request.bloodType.label} · ${request.component.label} · '
+                      '${request.unitsNeeded} unit'
+                      '${request.unitsNeeded == 1 ? '' : 's'}',
+                ),
+                _detail(
+                  dialogContext,
+                  'Urgency',
+                  '${request.urgency.label} · ${request.urgency.detail}',
+                ),
+                _detail(dialogContext, 'Hospital', request.hospital),
+                _detail(dialogContext, 'Barangay', request.barangay),
+                _detail(dialogContext, 'Source', request.source.label),
+                _detail(
+                  dialogContext,
+                  'Requested',
+                  formatDateTime(request.createdAt),
+                ),
+                _detail(
+                  dialogContext,
+                  'Requested by',
+                  requester?.alias ?? 'Unknown requester',
+                ),
+                if (request.scheduledFor != null)
+                  _detail(
+                    dialogContext,
+                    'Booked slot',
+                    formatDateTime(request.scheduledFor!),
+                  ),
+                _detail(
+                  dialogContext,
+                  'Responses',
+                  '$selected selected · ${responses.length} total',
+                ),
+                if (request.assignedUnitIds.isNotEmpty)
+                  _detail(
+                    dialogContext,
+                    'Held units',
+                    request.assignedUnitIds.join(', '),
+                  ),
+                if (request.documents.isNotEmpty) ...[
+                  const SizedBox(height: TabangSpace.sm),
+                  Text(
+                    'Attached documents',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: dialogContext.textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  RequestDocumentList(
+                    documents: request.documents,
+                    dense: true,
+                  ),
+                ],
+                if (request.reviewNote != null &&
+                    request.reviewNote!.trim().isNotEmpty)
+                  _detail(dialogContext, 'Review note', request.reviewNote!),
+                if (request.note != null && request.note!.trim().isNotEmpty)
+                  _detail(dialogContext, 'Note', request.note!),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          if (requester != null)
+            TextButton(
+              onPressed: () => showUserRecordDialog(dialogContext, requester),
+              child: const Text('Requester details'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          if (canReview) ...[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                showRejectRequestDialog(
+                  context,
+                  request,
+                  actor: widget.currentUser,
+                );
+              },
+              child: const Text('Reject'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                showVerifyRequestDialog(
+                  context,
+                  request,
+                  actor: widget.currentUser,
+                );
+              },
+              child: const Text('Verify and open'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   /// The removed-units ledger: every deletion stays visible and reversible.
   Widget _buildRemovedUnitsTab(BuildContext context) {
     final records = _repo.removedUnits;
@@ -1033,6 +1169,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     final requester = _repo.userById(request.requesterId);
     final pending = request.status == RequestStatus.pendingReview;
     return SurfaceCard(
+      onTap: () => _showRequestDetails(context, request),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

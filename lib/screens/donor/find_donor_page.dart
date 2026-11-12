@@ -92,8 +92,18 @@ class _FindDonorPageState extends State<FindDonorPage> {
   bool _mapDark = false;
   bool? _mapDarkOverride;
 
-  /// Donor pane tab: 0 donors, 1 facilities, 2 drives.
+  /// Community users can switch the heat ramp between the donor-density view
+  /// (the default, and Find Donor's original behaviour) and the amber
+  /// request-workload view the staff Operations map opens on. The legend switch
+  /// drives both this flag and the map fill.
+  bool _showDonorDensity = true;
+
+  /// Panel tab: 0 donors, 1 facilities, 2 drives, 3 open requests.
   int _paneTab = 0;
+
+  /// The read-only open-request list, the community counterpart of the staff
+  /// queue.
+  static const int _requestsTab = 3;
 
   void _focusFacility(DigosFacilityPin pin) {
     // The pin is drawn in the map frame, so the camera must target the same
@@ -148,6 +158,37 @@ class _FindDonorPageState extends State<FindDonorPage> {
 
   void _refreshCounts() {
     _donorCounts = _repo.donorCountsByBarangay(bloodType: _bloodType);
+  }
+
+  /// Open requests per barangay: the same request heat layer the staff
+  /// Operations map paints, sourced from the repository.
+  Map<String, int> get _requestCounts => _repo.openRequestsByBarangay();
+
+  /// Open requests shown in the pane: the same open/matched set the heat layer
+  /// paints, narrowed by the selected barangay and the search box.
+  ///
+  /// Read-only on purpose — community users see the need, verification and
+  /// fulfilment stay with chapter staff.
+  List<BloodRequest> get _visibleRequests {
+    final q = _query.trim().toLowerCase();
+    final list = _repo.requests.where((request) {
+      final open =
+          request.status == RequestStatus.open ||
+          request.status == RequestStatus.matched;
+      if (!open) return false;
+      if (_selectedBarangay != null &&
+          request.barangay != _selectedBarangay) {
+        return false;
+      }
+      if (q.isEmpty) return true;
+      return request.id.toLowerCase().contains(q) ||
+          request.patientAlias.toLowerCase().contains(q) ||
+          request.hospital.toLowerCase().contains(q) ||
+          request.barangay.toLowerCase().contains(q) ||
+          request.bloodType.label.toLowerCase().contains(q);
+    }).toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
   }
 
   List<AppUser> get _visibleDonors {
@@ -719,6 +760,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
     return DigosMapPane(
       controller: _mapController,
       donorCounts: _donorCounts,
+      // A null requestCounts makes the shared map paint the donor-density ramp;
+      // the legend switch decides which ramp is live.
+      requestCounts: _showDonorDensity ? null : _requestCounts,
       drives: _driveMarkers,
       selectedBarangay: selected,
       selectedSummary: summary,
@@ -796,27 +840,61 @@ class _FindDonorPageState extends State<FindDonorPage> {
       (total, count) => total + count,
     );
     final driveLabel = '$driveCount drive${driveCount == 1 ? '' : 's'}';
+    // One two-state switch, exactly like the staff Operations map: the
+    // community donor-density ramp (the default) and the amber
+    // request-workload ramp.
+    final donor = _showDonorDensity;
     return DigosLegendPanel(
-      title: compact ? 'Donors' : 'DONOR DENSITY',
+      // On phones the switch chips name the active ramp, as on the staff map;
+      // the wide legend keeps the donor-density key the page always had.
+      title: compact ? '' : (donor ? 'DONOR DENSITY' : 'REQUEST HEAT'),
       compact: compact,
-      entries: [
-        DigosLegendEntry(
-          color: _fillFor(0),
-          label: compact ? '0' : 'No available donors',
-        ),
-        DigosLegendEntry(
-          color: _fillFor(1),
-          label: compact ? '1–2' : '1–2 donors',
-        ),
-        DigosLegendEntry(
-          color: _fillFor(4),
-          label: compact ? '3–5' : '3–5 donors',
-        ),
-        DigosLegendEntry(
-          color: _fillFor(7),
-          label: compact ? '6+' : '6+ donors',
-        ),
-      ],
+      header: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _layerToggle(context, compact: compact, donor: true),
+          _layerToggle(context, compact: compact, donor: false),
+        ],
+      ),
+      entries: donor
+          ? [
+              DigosLegendEntry(
+                color: _fillFor(0),
+                label: compact ? '0' : 'No available donors',
+              ),
+              DigosLegendEntry(
+                color: _fillFor(1),
+                label: compact ? '1–2' : '1–2 donors',
+              ),
+              DigosLegendEntry(
+                color: _fillFor(4),
+                label: compact ? '3–5' : '3–5 donors',
+              ),
+              DigosLegendEntry(
+                color: _fillFor(7),
+                label: compact ? '6+' : '6+ donors',
+              ),
+            ]
+          : [
+              DigosLegendEntry(
+                color: digosRequestColor(0, dark: _mapDark),
+                label: compact ? '0' : 'None open',
+              ),
+              DigosLegendEntry(
+                color: digosRequestColor(1, dark: _mapDark),
+                label: compact ? '1' : '1 request',
+              ),
+              DigosLegendEntry(
+                color: digosRequestColor(3, dark: _mapDark),
+                label: compact ? '2–3' : '2–3 requests',
+              ),
+              DigosLegendEntry(
+                color: digosRequestColor(6, dark: _mapDark),
+                label: compact ? '4+' : '4+ requests',
+              ),
+            ],
       footer: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -831,8 +909,53 @@ class _FindDonorPageState extends State<FindDonorPage> {
     );
   }
 
+  /// Small two-state switch inside the map legend card, mirroring the staff
+  /// Operations map's donor/request heat selectors.
+  Widget _layerToggle(
+    BuildContext context, {
+    required bool compact,
+    required bool donor,
+  }) {
+    final selected = _showDonorDensity == donor;
+    return InkWell(
+      key: ValueKey(donor ? 'findDonorHeatDonors' : 'findDonorHeatRequests'),
+      borderRadius: BorderRadius.circular(TabangRadius.xs),
+      onTap: () => setState(() {
+        _showDonorDensity = donor;
+        // The panel follows the heat, as on the staff map: the donor ramp
+        // brings the directory forward, the request ramp the open queue.
+        _paneTab = donor ? 0 : _requestsTab;
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: selected
+              ? (context.isDark
+                    ? TabangColors.crimson.withValues(alpha: 0.22)
+                    : TabangColors.crimsonSoft)
+              : null,
+          borderRadius: BorderRadius.circular(TabangRadius.xs),
+          border: Border.all(
+            color: selected
+                ? TabangColors.crimson.withValues(alpha: 0.45)
+                : context.border,
+          ),
+        ),
+        child: Text(
+          donor ? (compact ? 'Donors' : 'Donor density') : 'Requests',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: selected ? TabangColors.crimson : context.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDonorPane(BuildContext context, {required bool compact}) {
     final donors = _visibleDonors;
+    final requests = _visibleRequests;
     final drives = _repo.drives
         .where((d) => d.status != 'Completed')
         .toList(growable: false);
@@ -843,14 +966,18 @@ class _FindDonorPageState extends State<FindDonorPage> {
       1 => _selectedBarangay == null
           ? 'Hospitals & chapter'
           : 'Facilities in $_selectedBarangay',
-      _ => _selectedBarangay == null
+      2 => _selectedBarangay == null
           ? 'Upcoming drives'
           : 'Drives in $_selectedBarangay',
+      _ => _selectedBarangay == null
+          ? 'Open requests'
+          : 'Requests in $_selectedBarangay',
     };
     final count = switch (_paneTab) {
       0 => donors.length,
       1 => digosFacilityPins.length,
-      _ => drives.length,
+      2 => drives.length,
+      _ => requests.length,
     };
 
     return Column(
@@ -910,21 +1037,16 @@ class _FindDonorPageState extends State<FindDonorPage> {
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<int>(
-                  // Text-only segments: with icons the three labels wrapped
-                  // onto two lines ("Donor / s", "Faciliti / es") in a
-                  // 330 px side panel.
-                  segments: const [
+                  // Text-only, scale-down segments: with icons the labels
+                  // wrapped onto two lines in the 330 px side panel, and four
+                  // tabs are wider than a phone's test font can fit.
+                  segments: [
+                    ButtonSegment(value: 0, label: _tabLabel('Donors')),
+                    ButtonSegment(value: 1, label: _tabLabel('Facilities')),
+                    ButtonSegment(value: 2, label: _tabLabel('Drives')),
                     ButtonSegment(
-                      value: 0,
-                      label: Text('Donors', softWrap: false),
-                    ),
-                    ButtonSegment(
-                      value: 1,
-                      label: Text('Facilities', softWrap: false),
-                    ),
-                    ButtonSegment(
-                      value: 2,
-                      label: Text('Drives', softWrap: false),
+                      value: _requestsTab,
+                      label: _tabLabel('Requests'),
                     ),
                   ],
                   selected: {_paneTab},
@@ -940,15 +1062,17 @@ class _FindDonorPageState extends State<FindDonorPage> {
                       setState(() => _paneTab = selection.first),
                 ),
               ),
-              if (_paneTab == 0) ...[
+              if (_paneTab == 0 || _paneTab == _requestsTab) ...[
                 const SizedBox(height: TabangSpace.sm),
                 TextField(
                   onChanged: (v) => setState(() => _query = v),
                   style: const TextStyle(fontSize: 13),
-                  decoration: const InputDecoration(
-                    hintText: 'Search donor # or barangay',
+                  decoration: InputDecoration(
+                    hintText: _paneTab == 0
+                        ? 'Search donor # or barangay'
+                        : 'Search request # or barangay',
                     isDense: true,
-                    prefixIcon: Icon(Icons.search, size: 16),
+                    prefixIcon: const Icon(Icons.search, size: 16),
                   ),
                 ),
               ],
@@ -976,10 +1100,90 @@ class _FindDonorPageState extends State<FindDonorPage> {
                           _buildDonorCard(context, donors[i]),
                     ),
             1 => _buildFacilitiesTab(context),
-            _ => _buildDrivesTab(context),
+            2 => _buildDrivesTab(context),
+            _ =>
+              requests.isEmpty
+                  ? EmptyState(
+                      art: TabangArt.requests,
+                      title: 'Nothing open',
+                      message: _selectedBarangay == null
+                          ? 'No request is open for donor responses right now.'
+                          : 'No request is open in '
+                                '$_selectedBarangay right now.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(TabangSpace.md),
+                      itemCount: requests.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: TabangSpace.sm),
+                      itemBuilder: (context, i) =>
+                          _buildRequestCard(context, requests[i]),
+                    ),
           },
         ),
       ],
+    );
+  }
+
+  /// A compact label for the four-way panel switch. FittedBox keeps the labels
+  /// inside the panel (and the much wider test font) instead of overflowing.
+  Widget _tabLabel(String label) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(label, softWrap: false),
+    );
+  }
+
+  /// One open request, read-only. Community users see the need and where it is;
+  /// verification and fulfilment stay with chapter staff.
+  Widget _buildRequestCard(BuildContext context, BloodRequest request) {
+    return SurfaceCard(
+      padding: const EdgeInsets.all(TabangSpace.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    StatusPill(
+                      request.urgency.label,
+                      tone: toneForUrgency(request.urgency),
+                      dense: true,
+                    ),
+                    StatusPill(request.status.label, dense: true),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                request.barangay,
+                style: TextStyle(fontSize: 11, color: context.textMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${request.patientAlias} · ${request.bloodType.label} '
+            '${request.component.label}',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: context.textColor,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${request.hospital} · ${request.unitsNeeded} unit'
+            '${request.unitsNeeded == 1 ? '' : 's'}',
+            style: TextStyle(fontSize: 11, color: context.textMuted),
+          ),
+        ],
+      ),
     );
   }
 
