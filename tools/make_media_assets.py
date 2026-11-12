@@ -61,16 +61,16 @@ def save_jpeg(image: Image.Image, name: str, width: int = 1200) -> None:
 
 
 def process_photos() -> None:
-    # source file, output file, crop-top, relative warmth
+    # source file, output file, crop-top, relative warmth.
+    #
+    # Only the photos the app still uses are listed: the ten content_*.jpg
+    # illustrations were replaced by the per-folder artwork (Learn & Prepare,
+    # Blood Drives, Announcements & Stories) and the files were deleted, so
+    # listing them here would recreate them on the next run.
     specs = [
         ("ramstein.jpg", "hero_donation.jpg", 10, 0.035),
-        ("water_droplets.jpg", "content_hydration.jpg", 100, 0.0),
-        ("salad.jpg", "content_nutrition.jpg", 360, 0.02),
-        ("baliuag03.jpg", "content_recovery.jpg", 340, 0.03),
-        ("guam.jpg", "content_screening.jpg", 120, 0.03),
         ("baliuag07.jpg", "content_drive.jpg", 250, 0.03),
         ("baliuag04.jpg", "drive_community.jpg", 300, 0.03),
-        ("ph_redcross.jpg", "content_story.jpg", 60, 0.03),
     ]
     for source, output, top, warmth in specs:
         path = SOURCES / source
@@ -301,7 +301,6 @@ def make_privacy_art() -> None:
 def main() -> None:
     ensure_dirs()
     process_photos()
-    make_privacy_art()
     write_icon_set()
 
 
