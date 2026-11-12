@@ -31,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _aliasController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
   final _phoneController = TextEditingController();
   final _birthDateController = TextEditingController();
 
@@ -49,6 +50,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _aliasController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     _phoneController.dispose();
     _birthDateController.dispose();
     super.dispose();
@@ -398,6 +400,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       validator: (v) => (v == null || v.length < 8)
                           ? 'Use at least 8 characters'
+                          : null,
+                    ),
+                    const SizedBox(height: TabangSpace.md),
+                    TextFormField(
+                      controller: _confirmController,
+                      obscureText: _obscure,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm password',
+                        prefixIcon: Icon(Icons.lock_reset_outlined, size: 18),
+                        helperText: 'Type the same password again',
+                      ),
+                      validator: (v) => v != _passwordController.text
+                          ? 'Passwords do not match'
                           : null,
                     ),
 

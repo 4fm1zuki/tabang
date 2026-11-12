@@ -24,6 +24,17 @@ from docx.shared import Pt, RGBColor
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TARGET = os.path.join(ROOT, "TABANG_Demonstration_Guide.docx")
 
+# Research group, alphabetical by surname as supplied.
+AUTHORS = [
+    "BARON, HANZ EMMANUEL D.",
+    "BRIONES, IVERSON D.",
+    "CATALAN, AERON RODGE B.",
+    "RECIMO, NI\u00d1O RHEYN F.",
+    "ROLDAN, KATHERINE NICOLE E.",
+    "SANCHEZ, LLOYD P.",
+    "THAPA, SAMEERA P.",
+]
+
 FONT = "Verdana"
 RED = RGBColor(0x8B, 0x0F, 0x1A)
 NAVY = RGBColor(0x1A, 0x2B, 0x4C)
@@ -329,6 +340,10 @@ def build() -> None:
         "Read straight down your own parts. Every section gives the same four "
         "lines: Purpose, Components, How to collect data, How it's made."
     )
+
+    heading("Research group")
+    for author in AUTHORS:
+        bullet(None, author)
 
     heading("Who presents what")
     for name, parts in (
