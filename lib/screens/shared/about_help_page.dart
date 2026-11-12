@@ -1467,6 +1467,8 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
           },
         ),
         const SizedBox(height: TabangSpace.md),
+        const _ResearchGroupCard(),
+        const SizedBox(height: TabangSpace.md),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(TabangSpace.md),
@@ -1724,4 +1726,137 @@ class _Faq {
   const _Faq(this.question, this.answer);
   final String question;
   final String answer;
+}
+
+/// The research group behind TABANG, listed on the About tab.
+class _ResearchGroupCard extends StatelessWidget {
+  const _ResearchGroupCard();
+
+  /// Alphabetical by surname, as supplied by the team.
+  static const List<String> authors = [
+    'BARON, HANZ EMMANUEL D.',
+    'BRIONES, IVERSON D.',
+    'CATALAN, AERON RODGE B.',
+    'RECIMO, NI\u00d1O RHEYN F.',
+    'ROLDAN, KATHERINE NICOLE E.',
+    'SANCHEZ, LLOYD P.',
+    'THAPA, SAMEERA P.',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      padding: const EdgeInsets.all(TabangSpace.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionLabel('Research group'),
+          const SizedBox(height: TabangSpace.xs),
+          Text(
+            'College of Computer Studies, Cor Jesu College. '
+            'Alphabetical by surname.',
+            style: TextStyle(fontSize: 11.5, color: context.textMuted),
+          ),
+          const SizedBox(height: TabangSpace.sm),
+          for (final author in authors)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: author == 'BRIONES, IVERSON D.'
+                  ? const _AuthorName(
+                      name: 'BRIONES, IVERSON D.',
+                      alternate:
+                          'RIVERA, BREXTHER JAY T. \u2014 Senior Research '
+                          'Scientist & Lead Developer',
+                    )
+                  : Text(
+                      author,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: context.textColor,
+                      ),
+                    ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One author name. The lead developer's entry is a small easter egg: tapping
+/// it fades the colour into a moving rainbow and swaps the name for the
+/// alternate credit; tapping again switches back, rainbow and all.
+class _AuthorName extends StatefulWidget {
+  const _AuthorName({required this.name, required this.alternate});
+
+  final String name;
+  final String alternate;
+
+  @override
+  State<_AuthorName> createState() => _AuthorNameState();
+}
+
+class _AuthorNameState extends State<_AuthorName>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _colour = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 4),
+  );
+
+  bool _rainbow = false;
+  bool _alternate = false;
+
+  @override
+  void dispose() {
+    _colour.dispose();
+    super.dispose();
+  }
+
+  void _tap() {
+    setState(() {
+      if (!_rainbow) {
+        // First tap reveals the credit and starts the rainbow; later taps only
+        // swap the name, so the rainbow stays on as requested.
+        _rainbow = true;
+        _alternate = true;
+        _colour.repeat();
+      } else {
+        _alternate = !_alternate;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = _alternate ? widget.alternate : widget.name;
+    const style = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700);
+
+    if (!_rainbow) {
+      return InkWell(
+        onTap: _tap,
+        child: Text(
+          text,
+          style: style.copyWith(color: context.textColor),
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: _tap,
+      child: AnimatedBuilder(
+        animation: _colour,
+        builder: (context, _) => Text(
+          text,
+          style: style.copyWith(
+            color: HSVColor.fromAHSV(
+              1,
+              (_colour.value * 360) % 360,
+              0.82,
+              0.92,
+            ).toColor(),
+          ),
+        ),
+      ),
+    );
+  }
 }
