@@ -6,6 +6,7 @@ import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/layout.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// Blood-drive management for the chapter.
 ///
@@ -651,7 +652,7 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
                       (value ?? '').trim().isEmpty ? 'Where is it held?' : null,
                 ),
                 const SizedBox(height: TabangSpace.sm),
-                DropdownButtonFormField<String>(
+                TabangDropdown<String>(
                   initialValue: _barangay,
                   isDense: true,
                   decoration: const InputDecoration(

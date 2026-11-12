@@ -8,6 +8,7 @@ import '../../widgets/chapter_identity.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
 import '../../widgets/photo.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// Donor / recipient profile.
 ///
@@ -788,7 +789,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           : null,
                     ),
                     const SizedBox(height: TabangSpace.md),
-                    DropdownButtonFormField<String>(
+                    TabangDropdown<String>(
                       initialValue: barangay,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Barangay'),
@@ -802,7 +803,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     if (user.role == UserRole.donor) ...[
                       const SizedBox(height: TabangSpace.md),
-                      DropdownButtonFormField<BloodType>(
+                      TabangDropdown<BloodType>(
                         initialValue: bloodType,
                         decoration: const InputDecoration(
                           labelText: 'Blood type',

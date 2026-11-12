@@ -9,6 +9,7 @@ import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
 import '../../widgets/onboarding.dart';
 import '../../widgets/photo.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// Guides, FAQ and About TABANG.
 ///
@@ -849,7 +850,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DropdownButtonFormField<String>(
+                TabangDropdown<String>(
                   initialValue: category,
                   isExpanded: true,
                   decoration: const InputDecoration(

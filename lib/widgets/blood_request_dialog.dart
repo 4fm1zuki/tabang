@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../core/repository.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'tabang_dropdown.dart';
 
 /// Shared recipient request dialog.
 ///
@@ -216,7 +217,7 @@ Future<void> showBloodRequestDialog(
                           : null,
                     ),
                     const SizedBox(height: TabangSpace.md),
-                    DropdownButtonFormField<String>(
+                    TabangDropdown<String>(
                       initialValue: hospital,
                       isExpanded: true,
                       decoration: const InputDecoration(
@@ -237,7 +238,7 @@ Future<void> showBloodRequestDialog(
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<BloodType>(
+                          child: TabangDropdown<BloodType>(
                             initialValue: bloodType,
                             isExpanded: true,
                             decoration: const InputDecoration(
@@ -279,7 +280,7 @@ Future<void> showBloodRequestDialog(
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<BloodComponent>(
+                          child: TabangDropdown<BloodComponent>(
                             initialValue: component,
                             isExpanded: true,
                             decoration: const InputDecoration(
@@ -303,7 +304,7 @@ Future<void> showBloodRequestDialog(
                         ),
                         const SizedBox(width: TabangSpace.md),
                         Expanded(
-                          child: DropdownButtonFormField<RequestUrgency>(
+                          child: TabangDropdown<RequestUrgency>(
                             initialValue: urgency,
                             isExpanded: true,
                             decoration: const InputDecoration(
@@ -333,7 +334,7 @@ Future<void> showBloodRequestDialog(
                       ),
                     ),
                     const SizedBox(height: TabangSpace.md),
-                    DropdownButtonFormField<String>(
+                    TabangDropdown<String>(
                       initialValue: barangay,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Barangay'),

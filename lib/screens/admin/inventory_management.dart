@@ -11,6 +11,7 @@ import '../../widgets/illustrations.dart';
 import '../../widgets/request_document_list.dart';
 import '../../widgets/request_review_dialogs.dart';
 import '../../widgets/user_record_dialog.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// Inventory and request management for chapter staff.
 ///
@@ -218,7 +219,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
       children: [
         TabangFilterBar(
           filters: [
-            DropdownButtonFormField<BloodType?>(
+            TabangDropdown<BloodType?>(
               initialValue: _typeFilter,
               isExpanded: true,
               decoration: const InputDecoration(
@@ -240,7 +241,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               ],
               onChanged: (v) => setState(() => _typeFilter = v),
             ),
-            DropdownButtonFormField<UnitStatus?>(
+            TabangDropdown<UnitStatus?>(
               initialValue: _statusFilter,
               isExpanded: true,
               decoration: const InputDecoration(
@@ -1216,7 +1217,7 @@ class _AddUnitDialogState extends State<_AddUnitDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DropdownButtonFormField<BloodType>(
+              TabangDropdown<BloodType>(
                 initialValue: _type,
                 isExpanded: true,
                 decoration: const InputDecoration(
@@ -1231,7 +1232,7 @@ class _AddUnitDialogState extends State<_AddUnitDialog> {
                 onChanged: (v) => setState(() => _type = v ?? _type),
               ),
               const SizedBox(height: TabangSpace.md),
-              DropdownButtonFormField<BloodComponent>(
+              TabangDropdown<BloodComponent>(
                 initialValue: _component,
                 isExpanded: true,
                 decoration: const InputDecoration(

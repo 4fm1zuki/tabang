@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../core/repository.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'tabang_dropdown.dart';
 
 /// Donor registration interest.
 ///
@@ -230,7 +231,7 @@ class _DonorRegistrationDialogState extends State<_DonorRegistrationDialog> {
                 ),
               ],
               const SizedBox(height: TabangSpace.md),
-              DropdownButtonFormField<BloodType?>(
+              TabangDropdown<BloodType?>(
                 initialValue: _bloodType,
                 isExpanded: true,
                 decoration: const InputDecoration(

@@ -6,6 +6,7 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/photo.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// Registration screen.
 ///
@@ -360,7 +361,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           _birthDate == null ? 'Select your birth date' : null,
                     ),
                     const SizedBox(height: TabangSpace.md),
-                    DropdownButtonFormField<String>(
+                    TabangDropdown<String>(
                       initialValue: _barangay,
                       isExpanded: true,
                       decoration: const InputDecoration(

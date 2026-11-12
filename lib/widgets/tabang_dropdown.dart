@@ -29,10 +29,22 @@ class TabangDropdown<T> extends StatefulWidget {
     this.validator,
     this.decoration,
     this.enabled = true,
+    this.isExpanded = true,
+    this.isDense,
+    this.hint,
+    this.autovalidateMode,
     this.searchThreshold = 8,
     this.searchHint = 'Search',
     this.emptyLabel = 'No matches',
     this.title,
+    // Accepted and ignored so a call site written for the stock control does
+    // not have to drop its styling arguments: the panel look is fixed here.
+    this.menuMaxHeight,
+    this.dropdownColor,
+    this.borderRadius,
+    this.icon,
+    this.focusColor,
+    this.style,
   });
 
   final List<DropdownMenuItem<T>> items;
@@ -52,6 +64,14 @@ class TabangDropdown<T> extends StatefulWidget {
   final InputDecoration? decoration;
 
   final bool enabled;
+  final bool isExpanded;
+  final bool? isDense;
+
+  /// Placeholder shown while nothing is selected. Falls back to
+  /// `decoration.hintText` and then to "Select".
+  final Widget? hint;
+
+  final AutovalidateMode? autovalidateMode;
 
   /// Show the search box when there are more items than this.
   final int searchThreshold;
@@ -60,6 +80,16 @@ class TabangDropdown<T> extends StatefulWidget {
 
   /// Optional heading for the picker sheet.
   final String? title;
+
+  /// Accepted for call-site compatibility; the panel styling is fixed.
+  final double? menuMaxHeight;
+  final Color? dropdownColor;
+  final BorderRadius? borderRadius;
+  final Widget? icon;
+  final Color? focusColor;
+
+  /// Field text style; the colour is still chosen from the selection state.
+  final TextStyle? style;
 
   @override
   State<TabangDropdown<T>> createState() => _TabangDropdownState<T>();
@@ -115,6 +145,7 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
     return FormField<T>(
       initialValue: selected,
       validator: widget.validator,
+      autovalidateMode: widget.autovalidateMode ?? AutovalidateMode.disabled,
       builder: (field) {
         final current = field.value ?? selected;
         final chosen = widget.items.where((item) => item.value == current);
@@ -132,20 +163,22 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
                 isEmpty: current == null,
                 decoration: decoration.copyWith(
                   enabled: widget.enabled,
+                  isDense: widget.isDense ?? decoration.isDense,
                   errorText: field.errorText,
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: DefaultTextStyle.merge(
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: current == null
-                              ? context.textMuted
-                              : context.textColor,
-                        ),
+                        style: (widget.style ?? const TextStyle(fontSize: 14))
+                            .copyWith(
+                              color: current == null
+                                  ? context.textMuted
+                                  : context.textColor,
+                            ),
                         child:
                             label ??
+                            widget.hint ??
                             Text(
                               decoration.hintText ?? 'Select',
                               style: TextStyle(color: context.textMuted),

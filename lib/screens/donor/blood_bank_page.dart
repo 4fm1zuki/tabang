@@ -9,6 +9,7 @@ import '../../widgets/blood_request_dialog.dart';
 import '../../widgets/common.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/illustrations.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// Blood bank inventory, reservations and the blood-request flow.
 ///
@@ -683,7 +684,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
   }) {
-    return DropdownButtonFormField<T>(
+    return TabangDropdown<T>(
       initialValue: value,
       isExpanded: true,
       decoration: InputDecoration(labelText: label, isDense: true),
@@ -1058,7 +1059,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<BloodComponent>(
+                  TabangDropdown<BloodComponent>(
                     initialValue: component,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Component'),

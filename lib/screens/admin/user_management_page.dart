@@ -11,6 +11,7 @@ import '../../widgets/common.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/photo.dart';
 import '../donor/chat_page.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// User management for chapter staff.
 ///
@@ -153,7 +154,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         ),
                       ),
                       const SizedBox(height: TabangSpace.lg),
-                      DropdownButtonFormField<UserRole>(
+                      TabangDropdown<UserRole>(
                         initialValue: role,
                         decoration: const InputDecoration(labelText: 'Role'),
                         items: [
@@ -232,7 +233,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             : null,
                       ),
                       const SizedBox(height: TabangSpace.md),
-                      DropdownButtonFormField<String>(
+                      TabangDropdown<String>(
                         initialValue: barangay,
                         isExpanded: true,
                         decoration: const InputDecoration(
@@ -248,7 +249,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       ),
                       if (isDonor) ...[
                         const SizedBox(height: TabangSpace.md),
-                        DropdownButtonFormField<BloodType>(
+                        TabangDropdown<BloodType>(
                           initialValue: bloodType,
                           decoration: const InputDecoration(
                             labelText: 'Blood type',
@@ -505,7 +506,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
               ),
             ),
             filters: [
-              DropdownButtonFormField<AccountStatus?>(
+              TabangDropdown<AccountStatus?>(
                 initialValue: _statusFilter,
                 isExpanded: true,
                 decoration: const InputDecoration(
@@ -527,7 +528,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 ],
                 onChanged: (v) => setState(() => _statusFilter = v),
               ),
-              DropdownButtonFormField<UserRole?>(
+              TabangDropdown<UserRole?>(
                 initialValue: _roleFilter,
                 isExpanded: true,
                 decoration: const InputDecoration(
@@ -1541,7 +1542,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   label: Text('Last donation: ${formatDate(date)}'),
                 ),
                 const SizedBox(height: TabangSpace.sm),
-                DropdownButtonFormField<BloodComponent>(
+                TabangDropdown<BloodComponent>(
                   initialValue: component,
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -1615,7 +1616,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   style: TextStyle(fontSize: 12.5, height: 1.55),
                 ),
                 const SizedBox(height: TabangSpace.md),
-                DropdownButtonFormField<BloodComponent>(
+                TabangDropdown<BloodComponent>(
                   initialValue: component,
                   isExpanded: true,
                   decoration: const InputDecoration(
