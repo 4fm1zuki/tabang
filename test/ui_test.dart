@@ -865,6 +865,64 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('staff can remove a warning from an account record', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    // Seeded warned account with two warnings.
+    expect(repo.userById('USR-003')!.warningCount, 2);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: UserManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'Rogel');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rogelio Bautista'));
+    await tester.pumpAndSettle();
+
+    // The record lists the warnings and offers a per-warning remove control.
+    expect(find.textContaining('Moderation warnings'), findsOneWidget);
+    final removeButton = find.widgetWithText(TextButton, 'Remove');
+    expect(removeButton, findsWidgets);
+    await tester.ensureVisible(removeButton.first);
+    await tester.pumpAndSettle();
+    await tester.tap(removeButton.first);
+    await tester.pumpAndSettle();
+
+    expect(repo.userById('USR-003')!.warningCount, 1);
+    expect(repo.warningsFor('USR-003'), hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('profile carries the account standing history', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final warned = repo.userById('USR-003')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: ProfilePage(user: warned)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Account standing'), findsOneWidget);
+    expect(find.text('2 of 3'), findsOneWidget);
+    expect(find.text('What you can do now'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('avatar picker keeps staff and community sets apart', (
     tester,
   ) async {

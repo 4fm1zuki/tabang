@@ -770,6 +770,51 @@ void main() {
       expect(warning.message.toLowerCase(), contains('account'));
     });
 
+    test('staff can remove a warning and step the ladder down', () {
+      repo.currentUser = repo.userById('USR-010');
+      addTearDown(() => repo.currentUser = null);
+
+      repo.warnUser('USR-019', reason: 'First');
+      repo.warnUser('USR-019', reason: 'Second');
+      expect(repo.userById('USR-019')!.warningCount, 2);
+
+      expect(repo.revokeWarning('USR-019'), isTrue);
+      expect(repo.userById('USR-019')!.warningCount, 1);
+      // The newest warning is the one taken off first.
+      expect(repo.warningsFor('USR-019').single.message, 'First');
+    });
+
+    test('removing the third warning lifts the automatic suspension', () {
+      repo.warnUser('USR-019', reason: 'One');
+      repo.warnUser('USR-019', reason: 'Two');
+      repo.warnUser('USR-019', reason: 'Three');
+      expect(repo.userById('USR-019')!.status, AccountStatus.suspended);
+
+      expect(repo.revokeWarning('USR-019'), isTrue);
+      final lifted = repo.userById('USR-019')!;
+      expect(lifted.status, AccountStatus.warned);
+      expect(lifted.warningCount, 2);
+      expect(lifted.suspensionReason, isNull);
+
+      // Pardoning the rest clears the ladder entirely.
+      repo.revokeWarning('USR-019');
+      repo.revokeWarning('USR-019');
+      expect(repo.userById('USR-019')!.status, AccountStatus.verified);
+      expect(repo.warningsFor('USR-019'), isEmpty);
+      expect(repo.revokeWarning('USR-019'), isFalse);
+    });
+
+    test('removing a warning never lifts an unrelated suspension', () {
+      repo.warnUser('USR-019', reason: 'One');
+      repo.setUserStatus('USR-019', AccountStatus.suspended, reason: 'Fraud');
+
+      expect(repo.revokeWarning('USR-019'), isTrue);
+      final user = repo.userById('USR-019')!;
+      expect(user.status, AccountStatus.suspended);
+      expect(user.suspensionReason, 'Fraud');
+      expect(user.warningCount, 0);
+    });
+
     test('a verified donor can be returned to unverified review', () {
       final donor = repo.userById('USR-001')!;
       expect(donor.status, AccountStatus.verified);

@@ -1095,7 +1095,7 @@ class TabangRepository {
   /// Repeatedly pressing Warn must not keep stacking: once an account is
   /// suspended the action is refused, and reinstating an account clears its
   /// warning count back to zero. Every warning stores the specific message
-  /// staff entered so the account holder can read it in Profile and Settings.
+  /// staff entered so the account holder can read it in Profile.
   bool warnUser(String userId, {String? reason, String? actorId}) {
     final user = userById(userId);
     if (user == null) return false;
@@ -1124,9 +1124,7 @@ class TabangRepository {
       user.copyWith(
         warningCount: next,
         status: next >= 3 ? AccountStatus.suspended : AccountStatus.warned,
-        suspensionReason: next >= 3
-            ? 'Three moderation warnings on record.'
-            : null,
+        suspensionReason: next >= 3 ? warningSuspensionReason : null,
       ),
     );
     _logActivity(
@@ -1136,6 +1134,53 @@ class TabangRepository {
       summary:
           'Issued warning $next to ${user.alias}'
           '${note == null || note.isEmpty ? '' : ': $note'}',
+    );
+    return true;
+  }
+
+  /// Removes one warning from an account and steps the active ladder down.
+  ///
+  /// This is the pardon path: staff sometimes warn by mistake, or lift a
+  /// warning after the account holder explains. The newest warning is removed
+  /// by default, or a specific one through [warningId]. An account suspended by
+  /// the ladder itself returns to Warned — or straight to Verified once no
+  /// active warnings remain. Removing a warning never touches a suspension a
+  /// member of staff set for another reason.
+  bool revokeWarning(String userId, {String? warningId, String? actorId}) {
+    final user = userById(userId);
+    if (user == null) return false;
+    final history = warningsFor(userId);
+    if (history.isEmpty) return false;
+    final target = warningId == null
+        ? history.first
+        : _firstOrNull(history, (warning) => warning.id == warningId);
+    if (target == null) return false;
+
+    _warnings.removeWhere((warning) => warning.id == target.id);
+    final next = (user.warningCount - 1).clamp(0, 3);
+    final fromLadder =
+        user.status == AccountStatus.suspended &&
+        user.suspensionReason == warningSuspensionReason;
+    // `warned` is itself a warning-ladder state, so it steps down with the
+    // count; any other status (unverified, a staff suspension) is untouched.
+    final ladderOwnsStatus = fromLadder || user.status == AccountStatus.warned;
+    updateUser(
+      user.copyWith(
+        warningCount: next,
+        status: ladderOwnsStatus
+            ? (next > 0 ? AccountStatus.warned : AccountStatus.verified)
+            : user.status,
+        clearSuspensionReason: fromLadder,
+      ),
+    );
+    final actorId2 = actorId ?? currentUser?.id ?? staffAccountId;
+    _logActivity(
+      kind: ActivityKind.warning,
+      actorId: actorId2,
+      subjectId: userId,
+      summary:
+          'Removed warning ${target.level} from ${user.alias} '
+          '($next of 3 active)',
     );
     return true;
   }
@@ -1916,6 +1961,12 @@ class TabangRepository {
 
   /// Backwards-compatible alias used by older call sites.
   static const String staffAccountId = chapterAccountId;
+
+  /// Suspension reason the warning ladder itself writes. [revokeWarning] only
+  /// lifts a suspension when it matches, so a suspension staff set for another
+  /// reason is never cleared by pardoning a warning.
+  static const String warningSuspensionReason =
+      'Three moderation warnings on record.';
 
   /// Official organization name shown on every chapter thread and profile.
   static const String chapterName =

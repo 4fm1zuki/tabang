@@ -118,8 +118,8 @@ class AccountWarningNotice extends StatelessWidget {
           ],
           const SizedBox(height: TabangSpace.sm),
           Text(
-            'See Account standing in Settings for the full history and what '
-            'to do next.',
+            'The full history and what to do next are in Account standing '
+            'below.',
             style: TextStyle(
               fontSize: 11.5,
               height: 1.45,

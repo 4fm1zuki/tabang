@@ -492,9 +492,19 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
         content: Text(
           warned
               ? 'Warning recorded for ${user.alias}. They will see it at '
-                    'their next sign-in and in Settings.'
+                    'their next sign-in and in Profile.'
               : 'That account cannot be warned.',
         ),
+        duration: const Duration(seconds: 6),
+        action: warned
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _repo.revokeWarning(
+                  user.id,
+                  actorId: widget.currentUser.id,
+                ),
+              )
+            : null,
       ),
     );
   }
@@ -1306,6 +1316,19 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                   ModerationFlag.inappropriate,
                 );
                 Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  TabangSnackBar(
+                    content: Text('Warning recorded for ${sender.alias}.'),
+                    duration: const Duration(seconds: 6),
+                    action: SnackBarAction(
+                      label: 'Undo',
+                      onPressed: () => _repo.revokeWarning(
+                        sender.id,
+                        actorId: widget.currentUser.id,
+                      ),
+                    ),
+                  ),
+                );
               },
               child: const Text('Issue warning'),
             ),

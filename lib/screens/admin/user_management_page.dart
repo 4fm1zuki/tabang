@@ -1199,7 +1199,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ),
         // Warn and Suspend are issued from Moderation (the Users page has a
         // Moderation tab), so a mis-tap on an unrelated account row cannot
-        // discipline someone. The account's state is still shown here.
+        // discipline someone. Removing a warning is the lenient direction, so
+        // it stays available here where staff can see the account's record.
+        if (user.warningCount > 0)
+          OutlinedButton.icon(
+            onPressed: () => _removeLatestWarning(context, user),
+            icon: const Icon(Icons.undo, size: 14),
+            label: const Text('Remove warning'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: TabangSpace.md,
+                vertical: TabangSpace.sm,
+              ),
+            ),
+          ),
         if (user.status == AccountStatus.suspended)
           const StatusPill('Suspended', tone: Tone.danger, dense: true),
       ],
@@ -1209,6 +1222,40 @@ class _UserManagementPageState extends State<UserManagementPage> {
       spacing: TabangSpace.sm,
       runSpacing: TabangSpace.sm,
       children: actions,
+    );
+  }
+
+  /// Removes the newest warning from an account after a confirmation that shows
+  /// exactly which message is being taken off and the new active count.
+  Future<void> _removeLatestWarning(BuildContext context, AppUser user) async {
+    final warnings = _repo.warningsFor(user.id);
+    if (warnings.isEmpty) return;
+    final latest = warnings.first;
+    final next = (user.warningCount - 1).clamp(0, 3);
+    final ok = await confirmAction(
+      context,
+      title: 'Remove a warning from ${user.alias}?',
+      message:
+          'The most recent warning is removed and the active count drops to '
+          '$next of 3.'
+          '${user.status == AccountStatus.suspended ? ' The warning suspension is lifted.' : ''}'
+          '\n\nWarning ${latest.level}: ${latest.message}',
+      confirmLabel: 'Remove warning',
+    );
+    if (!ok || !context.mounted) return;
+    final removed = _repo.revokeWarning(
+      user.id,
+      actorId: widget.currentUser.id,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          removed
+              ? 'Warning removed from ${user.alias}. '
+                    'Active warnings: $next of 3.'
+              : 'No warning could be removed.',
+        ),
+      ),
     );
   }
 
@@ -1310,198 +1357,314 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Row(
-          children: [
-            ClipOval(
-              child: SizedBox(
-                width: 38,
-                height: 38,
-                child: TabangPhoto(
-                  user.photoAsset,
-                  semanticLabel: '${user.alias} profile photo',
-                  creditLabel: user.alias,
-                  fallbackIcon: Icons.person_outline,
-                  fallbackIconSize: 18,
-                ),
-              ),
-            ),
-            const SizedBox(width: TabangSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(user.fullName, style: const TextStyle(fontSize: 15)),
-                  Text(
-                    '${user.alias} · ${user.role.label}',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w400,
-                      color: dialogContext.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460, maxHeight: 460),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final live = _repo.userById(user.id) ?? user;
+          return AlertDialog(
+            title: Row(
               children: [
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    StatusPill(
-                      user.status.label,
-                      tone: toneForAccount(user.status),
-                      dense: true,
+                ClipOval(
+                  child: SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: TabangPhoto(
+                      user.photoAsset,
+                      semanticLabel: '${user.alias} profile photo',
+                      creditLabel: user.alias,
+                      fallbackIcon: Icons.person_outline,
+                      fallbackIconSize: 18,
                     ),
-                    StatusPill(
-                      user.role.label,
-                      tone: Tone.neutral,
-                      dense: true,
-                    ),
-                    if (user.warningCount > 0)
-                      StatusPill(
-                        '${user.warningCount} warning'
-                        '${user.warningCount == 1 ? '' : 's'}',
-                        tone: Tone.warning,
-                        dense: true,
+                  ),
+                ),
+                const SizedBox(width: TabangSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(user.fullName, style: const TextStyle(fontSize: 15)),
+                      Text(
+                        '${user.alias} · ${user.role.label}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w400,
+                          color: dialogContext.textMuted,
+                        ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: TabangSpace.md),
-                _detailRow(dialogContext, 'Email', user.email),
-                _detailRow(dialogContext, 'Phone', user.phone),
-                _detailRow(dialogContext, 'Barangay', user.barangay),
-                _detailRow(
-                  dialogContext,
-                  'Registered',
-                  formatDate(user.registeredOn),
-                ),
-                if (isDonor) ...[
-                  const Divider(height: TabangSpace.xl),
-                  _detailRow(
-                    dialogContext,
-                    'Blood type',
-                    user.bloodType?.label ?? 'Not recorded',
-                  ),
-                  _detailRow(
-                    dialogContext,
-                    'Birth date',
-                    user.birthDate == null
-                        ? 'Not recorded'
-                        : formatDate(user.birthDate!),
-                  ),
-                  _detailRow(
-                    dialogContext,
-                    'Weight',
-                    user.weightKg == null
-                        ? 'Not recorded'
-                        : '${user.weightKg!.toStringAsFixed(0)} kg',
-                  ),
-                  _detailRow(
-                    dialogContext,
-                    'Donations',
-                    '${user.totalDonations}',
-                  ),
-                  _detailRow(
-                    dialogContext,
-                    'Last donation',
-                    user.lastDonationDate == null
-                        ? 'None recorded'
-                        : formatDate(user.lastDonationDate!),
-                  ),
-                  _detailRow(
-                    dialogContext,
-                    'Component',
-                    user.lastDonationComponent?.label ?? 'Not recorded',
-                  ),
-                  _detailRow(
-                    dialogContext,
-                    'Blood card',
-                    user.bloodCardVerified ? 'Verified' : 'Not verified',
-                  ),
-                  _detailRow(
-                    dialogContext,
-                    'Directory',
-                    user.isAvailable ? 'Visible' : 'Hidden by donor',
-                  ),
-                  _detailRow(dialogContext, 'Eligibility', eligibility.summary),
-                ],
-                if (user.suspensionReason != null) ...[
-                  const Divider(height: TabangSpace.xl),
-                  _detailRow(
-                    dialogContext,
-                    'Suspension reason',
-                    user.suspensionReason!,
-                  ),
-                ],
-                const Divider(height: TabangSpace.xl),
-                Text(
-                  'Recent activity',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: dialogContext.textColor,
-                  ),
-                ),
-                const SizedBox(height: TabangSpace.sm),
-                ..._activityLines(dialogContext, user),
-                const SizedBox(height: TabangSpace.md),
-                Text(
-                  'Contact details and this record are visible to chapter '
-                  'staff and administrators only.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    height: 1.45,
-                    color: dialogContext.textMuted,
+                    ],
                   ),
                 ),
               ],
             ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460, maxHeight: 460),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        StatusPill(
+                          user.status.label,
+                          tone: toneForAccount(user.status),
+                          dense: true,
+                        ),
+                        StatusPill(
+                          user.role.label,
+                          tone: Tone.neutral,
+                          dense: true,
+                        ),
+                        if (live.warningCount > 0)
+                          StatusPill(
+                            '${live.warningCount} of 3 warnings',
+                            tone: Tone.warning,
+                            dense: true,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: TabangSpace.md),
+                    _detailRow(dialogContext, 'Email', user.email),
+                    _detailRow(dialogContext, 'Phone', user.phone),
+                    _detailRow(dialogContext, 'Barangay', user.barangay),
+                    _detailRow(
+                      dialogContext,
+                      'Registered',
+                      formatDate(user.registeredOn),
+                    ),
+                    if (isDonor) ...[
+                      const Divider(height: TabangSpace.xl),
+                      _detailRow(
+                        dialogContext,
+                        'Blood type',
+                        user.bloodType?.label ?? 'Not recorded',
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Birth date',
+                        user.birthDate == null
+                            ? 'Not recorded'
+                            : formatDate(user.birthDate!),
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Weight',
+                        user.weightKg == null
+                            ? 'Not recorded'
+                            : '${user.weightKg!.toStringAsFixed(0)} kg',
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Donations',
+                        '${user.totalDonations}',
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Last donation',
+                        user.lastDonationDate == null
+                            ? 'None recorded'
+                            : formatDate(user.lastDonationDate!),
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Component',
+                        user.lastDonationComponent?.label ?? 'Not recorded',
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Blood card',
+                        user.bloodCardVerified ? 'Verified' : 'Not verified',
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Directory',
+                        user.isAvailable ? 'Visible' : 'Hidden by donor',
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Eligibility',
+                        eligibility.summary,
+                      ),
+                    ],
+                    if (user.suspensionReason != null) ...[
+                      const Divider(height: TabangSpace.xl),
+                      _detailRow(
+                        dialogContext,
+                        'Suspension reason',
+                        user.suspensionReason!,
+                      ),
+                    ],
+                    ..._warningLines(
+                      dialogContext,
+                      live,
+                      onChanged: () => setDialogState(() {}),
+                    ),
+                    const Divider(height: TabangSpace.xl),
+                    Text(
+                      'Recent activity',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: dialogContext.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: TabangSpace.sm),
+                    ..._activityLines(dialogContext, user),
+                    const SizedBox(height: TabangSpace.md),
+                    Text(
+                      'Contact details and this record are visible to chapter '
+                      'staff and administrators only.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.45,
+                        color: dialogContext.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
+              ),
+              if (!other) ...[
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    _openConversation(context, user);
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline, size: 15),
+                  label: const Text('Message'),
+                ),
+                if (!user.role.isAdminSide &&
+                    user.status == AccountStatus.verified &&
+                    user.bloodCardVerified)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _unverifyUser(context, user);
+                    },
+                    icon: const Icon(Icons.badge_outlined, size: 15),
+                    label: const Text('Unverify'),
+                  ),
+                if (isDonor)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _editDonationWindow(context, user);
+                    },
+                    icon: const Icon(Icons.event_repeat_outlined, size: 15),
+                    label: const Text('Donation window'),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Staff-facing warning history inside the account record, with a control to
+  /// remove a specific warning. Removing one steps the active ladder down, so a
+  /// warning issued by mistake does not sit on the account forever.
+  List<Widget> _warningLines(
+    BuildContext context,
+    AppUser user, {
+    required VoidCallback onChanged,
+  }) {
+    final warnings = _repo.warningsFor(user.id);
+    if (warnings.isEmpty) return const [];
+    return [
+      const Divider(height: TabangSpace.xl),
+      Text(
+        'Moderation warnings · ${user.warningCount} of 3 active',
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          color: context.textColor,
+        ),
+      ),
+      const SizedBox(height: TabangSpace.sm),
+      for (final warning in warnings)
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: TabangSpace.sm),
+          padding: const EdgeInsets.all(TabangSpace.sm),
+          decoration: BoxDecoration(
+            color: context.warningBg,
+            borderRadius: BorderRadius.circular(TabangRadius.xs),
+            border: Border.all(
+              color: TabangColors.warning.withValues(alpha: 0.28),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Warning ${warning.level} of 3',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () =>
+                        _revokeWarning(context, user, warning, onChanged),
+                    icon: const Icon(Icons.undo, size: 14),
+                    label: const Text('Remove'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                warning.message,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: context.textColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${warning.issuedByAlias} · ${formatDateTime(warning.issuedAt)}',
+                style: TextStyle(fontSize: 11, color: context.textMuted),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-          if (!other) ...[
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _openConversation(context, user);
-              },
-              icon: const Icon(Icons.chat_bubble_outline, size: 15),
-              label: const Text('Message'),
-            ),
-            if (!user.role.isAdminSide &&
-                user.status == AccountStatus.verified &&
-                user.bloodCardVerified)
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                  _unverifyUser(context, user);
-                },
-                icon: const Icon(Icons.badge_outlined, size: 15),
-                label: const Text('Unverify'),
-              ),
-            if (isDonor)
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                  _editDonationWindow(context, user);
-                },
-                icon: const Icon(Icons.event_repeat_outlined, size: 15),
-                label: const Text('Donation window'),
-              ),
-          ],
-        ],
+    ];
+  }
+
+  void _revokeWarning(
+    BuildContext context,
+    AppUser user,
+    AccountWarning warning,
+    VoidCallback onChanged,
+  ) {
+    final next = (user.warningCount - 1).clamp(0, 3);
+    final removed = _repo.revokeWarning(
+      warning.userId,
+      warningId: warning.id,
+      actorId: widget.currentUser.id,
+    );
+    if (!removed) return;
+    onChanged();
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          'Warning ${warning.level} removed from ${user.alias}. '
+          'Active warnings: $next of 3.',
+        ),
       ),
     );
   }

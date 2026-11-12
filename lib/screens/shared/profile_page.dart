@@ -205,6 +205,9 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: TabangSpace.lg),
           ],
 
+          _buildAccountStanding(context, user, warnings),
+          const SizedBox(height: TabangSpace.lg),
+
           if (user.role.isAdminSide) ...[
             _buildChapterAffiliationCard(context, user),
             const SizedBox(height: TabangSpace.lg),
@@ -218,6 +221,63 @@ class _ProfilePageState extends State<ProfilePage> {
           _buildDetailsCard(context, user),
           const SizedBox(height: TabangSpace.lg),
           _buildPrivacyCard(context, user),
+        ],
+      ),
+    );
+  }
+
+  /// The account's moderation standing: status, active ladder and every
+  /// warning message. This used to live in Settings, but it belongs on the page
+  /// that already shows the account's own record and the warning banner.
+  Widget _buildAccountStanding(
+    BuildContext context,
+    AppUser user,
+    List<AccountWarning> warnings,
+  ) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionLabel('Account standing'),
+          Text(
+            warnings.isEmpty
+                ? 'No moderation warnings are on this account.'
+                : 'The warnings on this account, why they were issued and '
+                      'what happens next.',
+            style: TextStyle(fontSize: 12, color: context.textMuted),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          _detailRow(context, 'Status', user.status.label),
+          _detailRow(context, 'Active warnings', '${user.warningCount} of 3'),
+          if (warnings.isEmpty)
+            Text(
+              'No warning messages have been recorded. Keep your contact '
+              'details current and cancel a booked slot if you cannot attend.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.5,
+                color: context.textMuted,
+              ),
+            )
+          else ...[
+            const SizedBox(height: TabangSpace.xs),
+            for (final warning in warnings)
+              AccountWarningTile(warning: warning),
+            if (user.warningCount > 0) ...[
+              const SizedBox(height: TabangSpace.xs),
+              const WarningGuidance(
+                title: 'What another warning would mean',
+                lines: warningConsequences,
+                icon: Icons.shield_outlined,
+              ),
+              const SizedBox(height: TabangSpace.sm),
+              const WarningGuidance(
+                title: 'What you can do now',
+                lines: warningNextSteps,
+                icon: Icons.check_circle_outline,
+              ),
+            ],
+          ],
         ],
       ),
     );
