@@ -183,6 +183,15 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                           value: _onlyFlagged,
                           onChanged: (v) => setState(() => _onlyFlagged = v),
                         ),
+                        const Spacer(),
+                        // The keyword lists used to be reachable only from the
+                        // phone layout, so the button was simply missing on a
+                        // desktop window.
+                        OutlinedButton.icon(
+                          onPressed: () => _showKeywordsDialog(context),
+                          icon: const Icon(Icons.tag, size: 15),
+                          label: const Text('Keywords'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: TabangSpace.sm),
