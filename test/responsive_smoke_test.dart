@@ -527,12 +527,11 @@ void main() {
           ),
         )
         .first;
-    final pin = find.byKey(const ValueKey('phoneNavPinButton'));
-    expect(pin, findsOneWidget);
-
-    await tester.tap(pin);
+    // The pin moved off the header and into the account menu.
+    await tester.tap(find.byTooltip('Account'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Allow the bottom bar to hide'), findsOneWidget);
+    await tester.tap(find.text('Pin bottom bar'));
+    await tester.pumpAndSettle();
 
     await tester.drag(feed, const Offset(0, -420));
     await tester.pumpAndSettle();
@@ -543,9 +542,10 @@ void main() {
     );
 
     // Unpin, return to the top, and confirm the normal auto-hide is back.
-    await tester.tap(pin);
+    await tester.tap(find.byTooltip('Account'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Keep the bottom bar visible'), findsOneWidget);
+    await tester.tap(find.text('Unpin bottom bar'));
+    await tester.pumpAndSettle();
 
     await tester.drag(feed, const Offset(0, 1200));
     await tester.pumpAndSettle();

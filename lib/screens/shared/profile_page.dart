@@ -189,6 +189,65 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
 
           _buildDetailsCard(context, user),
+          const SizedBox(height: TabangSpace.lg),
+          _buildPrivacyCard(context, user),
+        ],
+      ),
+    );
+  }
+
+  /// Privacy & data moved here from Settings: this is the page that shows the
+  /// account's own record, so the explanation of what other people can see
+  /// belongs beside it.
+  Widget _buildPrivacyCard(BuildContext context, AppUser user) {
+    return SurfaceCard(
+      padding: const EdgeInsets.all(TabangSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionLabel('Privacy & data'),
+          const SizedBox(height: TabangSpace.xs),
+          Text(
+            'Aligned with RA 10173 (Data Privacy Act).',
+            style: TextStyle(fontSize: 12, color: context.textMuted),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.shield_outlined, size: 15, color: context.textMuted),
+              const SizedBox(width: TabangSpace.sm),
+              Expanded(
+                child: Text(
+                  'Your real name and exact address are never shown to other '
+                  'users. Donors and recipients appear as aliases until both '
+                  'sides agree to reveal their identity. Staff see real names '
+                  'only for verified care coordination.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.6,
+                    color: context.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: TabangSpace.md),
+          _detailRow(context, 'Public identity', user.alias),
+          _detailRow(context, 'Account type', user.role.label),
+          _detailRow(context, 'Visibility', user.isAvailable
+              ? 'Listed in the donor directory'
+              : 'Hidden from the donor directory'),
+          const SizedBox(height: TabangSpace.sm),
+          Text(
+            'TABANG stores simulated records on this device only. No real '
+            'hospital, Red Cross or EHR system is connected.',
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.55,
+              color: context.textMuted,
+            ),
+          ),
         ],
       ),
     );

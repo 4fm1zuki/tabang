@@ -571,15 +571,22 @@ class _DonorHubPageState extends State<DonorHubPage> {
                       value: '${user.totalDonations}',
                       label: 'donations',
                     ),
-                    _HeroStat(
-                      value: '${(user.totalDonations * 3).clamp(0, 999)}',
-                      label: 'lives touched',
+                    Tooltip(
+                      message:
+                          'One donation can be separated for up to three '
+                          'patients. Only blood that was issued to a patient '
+                          'counts here, so a unit still in the bank is not '
+                          'included.',
+                      child: _HeroStat(
+                        value: '${(user.totalDonations * 3).clamp(0, 999)}',
+                        label: 'patients helped',
+                      ),
                     ),
                     _HeroStat(
                       value: nextDate == null
-                          ? 'Now'
-                          : '${eligibility.daysRemaining}d',
-                      label: nextDate == null ? 'available' : 'to next gift',
+                          ? 'Ready'
+                          : 'In ${eligibility.daysRemaining}d',
+                      label: nextDate == null ? 'to donate' : 'to next gift',
                     ),
                   ],
                 );

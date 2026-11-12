@@ -683,31 +683,9 @@ class _PhoneHeader extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            key: const ValueKey('phoneNavPinButton'),
-            tooltip: navPinned
-                ? 'Allow the bottom bar to hide'
-                : 'Keep the bottom bar visible',
-            visualDensity: VisualDensity.compact,
-            onPressed: onToggleNavPin,
-            icon: Icon(
-              navPinned ? Icons.push_pin : Icons.push_pin_outlined,
-              size: 19,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Messages',
-            onPressed: onOpenChat,
-            icon: _UnreadBadge(
-              count: unreadMessages,
-              child: const Icon(Icons.forum_outlined, size: 20),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Guides & help',
-            onPressed: onOpenHelp,
-            icon: const Icon(Icons.help_outline, size: 20),
-          ),
+          // The header keeps one control: the account menu. The pin, the
+          // Messages shortcut and the Help shortcut moved into it, so the bar
+          // is the identity plus a single tap target.
           PopupMenuButton<String>(
             tooltip: 'Account',
             position: PopupMenuPosition.under,
@@ -719,6 +697,8 @@ class _PhoneHeader extends StatelessWidget {
                   onOpenSettings();
                 case 'help':
                   onOpenHelp();
+                case 'pin':
+                  onToggleNavPin();
                 case 'signout':
                   if (await confirmAction(
                     context,
@@ -732,7 +712,8 @@ class _PhoneHeader extends StatelessWidget {
                   }
               }
             },
-            itemBuilder: (context) => accountMenuItems(context, user),
+            itemBuilder: (context) =>
+                accountMenuItems(context, user, navPinned: navPinned),
             child: Padding(
               padding: const EdgeInsets.only(left: 4),
               child: ClipOval(
@@ -1144,8 +1125,10 @@ class _Sidebar extends StatelessWidget {
 /// per action and ends with a destructive sign-out behind a divider.
 List<PopupMenuEntry<String>> accountMenuItems(
   BuildContext context,
-  AppUser user,
-) {
+  AppUser user, {
+  /// Phone-only: the bottom bar's pin moved off the header and into this menu.
+  bool? navPinned,
+}) {
   return [
     PopupMenuItem<String>(
       value: 'profile',
@@ -1204,8 +1187,15 @@ List<PopupMenuEntry<String>> accountMenuItems(
       context,
       value: 'help',
       icon: Icons.help_outline,
-      label: 'Guides & help',
+      label: 'About & Help',
     ),
+    if (navPinned != null)
+      _accountItem(
+        context,
+        value: 'pin',
+        icon: navPinned ? Icons.push_pin : Icons.push_pin_outlined,
+        label: navPinned ? 'Unpin bottom bar' : 'Pin bottom bar',
+      ),
     const PopupMenuDivider(),
     _accountItem(
       context,

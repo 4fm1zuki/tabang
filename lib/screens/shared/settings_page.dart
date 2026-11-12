@@ -195,77 +195,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: TabangSpace.lg),
 
-          if (user.role == UserRole.donor) ...[
-            _section(
-              context,
-              'Donor availability',
-              'Control whether the donor directory can show you.',
-              help:
-                  'TABANG hides you automatically during a donation cooldown '
-                  'even when the directory switch is on. Exact addresses are '
-                  'never shown; the barangay switch controls the only location '
-                  'other users see.',
-              children: [
-                _switchRow(
-                  context,
-                  'List me in the public donor directory',
-                  'When off, you are hidden from the directory and marked '
-                      'unavailable for request matching',
-                  user.isAvailable,
-                  (v) => _repo.setDonorAvailability(user.id, v),
-                ),
-                _switchRow(
-                  context,
-                  'Show my barangay to other users',
-                  'Exact addresses are never shown; turn this off to hide '
-                      'your barangay in the donor directory',
-                  user.shareBarangay,
-                  (v) => _repo.updateUser(user.copyWith(shareBarangay: v)),
-                ),
-              ],
-            ),
-            const SizedBox(height: TabangSpace.lg),
-          ],
-
-          _section(
-            context,
-            'Privacy & data',
-            'Controls aligned with RA 10173 (Data Privacy Act).',
-            help:
-                'Your real name and exact address are never shown to other '
-                'users. Donors and recipients appear as aliases until both '
-                'sides agree to reveal their identity. Staff can see real names '
-                'only for verified care coordination.',
-            children: [
-              _note(
-                context,
-                Icons.shield_outlined,
-                'Your real name and exact address are never shown to other '
-                'users. Donors and recipients appear as aliases until both '
-                'sides agree to reveal their identity.',
-              ),
-              const SizedBox(height: TabangSpace.sm),
-              _dataRow(context, 'Public identity', user.alias),
-              _dataRow(context, 'Account type', user.role.label),
-              _dataRow(context, 'Account status', user.status.label),
-              _dataRow(context, 'Barangay', user.barangay),
-              if (user.bloodType != null)
-                _dataRow(context, 'Blood type', user.bloodType!.label),
-              const SizedBox(height: TabangSpace.sm),
-              Text(
-                'TABANG stores simulated records on this device only. No real '
-                'hospital, Red Cross or EHR system is connected. You can sign '
-                'out at any time to clear the active session.',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  height: 1.55,
-                  color: context.textMuted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: TabangSpace.lg),
-
           _section(
             context,
             'Account',
@@ -380,34 +309,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: TabangSpace.lg),
           ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _note(BuildContext context, IconData icon, String text) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(TabangSpace.md),
-      decoration: BoxDecoration(
-        color: context.surfaceAlt,
-        borderRadius: BorderRadius.circular(TabangRadius.sm),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 15, color: context.textMuted),
-          const SizedBox(width: TabangSpace.sm),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.6,
-                color: context.textMuted,
-              ),
-            ),
-          ),
         ],
       ),
     );
