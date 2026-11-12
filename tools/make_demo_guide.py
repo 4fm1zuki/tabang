@@ -94,7 +94,7 @@ def build() -> None:
             "Lloyd \u2014 2. Community app: Profile, Settings, Guides & Help.",
             "Aeron \u2014 3. Staff console: Overview, Operations Map, Operations Inventory, Operations Drives.",
             "Kath \u2014 3. Staff console: Messages, Users, Moderation.",
-            "Iverson \u2014 4. Admin: Readiness Targets, Staff & Account Management; 5. Role & Persona Matrix; 6. Technical Foundations.",
+            "Iverson \u2014 4. Admin: Readiness Targets, Staff & Account Management; 5. Role & Persona Matrix; 6. Technical Foundations; 7. Demonstration Targets \u2014 Final Answers.",
         ]
     )
 
@@ -326,6 +326,22 @@ def build() -> None:
             "Components: the language and framework, the data store, the map, the privacy rules, and the builds we hand out.",
             "How to collect data: nothing is collected here \u2014 this is the summary of how everything else is stored and protected.",
             "How it's made: Flutter with Dart (one codebase for Android and web); no server and no database \u2014 an in-memory repository seeded at launch so every demo starts identically; eligibility, ABO/Rh compatibility and shelf-life expiry as in-app rules; keyless OpenStreetMap tiles over hand-traced barangay boundaries; aliases and double-blind chat by design (RA 10173); and Android APKs per processor plus a universal APK and a web build.",
+        ]
+    )
+
+    # ================================================ 7. final answers
+    head("7. Demonstration Targets — Final Answers (Iverson)")
+    line(
+        "These are the closing answers to the four questions the whole "
+        "demonstration builds up to. Read them last, after every reporter has "
+        "shown their part."
+    )
+    bullets(
+        [
+            "Purpose? — So a family in Digos City does not have to call around for blood during an emergency. TABANG puts donors, requests and remaining stock in one place, for three users at once: the community (donors and recipients), the Red Cross chapter staff, and the administrator. It is a research prototype on simulated records, and it is judged on usability (SUS) and on the staff's working system (SEIPS).",
+            "Components? — One app, three surfaces. The community app: Home, Blood Bank, Find Donor, Requests, Messages, Donor Hub, Profile, Settings, Guides & Help. The staff console: Overview, Operations (Map, Inventory, Drives), Messages, Users with Moderation as a tab. Admin and governance: Readiness Targets and Staff & Account Management. Under all of them, the Role & Persona Matrix decides who may do what, and Technical Foundations explains how it is built.",
+            "How to collect data? — From the app: registration details, request documents and the booked slot, unit and donation records, and who joined each drive. From people: every respondent answers the 10-statement SUS questionnaire (a 0–100 score, 68 is average), and the clinical staff also go through SEIPS, which checks the whole working system — people, tasks, tools, organisation and surroundings. Thirty-five respondents in Digos City are chosen on purpose (15 donors, 15 recipients or family, 5 clinical personnel) during Academic Year 2026–2027. Everything shown is simulated; no real hospital or Red Cross records are read (RA 10173).",
+            "How it's made? — Flutter with Dart: one codebase that builds both the Android app and the web version. There is no server and no database — an in-memory repository seeded at launch keeps every demonstration identical. The app itself enforces the rules: donor eligibility and cooldown timers, ABO/Rh and component compatibility, and unit expiry from each component's shelf life. The map draws hand-traced barangay boundaries over keyless OpenStreetMap tiles. Privacy is built in: aliases everywhere and double-blind messaging. It ships as Android APKs per processor (arm64, armv7, x86_64) plus a universal APK and a web build.",
         ]
     )
 
