@@ -1096,13 +1096,14 @@ class _Sidebar extends StatelessWidget {
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
+                        // The position wraps instead of ellipsising so the
+                        // rail never cuts a role label mid-word.
                         Text(
                           user.role.label,
                           style: TextStyle(
                             fontSize: 11.5,
                             color: context.textMuted,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1132,7 +1133,9 @@ List<PopupMenuEntry<String>> accountMenuItems(
   return [
     PopupMenuItem<String>(
       value: 'profile',
-      height: 72,
+      // Taller than the old 72 so the position line and the email line both
+      // fit even when a long role label wraps.
+      height: 84,
       child: Row(
         children: [
           ClipOval(
@@ -1163,11 +1166,21 @@ List<PopupMenuEntry<String>> accountMenuItems(
                     color: context.textColor,
                   ),
                 ),
+                // The position gets its own line so it is never ellipsised;
+                // the email moves below it and may shorten if space is tight.
                 Text(
-                  '${user.email} · ${user.role.label}',
+                  user.role.label,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: context.textMuted,
+                  ),
+                ),
+                Text(
+                  user.email,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                  style: TextStyle(fontSize: 11, color: context.textMuted),
                 ),
               ],
             ),

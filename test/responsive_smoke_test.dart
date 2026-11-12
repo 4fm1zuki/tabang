@@ -221,12 +221,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Awaiting verification'), findsWidgets);
-    // Verification lives in the row's details now, so open the first slot and
-    // check the detail offers it.
-    await tester.tap(find.textContaining('Awaiting verification').first);
+    // Every request now carries documents and a booked slot, so the queue is
+    // longer and the first pending row can sit below the fold. Scroll the row
+    // itself into view and tap the card (its InkWell), not the label.
+    final pendingRow = find
+        .ancestor(
+          of: find.textContaining('Awaiting verification').first,
+          matching: find.byType(InkWell),
+        )
+        .first;
+    await tester.ensureVisible(pendingRow);
     await tester.pumpAndSettle();
+    await tester.tap(pendingRow);
+    await tester.pumpAndSettle();
+    // Verification lives only in the row's details now, so the opened slot must
+    // offer the verify action.
     expect(find.text('Verify and open'), findsWidgets);
     expect(tester.takeException(), isNull);
+
+    // Close the details before exercising the other tabs: the dialog is modal,
+    // so leaving it open would make the next tab taps land on its barrier.
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
 
     // The restyled request queue and the removed-units ledger fit too. The
     // tab row sits above the queue, so scroll it back into view first.

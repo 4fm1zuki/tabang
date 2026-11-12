@@ -105,6 +105,38 @@ class _FindDonorPageState extends State<FindDonorPage> {
   /// queue.
   static const int _requestsTab = 3;
 
+  /// The list the side panel is showing, named for the map's restore bubble so
+  /// it says "Show donor list", "Show facilities list", and so on.
+  String get _paneListLabel => switch (_paneTab) {
+    0 => 'donor list',
+    1 => 'facilities list',
+    2 => 'drive list',
+    _ => 'request list',
+  };
+
+  /// The icon drawn at the head of the restore bubble, matching the list.
+  IconData get _paneListIcon => switch (_paneTab) {
+    0 => Icons.people_outline,
+    1 => Icons.local_hospital_outlined,
+    2 => Icons.event_outlined,
+    _ => Icons.assignment_outlined,
+  };
+
+  /// Selecting a panel tab also picks the heat layer, mirroring the staff
+  /// Operations map's `_layerToggle`: the Donors list paints donor density and
+  /// the Requests list the request ramp, so the legend and the tab never
+  /// disagree. Facilities and Drives name no ramp, so they leave it as it is.
+  void _selectPaneTab(int tab) {
+    setState(() {
+      _paneTab = tab;
+      if (tab == 0) {
+        _showDonorDensity = true;
+      } else if (tab == _requestsTab) {
+        _showDonorDensity = false;
+      }
+    });
+  }
+
   void _focusFacility(DigosFacilityPin pin) {
     // The pin is drawn in the map frame, so the camera must target the same
     // rebased point or "show on map" would centre half a kilometre away.
@@ -808,8 +840,8 @@ class _FindDonorPageState extends State<FindDonorPage> {
           _panelWidth = _widePanelWidth;
         }
       }),
-      listLabel: 'donor list',
-      listIcon: Icons.people_outline,
+      listLabel: _paneListLabel,
+      listIcon: _paneListIcon,
     );
   }
 
@@ -936,12 +968,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
     return InkWell(
       key: ValueKey(donor ? 'findDonorHeatDonors' : 'findDonorHeatRequests'),
       borderRadius: BorderRadius.circular(TabangRadius.xs),
-      onTap: () => setState(() {
-        _showDonorDensity = donor;
-        // The panel follows the heat, as on the staff map: the donor ramp
-        // brings the directory forward, the request ramp the open queue.
-        _paneTab = donor ? 0 : _requestsTab;
-      }),
+      onTap: () => _selectPaneTab(donor ? 0 : _requestsTab),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
@@ -1075,7 +1102,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                     textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
                   ),
                   onSelectionChanged: (selection) =>
-                      setState(() => _paneTab = selection.first),
+                      _selectPaneTab(selection.first),
                 ),
               ),
               if (_paneTab == 0 || _paneTab == _requestsTab) ...[

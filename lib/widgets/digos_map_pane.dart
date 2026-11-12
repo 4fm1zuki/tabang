@@ -380,23 +380,23 @@ class _DigosMapPaneState extends State<DigosMapPane> {
                       accent: true,
                       size: compact ? 30 : 36,
                     ),
-                    // The light/dark switch is desktop-only: on a phone the
-                    // extra button pushed the stack into the legend.
-                    if (!compact) ...[
-                      const SizedBox(height: 6),
-                      _mapButton(
-                        context,
-                        widget.mapDark
-                            ? Icons.light_mode_outlined
-                            : Icons.dark_mode_outlined,
-                        widget.onToggleMapDark,
-                        tooltip: widget.mapDark
-                            ? 'Use light map'
-                            : 'Use dark map',
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    SizedBox(height: compact ? 4 : 0),
+                    // The light/dark switch: the moon brings the dark map up
+                    // and the sun returns to light. It sits in the same stack
+                    // as the zoom, fit and layers controls, on phones as well
+                    // as desktops.
+                    SizedBox(height: compact ? 4 : 6),
+                    _mapButton(
+                      context,
+                      widget.mapDark
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined,
+                      widget.onToggleMapDark,
+                      tooltip: widget.mapDark
+                          ? 'Use light map'
+                          : 'Use dark map',
+                      size: compact ? 30 : 36,
+                    ),
+                    SizedBox(height: compact ? 4 : 12),
                     // Hides every map panel for an unobstructed view.
                     _mapButton(
                       context,

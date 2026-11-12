@@ -639,7 +639,11 @@ class _AdminPhoneHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
+      // A 58 px baseline, not a hard height: on a 360 px phone a long role
+      // such as "System Administrator" wraps to a second line, and the old
+      // fixed height clipped it. The bar grows to keep the position readable
+      // in full instead of ellipsising it.
+      constraints: const BoxConstraints(minHeight: 58),
       padding: const EdgeInsets.symmetric(horizontal: TabangSpace.md),
       decoration: BoxDecoration(
         color: context.surface,
@@ -649,10 +653,12 @@ class _AdminPhoneHeader extends StatelessWidget {
         children: [
           const TabangLogo(),
           const SizedBox(width: TabangSpace.sm),
-          // Long aliases and role labels must ellipsize, never widen the row:
-          // the donor and staff headers share this rule.
+          // Long aliases may ellipsize, never widen the row: the donor and
+          // staff headers share this rule. Role labels get their own line so
+          // the position is always readable in full, wrapping if needed.
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -668,10 +674,18 @@ class _AdminPhoneHeader extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${user.alias} · ${user.role.label}',
+                  user.alias,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                ),
+                Text(
+                  user.role.label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: context.textMuted,
+                  ),
                 ),
               ],
             ),
@@ -990,7 +1004,6 @@ class _AdminSidebar extends StatelessWidget {
                                   fontSize: 12,
                                   color: Colors.white70,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -1047,9 +1060,19 @@ class _AdminSidebar extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${user.role.label} · ${user.email}',
+                            user.role.label,
                             style: TextStyle(
                               fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: context.textMuted,
+                            ),
+                          ),
+                          Text(
+                            user.email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
                               color: context.textMuted,
                             ),
                           ),

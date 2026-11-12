@@ -3355,6 +3355,8 @@ class TabangRepository {
         barangay: 'Zone 2',
         urgency: RequestUrgency.critical,
         createdAt: now.subtract(const Duration(hours: 5)),
+        status: RequestStatus.open,
+        source: RequestSource.donorNetwork,
         note: 'Postpartum hemorrhage, OR scheduled tonight.',
       ),
       BloodRequest(
@@ -3368,6 +3370,7 @@ class TabangRepository {
         barangay: 'Zone 3',
         urgency: RequestUrgency.urgent,
         createdAt: now.subtract(const Duration(days: 1, hours: 3)),
+        status: RequestStatus.open,
         source: RequestSource.bloodBank,
       ),
       BloodRequest(
@@ -3381,6 +3384,8 @@ class TabangRepository {
         barangay: 'Zone 1',
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(days: 3)),
+        status: RequestStatus.open,
+        source: RequestSource.donorNetwork,
       ),
       BloodRequest(
         id: 'REQ-004',
@@ -3405,6 +3410,8 @@ class TabangRepository {
         barangay: 'Matti',
         urgency: RequestUrgency.urgent,
         createdAt: now.subtract(const Duration(days: 1, hours: 8)),
+        status: RequestStatus.open,
+        source: RequestSource.donorNetwork,
         note:
             'Dialysis patient, two units requested by the attending physician.',
       ),
@@ -3419,6 +3426,7 @@ class TabangRepository {
         barangay: 'San Jose',
         urgency: RequestUrgency.routine,
         createdAt: now.subtract(const Duration(hours: 20)),
+        status: RequestStatus.open,
         source: RequestSource.bloodBank,
       ),
       BloodRequest(
@@ -3432,6 +3440,8 @@ class TabangRepository {
         barangay: 'Kapatagan',
         urgency: RequestUrgency.critical,
         createdAt: now.subtract(const Duration(hours: 16)),
+        status: RequestStatus.open,
+        source: RequestSource.donorNetwork,
         note: 'Trauma case in the emergency room; universal donor needed.',
       ),
       BloodRequest(
@@ -3445,6 +3455,8 @@ class TabangRepository {
         barangay: 'Kiagot',
         urgency: RequestUrgency.urgent,
         createdAt: now.subtract(const Duration(hours: 11)),
+        status: RequestStatus.open,
+        source: RequestSource.donorNetwork,
       ),
       BloodRequest(
         id: 'REQ-009',
@@ -3457,6 +3469,8 @@ class TabangRepository {
         barangay: 'San Miguel',
         urgency: RequestUrgency.urgent,
         createdAt: now.subtract(const Duration(hours: 7)),
+        status: RequestStatus.open,
+        source: RequestSource.donorNetwork,
       ),
       BloodRequest(
         id: 'REQ-010',
@@ -3502,10 +3516,13 @@ class TabangRepository {
       ),
     ]);
 
-    // Seeded requests already cleared chapter review: they carry document
-    // files on record and a bookable slot so the demo starts in a realistic
-    // state. Seed documents have no payload, meaning "already on file with the
-    // chapter"; uploads made in the app do carry the file bytes.
+    // Every seeded request carries documents on file and a booked slot so the
+    // verification sheet, the staff queue and the community list all start
+    // populated: already-verified donor-network requests are open, blood-bank
+    // requests are open for chapter processing, and a few stay pendingReview
+    // for the verification queue. Seed documents have no payload, meaning
+    // "already on file with the chapter"; uploads made in the app do carry the
+    // file bytes. Documents attached to a request (REQ-011) are kept as-is.
     const seededDocuments = <RequestDocument>[
       RequestDocument(
         kind: RequestDocuments.doctorsForm,
@@ -3522,13 +3539,13 @@ class TabangRepository {
     ];
     final seededSlots = bloodBankSlots(days: 14);
     for (var i = 0; i < _requests.length; i++) {
-      if (_requests[i].status == RequestStatus.pendingReview) continue;
-      _requests[i] = _requests[i].copyWith(
-        status: RequestStatus.open,
-        documents: seededDocuments,
+      final request = _requests[i];
+      _requests[i] = request.copyWith(
+        documents: request.documents.isEmpty ? seededDocuments : null,
         // Stagger the demo slots instead of parking every request on the
         // same hour.
-        scheduledFor: seededSlots[i % seededSlots.length],
+        scheduledFor:
+            request.scheduledFor ?? seededSlots[i % seededSlots.length],
       );
     }
 
