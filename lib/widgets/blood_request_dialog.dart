@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/models.dart';
 import '../core/repository.dart';
 import '../theme.dart';
+import 'common.dart';
 
 /// Shared recipient request dialog.
 ///
@@ -121,7 +122,7 @@ Future<void> showBloodRequestDialog(
             if (length > 8 * 1024 * 1024) {
               if (!dialogContext.mounted) return;
               ScaffoldMessenger.of(dialogContext).showSnackBar(
-                const SnackBar(
+                const TabangSnackBar(
                   content: Text('Attachments must be 8 MB or smaller.'),
                 ),
               );
@@ -140,7 +141,7 @@ Future<void> showBloodRequestDialog(
           } catch (_) {
             if (!dialogContext.mounted) return;
             ScaffoldMessenger.of(dialogContext).showSnackBar(
-              const SnackBar(
+              const TabangSnackBar(
                 content: Text(
                   'The file picker could not be opened on this device.',
                 ),
@@ -173,7 +174,7 @@ Future<void> showBloodRequestDialog(
           );
           if (created == null) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              const TabangSnackBar(
                 content: Text(
                   'That submission is incomplete. Check the documents and the '
                   'blood-bank slot.',
@@ -184,7 +185,7 @@ Future<void> showBloodRequestDialog(
           }
           Navigator.pop(dialogContext);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            TabangSnackBar(
               content: Text(
                 'Request ${created.id} submitted. Chapter staff will verify '
                 'the documents before it is posted.',

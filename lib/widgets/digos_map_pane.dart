@@ -148,7 +148,7 @@ class _DigosMapPaneState extends State<DigosMapPane> {
   void _fitCity() {
     DigosVectorMap.fitCity(widget.controller);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fitted to the city · all 26 barangays')),
+      const TabangSnackBar(content: Text('Fitted to the city · all 26 barangays')),
     );
   }
 

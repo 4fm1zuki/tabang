@@ -428,7 +428,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
               await Clipboard.setData(ClipboardData(text: credentials));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Credentials copied.')),
+                  const TabangSnackBar(content: Text('Credentials copied.')),
                 );
               }
             },
@@ -774,7 +774,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       requestedDocuments: requestedDocuments,
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      TabangSnackBar(
         content: Text(
           status == DonorApplicationStatus.verified
               ? 'Donor verified. They can donate from their next eligible date.'
@@ -1196,7 +1196,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
     if (thread == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        const TabangSnackBar(
           content: Text(
             'That conversation cannot be opened. The account may be blocked.',
           ),
@@ -1581,7 +1581,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 );
                 Navigator.pop(dialogContext);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  TabangSnackBar(
                     content: Text('Donation window updated for ${user.alias}.'),
                   ),
                 );
@@ -1648,7 +1648,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 _repo.recordDonation(user.id, component: component);
                 Navigator.pop(dialogContext);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  TabangSnackBar(
                     content: Text(
                       'Donation recorded for ${user.alias}. Cooldown updated.',
                     ),
@@ -1711,7 +1711,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
               final ok = _repo.warnUser(user.id, reason: reasonController.text);
               Navigator.pop(dialogContext);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                TabangSnackBar(
                   content: Text(
                     ok
                         ? 'Warning $next issued to ${user.alias}.'

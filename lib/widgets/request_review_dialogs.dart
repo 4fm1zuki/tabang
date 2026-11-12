@@ -94,7 +94,7 @@ Future<void> showVerifyRequestDialog(
             );
             Navigator.pop(dialogContext);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              TabangSnackBar(
                 content: Text(
                   ok
                       ? 'Request ${request.id} verified and opened.'
@@ -111,7 +111,7 @@ Future<void> showVerifyRequestDialog(
                             actorId: actor.id,
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                            TabangSnackBar(
                               content: Text(
                                 reverted
                                     ? 'Verification undone; ${request.id} is '
@@ -184,7 +184,7 @@ Future<void> showRejectRequestDialog(
             );
             Navigator.pop(dialogContext);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              TabangSnackBar(
                 content: Text(
                   ok
                       ? 'Request ${request.id} rejected with a reason.'
@@ -200,7 +200,7 @@ Future<void> showRejectRequestDialog(
                             actorId: actor.id,
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                            TabangSnackBar(
                               content: Text(
                                 undone
                                     ? 'Request ${request.id} is back in the '

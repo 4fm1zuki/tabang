@@ -929,7 +929,7 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
+        TabangSnackBar(
           content: Text(
             thread == null
                 ? 'The chapter thread is unavailable right now.'

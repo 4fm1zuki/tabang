@@ -516,7 +516,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 );
                 Navigator.pop(dialogContext);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  TabangSnackBar(
                     content: Text(
                       ok
                           ? '${unit.barcode} released back to available stock.'
@@ -536,7 +536,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 );
                 Navigator.pop(dialogContext);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  TabangSnackBar(
                     content: Text(
                       ok
                           ? '${unit.barcode} removed from the ledger.'
@@ -551,7 +551,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                                 actorId: widget.currentUser.id,
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
+                                TabangSnackBar(
                                   content: Text(
                                     restored
                                         ? '${unit.barcode} restored to stock.'
@@ -660,7 +660,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               RequestStatus.rejected => false,
             };
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              TabangSnackBar(
                 content: Text(
                   ok
                       ? 'Request ${request.id} marked ${status.label.toLowerCase()}.'
@@ -968,7 +968,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                             actorId: widget.currentUser.id,
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
+                            TabangSnackBar(
                               content: Text(
                                 ok
                                     ? '${record.unit.barcode} restored to stock.'
@@ -1143,7 +1143,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
         onAdded: (unit) {
           if (unit == null || !context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            TabangSnackBar(
               content: Text(
                 '${unit.barcode} added — expires '
                 '${formatDate(unit.expiresOn)}.',
@@ -1156,7 +1156,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     actorId: widget.currentUser.id,
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    TabangSnackBar(
                       content: Text(
                         removed
                             ? '${unit.barcode} removed again.'
@@ -1312,7 +1312,7 @@ class _AddUnitDialogState extends State<_AddUnitDialog> {
             );
             if (unit == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                const TabangSnackBar(
                   content: Text(
                     'Could not add the unit — check the barcode and that your '
                     'role can manage inventory.',

@@ -43,6 +43,20 @@ class TabangLogo extends StatelessWidget {
   }
 }
 
+/// Every snackbar in the app, so behaviour is uniform: it clears itself after
+/// three seconds instead of four, and it can be swiped away in either
+/// direction instead of only downward — a message that lingers under a thumb
+/// is in the way.
+class TabangSnackBar extends SnackBar {
+  const TabangSnackBar({
+    super.key,
+    required super.content,
+    super.action,
+    super.duration = const Duration(seconds: 3),
+    super.dismissDirection = DismissDirection.horizontal,
+  });
+}
+
 /// Branded confirmation for actions that are hard to undo: signing out,
 /// leaving a blood drive's chapter list, or closing the app from a phone.
 ///

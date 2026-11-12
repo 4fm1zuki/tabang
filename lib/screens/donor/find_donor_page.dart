@@ -1233,14 +1233,14 @@ class _FindDonorPageState extends State<FindDonorPage> {
     controller.dispose();
     if (thread == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        const TabangSnackBar(
           content: Text('This conversation is unavailable right now.'),
         ),
       );
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      TabangSnackBar(
         content: Text('Conversation with ${donor.mapHandle} is ready.'),
         action: widget.onOpenChat == null
             ? null

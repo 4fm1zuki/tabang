@@ -640,7 +640,7 @@ class _RequestsPageState extends State<RequestsPage> {
                       actorId: _user.id,
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                      TabangSnackBar(
                         content: Text(
                           ok
                               ? 'Request cancelled.'
@@ -884,7 +884,7 @@ class _RequestsPageState extends State<RequestsPage> {
                       actorId: _user.id,
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                      TabangSnackBar(
                         content: Text(
                           ok
                               ? 'Request cancelled.'
@@ -1460,7 +1460,7 @@ class _RequestsPageState extends State<RequestsPage> {
               );
               Navigator.pop(dialogContext);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                TabangSnackBar(
                   content: Text(
                     response == null
                         ? 'Could not send response. The request may have '
@@ -1490,7 +1490,7 @@ class _RequestsPageState extends State<RequestsPage> {
     );
     if (commitment != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        TabangSnackBar(
           content: Text(
             '${donor?.mapHandle ?? 'This donor'} is already coordinating '
             'request ${commitment.requestId}. They stay visible here, but '
@@ -1502,7 +1502,7 @@ class _RequestsPageState extends State<RequestsPage> {
     }
     if (donor != null && !_repo.hasReciprocalChat(_user.id, donor.id)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        TabangSnackBar(
           content: Text(
             'Message ${donor.mapHandle} first. Both of you need to exchange at '
             'least one message before a donor can be selected.',
@@ -1517,7 +1517,7 @@ class _RequestsPageState extends State<RequestsPage> {
       selectedById: _user.id,
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      TabangSnackBar(
         content: Text(
           thread == null
               ? 'Could not select this donor. They may no longer be eligible, '

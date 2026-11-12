@@ -809,7 +809,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(TabangSnackBar(content: Text(message)));
   }
 
   // --------------------------------------------------------------- unit list

@@ -493,7 +493,7 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
   }) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(
-      SnackBar(
+      TabangSnackBar(
         content: Text(message),
         duration: const Duration(seconds: 6),
         action: undo == null
@@ -503,7 +503,7 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
                 onPressed: () {
                   undo();
                   if (undone != null) {
-                    messenger.showSnackBar(SnackBar(content: Text(undone)));
+                    messenger.showSnackBar(TabangSnackBar(content: Text(undone)));
                   }
                 },
               ),
@@ -773,7 +773,7 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
             if (!accepted) {
               // The window is the only thing the form cannot validate inline.
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                const TabangSnackBar(
                   content: Text('The drive must end after it starts.'),
                 ),
               );

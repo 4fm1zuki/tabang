@@ -1058,7 +1058,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   void _fulfil(BuildContext context, BloodRequest request) {
     final ok = _repo.markRequestFulfilled(request.id, actorId: widget.user.id);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      TabangSnackBar(
         content: Text(
           ok
               ? '${request.id} marked fulfilled.'

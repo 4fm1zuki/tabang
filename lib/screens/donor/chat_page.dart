@@ -1357,7 +1357,7 @@ class _ChatPageState extends State<ChatPage> {
                                   );
                                   if (thread == null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
+                                      const TabangSnackBar(
                                         content: Text(
                                           'That conversation cannot be '
                                           'opened right now.',
@@ -1409,7 +1409,7 @@ class _ChatPageState extends State<ChatPage> {
               _repo.requestIdentityReveal(thread.id, widget.user.id);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                const TabangSnackBar(
                   content: Text('Reveal request sent. Waiting for consent.'),
                 ),
               );
@@ -1452,7 +1452,7 @@ class _ChatPageState extends State<ChatPage> {
     final otherId = _otherId(thread);
     if (!_repo.canBlock(widget.user.id, otherId)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        const TabangSnackBar(
           content: Text(
             'You can re-block this user 48 hours after unblocking them.',
           ),
@@ -1479,7 +1479,7 @@ class _ChatPageState extends State<ChatPage> {
               _repo.blockUser(widget.user.id, otherId);
               Navigator.pop(context);
               ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(content: Text('User blocked.')));
+                  .showSnackBar(const TabangSnackBar(content: Text('User blocked.')));
             },
             child: const Text('Block'),
           ),
@@ -1491,7 +1491,7 @@ class _ChatPageState extends State<ChatPage> {
   void _unblock(BuildContext context, ChatThread thread) {
     _repo.unblockUser(widget.user.id, _otherId(thread));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      const TabangSnackBar(
         content: Text(
           'User unblocked. Re-blocking is available after 48 hours.',
         ),
@@ -1588,7 +1588,7 @@ class _ChatPageState extends State<ChatPage> {
                       );
                       Navigator.pop(dialogContext);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        TabangSnackBar(
                           content: Text(
                             'Report submitted against $other. Chapter staff '
                             'will review it.',

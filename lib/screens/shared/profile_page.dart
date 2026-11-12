@@ -679,7 +679,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
                           Navigator.pop(dialogContext);
                           messenger.showSnackBar(
-                            const SnackBar(
+                            const TabangSnackBar(
                               content: Text('Profile photo updated.'),
                             ),
                           );
@@ -895,7 +895,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 Navigator.pop(dialogContext);
                 if (typeChanged) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    const TabangSnackBar(
                       content: Text(
                         'Blood type changed. Your blood card must be '
                         're-verified by chapter staff before matching.',

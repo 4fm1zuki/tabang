@@ -982,7 +982,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
     String message,
   ) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      TabangSnackBar(
         content: Text(message),
         duration: const Duration(seconds: 6),
         action: SnackBarAction(

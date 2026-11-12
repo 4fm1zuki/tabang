@@ -700,7 +700,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
               );
               Navigator.pop(dialogContext);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                TabangSnackBar(
                   content: Text(
                     ok
                         ? 'Readiness targets updated: ${targets.describe()}'
