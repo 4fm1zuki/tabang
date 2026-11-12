@@ -1893,17 +1893,25 @@ class _KpiCard extends StatelessWidget {
   final String footnote;
   final double progress;
 
-  Color get _color => switch (tone) {
-    Tone.success => TabangColors.success,
-    Tone.warning => TabangColors.warning,
-    Tone.danger => TabangColors.danger,
-    Tone.info => TabangColors.info,
-    Tone.brand => TabangColors.crimson,
-    Tone.neutral => TabangColors.info,
-  };
+  /// KPI accents follow the same light/dark split as the shared pills; the
+  /// light-theme status colours disappear into the dark cards.
+  Color _color(BuildContext context) {
+    final dark = context.isDark;
+    return switch (tone) {
+      Tone.success =>
+        dark ? TabangColors.successOnDark : TabangColors.success,
+      Tone.warning =>
+        dark ? TabangColors.warningOnDark : TabangColors.warning,
+      Tone.danger => dark ? TabangColors.dangerOnDark : TabangColors.danger,
+      Tone.info => dark ? TabangColors.infoOnDark : TabangColors.info,
+      Tone.brand => dark ? TabangColors.brandOnDark : TabangColors.crimson,
+      Tone.neutral => dark ? TabangColors.infoOnDark : TabangColors.info,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
+    final color = _color(context);
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1915,10 +1923,10 @@ class _KpiCard extends StatelessWidget {
                 height: 30,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _color.withValues(alpha: context.isDark ? 0.18 : 0.10),
+                  color: color.withValues(alpha: context.isDark ? 0.18 : 0.10),
                   borderRadius: BorderRadius.circular(TabangRadius.xs),
                 ),
-                child: Icon(icon, size: 16, color: _color),
+                child: Icon(icon, size: 16, color: color),
               ),
               const SizedBox(width: TabangSpace.sm),
               Expanded(
@@ -1958,7 +1966,7 @@ class _KpiCard extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 5,
               value: progress.clamp(0.0, 1.0),
-              color: _color,
+              color: color,
             ),
           ),
         ],

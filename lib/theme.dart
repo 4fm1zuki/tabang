@@ -22,6 +22,17 @@ class TabangColors {
   static const Color dangerSoft = Color(0xFFF9DEDC);
   static const Color info = Color(0xFF1F5FA8);
   static const Color infoSoft = Color(0xFFDCE9F8);
+
+  // Foregrounds for the same semantic pills on the dark surfaces. The light
+  // values above sit on pale chips; reused on the charcoal theme they were only
+  // slightly brighter than their own dark tint, so count badges and status
+  // pills were hard to read. These match `scheme.primary` in dark and keep
+  // at least AA contrast against the dark backgrounds in [TabangThemeX].
+  static const Color successOnDark = Color(0xFF7FD9A8);
+  static const Color warningOnDark = Color(0xFFF5C96F);
+  static const Color dangerOnDark = Color(0xFFFFB4A8);
+  static const Color infoOnDark = Color(0xFF9CCBFF);
+  static const Color brandOnDark = Color(0xFFFFB4A8);
   static const Color gold = Color(0xFFB07A16);
   static const Color goldSoft = Color(0xFFF8E9C8);
   static const Color teal = Color(0xFF23695E);

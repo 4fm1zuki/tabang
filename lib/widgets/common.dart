@@ -321,18 +321,21 @@ class SectionLabel extends StatelessWidget {
 /// Semantic tone for pills and badges.
 enum Tone { neutral, success, warning, danger, info, brand }
 
-Color _toneFg(BuildContext context, Tone tone) {
+/// Foreground for a [Tone]. [onLight] keeps the light-theme values when the
+/// pill paints its own white [`onImage`] chip, even if the app is in dark mode.
+Color _toneFg(BuildContext context, Tone tone, {bool onLight = false}) {
+  final dark = context.isDark && !onLight;
   switch (tone) {
     case Tone.success:
-      return TabangColors.success;
+      return dark ? TabangColors.successOnDark : TabangColors.success;
     case Tone.warning:
-      return TabangColors.warning;
+      return dark ? TabangColors.warningOnDark : TabangColors.warning;
     case Tone.danger:
-      return TabangColors.danger;
+      return dark ? TabangColors.dangerOnDark : TabangColors.danger;
     case Tone.info:
-      return TabangColors.info;
+      return dark ? TabangColors.infoOnDark : TabangColors.info;
     case Tone.brand:
-      return TabangColors.crimson;
+      return dark ? TabangColors.brandOnDark : TabangColors.crimson;
     case Tone.neutral:
       return context.textMuted;
   }
@@ -382,7 +385,7 @@ class StatusPill extends StatelessWidget {
     final fg = onImage
         ? (tone == Tone.neutral
               ? TabangColors.crimsonDark
-              : _toneFg(context, tone))
+              : _toneFg(context, tone, onLight: true))
         : _toneFg(context, tone);
     return Container(
       padding: EdgeInsets.symmetric(
@@ -445,7 +448,11 @@ class BloodTypeChip extends StatelessWidget {
         style: TextStyle(
           fontSize: size * 0.36,
           fontWeight: FontWeight.w800,
-          color: TabangColors.crimson,
+          // The chip's own background is maroon in dark mode; the brand
+          // crimson text nearly vanished into it.
+          color: context.isDark
+              ? TabangColors.brandOnDark
+              : TabangColors.crimson,
         ),
       ),
     );
