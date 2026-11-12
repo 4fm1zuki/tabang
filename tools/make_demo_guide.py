@@ -1,9 +1,11 @@
 """Build TABANG_Demonstration_Guide.docx.
 
+Same look as the original guide: Verdana throughout, deep-red section headings
+(#8B0F1A), navy sub-headings (#1A2B4C), grey body text (#333333) and a bold
+label followed by grey detail on each demonstration target.
+
 Structured around the reporter assignments: every section and sub-section names
-its reporter, and each sub-section carries the same four one-line demonstration
-targets (Purpose, Components, How to collect data, How it's made), written for a
-general audience.
+its reporter, and each sub-section carries the same four one-line targets.
 
 Run from the repository root:
 
@@ -19,40 +21,93 @@ from __future__ import annotations
 import os
 
 import docx
-from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Pt, RGBColor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TARGET = os.path.join(ROOT, "TABANG_Demonstration_Guide.docx")
 
+FONT = "Verdana"
+RED = RGBColor(0x8B, 0x0F, 0x1A)  # section headings
+NAVY = RGBColor(0x1A, 0x2B, 0x4C)  # sub-headings
+BODY = RGBColor(0x33, 0x33, 0x33)  # body text and bullet labels
+MUTED = RGBColor(0x55, 0x55, 0x55)  # detail text beside a label
+
 
 def build() -> None:
     document = docx.Document()
-    normal = document.styles["Normal"]
-    normal.font.name = "Calibri"
-    normal.font.size = Pt(11)
-    normal.paragraph_format.space_after = Pt(3)
 
-    def title(text: str) -> None:
-        run = document.add_paragraph().add_run(text)
-        run.bold = True
-        run.font.size = Pt(20)
+    def style(style_name: str, size: float, colour: RGBColor, bold: bool = False):
+        target = document.styles[style_name]
+        target.font.name = FONT
+        target.font.size = Pt(size)
+        target.font.bold = bold
+        target.font.color.rgb = colour
+        return target
 
-    def line(text: str) -> None:
-        document.add_paragraph(text)
+    style("Normal", 10.5, BODY)
+    style("List Bullet", 10, BODY)
+    style("Heading 1", 15, RED, bold=True)
+    style("Heading 2", 12, NAVY, bold=True)
 
-    def head(text: str, level: int = 1) -> None:
-        document.add_heading(text, level=level)
+    def run(paragraph, text: str, size: float, colour: RGBColor, bold=False):
+        piece = paragraph.add_run(text)
+        piece.font.name = FONT
+        piece.font.size = Pt(size)
+        piece.font.color.rgb = colour
+        piece.font.bold = bold
+        return piece
+
+    def cover():
+        top = document.add_paragraph()
+        run(top, "TABANG", 34, RED, bold=True)
+        top.paragraph_format.space_after = Pt(0)
+
+        sub = document.add_paragraph()
+        run(
+            sub,
+            "Transfusion Access, Blood Availability and Network Guidance",
+            12,
+            NAVY,
+        )
+        sub.paragraph_format.space_after = Pt(0)
+
+        kind = document.add_paragraph()
+        run(kind, "Demonstration Guide", 14, BODY, bold=True)
+        kind.paragraph_format.space_after = Pt(0)
+
+        where = document.add_paragraph()
+        run(
+            where,
+            "Digos City, Davao del Sur  \u00b7  Build 2.0.0  \u00b7  "
+            "Seven reporters",
+            10,
+            MUTED,
+        )
+
+    def note(text: str) -> None:
+        paragraph = document.add_paragraph()
+        run(paragraph, text, 10.5, BODY)
+        paragraph.paragraph_format.space_after = Pt(6)
+
+    def heading(text: str, level: int = 1) -> None:
+        paragraph = document.add_heading(level=level)
+        paragraph.add_run(text)
+        for piece in paragraph.runs:
+            piece.font.name = FONT
+            piece.font.size = Pt(15 if level == 1 else 12)
+            piece.font.bold = True
+            piece.font.color.rgb = RED if level == 1 else NAVY
+        paragraph.paragraph_format.space_before = Pt(10)
+        paragraph.paragraph_format.space_after = Pt(2)
 
     def bullets(items: list[str]) -> None:
         for item in items:
-            document.add_paragraph(item, style="List Bullet")
+            paragraph = document.add_paragraph(style="List Bullet")
+            run(paragraph, item, 10, BODY)
+            paragraph.paragraph_format.space_after = Pt(2)
 
-    def section(title_text: str, reporter: str, items: list[str]) -> None:
-        """One sub-section: the four demonstration targets, one line each."""
-        head(f"{title_text} ({reporter})", level=2)
-        bullets(items)
-
-    def targets(
+    def target(
         title_text: str,
         reporter: str,
         purpose: str,
@@ -60,24 +115,26 @@ def build() -> None:
         data: str,
         made: str,
     ) -> None:
-        section(
-            title_text,
-            reporter,
-            [
-                f"Purpose: {purpose}",
-                f"Components: {components}",
-                f"How to collect data: {data}",
-                f"How it's made: {made}",
-            ],
-        )
+        """One sub-section: the four targets, each a bullet with a bold label."""
+        heading(f"{title_text} ({reporter})", level=2)
+        for label, value in (
+            ("Purpose:", purpose),
+            ("Components:", components),
+            ("How to collect data:", data),
+            ("How it's made:", made),
+        ):
+            paragraph = document.add_paragraph(style="List Bullet")
+            run(paragraph, label + " ", 10, BODY, bold=True)
+            run(paragraph, value, 10, MUTED)
+            paragraph.paragraph_format.space_after = Pt(2)
+
+    def plain_target(title_text: str, reporter: str, items: list[str]) -> None:
+        heading(f"{title_text} ({reporter})", level=2)
+        bullets(items)
 
     # ------------------------------------------------------------------ head
-    title("TABANG \u2014 Demonstration Guide")
-    line(
-        "Transfusion Access, Blood Availability and Network Guidance | "
-        "Digos City, Davao del Sur | Build 2.0.0"
-    )
-    line(
+    cover()
+    note(
         "How to use this guide: keep it open while the app is on screen. Each "
         "numbered part belongs to one reporter, says what to show, and gives the "
         "four demonstration targets in one line each. Everything is written for "
@@ -85,7 +142,7 @@ def build() -> None:
     )
 
     # ------------------------------------------------------- who presents
-    head("Who presents what")
+    heading("Who presents what")
     bullets(
         [
             "Ni\u00f1o \u2014 Executive summary; 1. Access & Onboarding (Login, Registration).",
@@ -99,8 +156,8 @@ def build() -> None:
     )
 
     # ------------------------------------------------------- the four targets
-    head("The four demonstration targets")
-    line("Every section below answers the same four questions:")
+    heading("The four demonstration targets")
+    note("Every section below answers the same four questions:")
     bullets(
         [
             "Purpose \u2014 why it exists, and the problem it removes.",
@@ -111,8 +168,8 @@ def build() -> None:
     )
 
     # ---------------------------------------------------------- evaluation
-    head("How we collect data (SUS and SEIPS)")
-    line("Everyone should be able to explain these two in one sentence.")
+    heading("How we collect data (SUS and SEIPS)")
+    note("Everyone should be able to explain these two in one sentence.")
     bullets(
         [
             "SUS (System Usability Scale) \u2014 10 statements answered from 1 (strongly disagree) to 5 (strongly agree), turned into a 0\u2013100 score. About 68 is average; higher means easier to use. It takes two minutes, so anyone can answer.",
@@ -123,7 +180,7 @@ def build() -> None:
     )
 
     # =================================================== 0. exec summary
-    head("Executive Summary (Ni\u00f1o)")
+    heading("Executive Summary (Ni\u00f1o)")
     bullets(
         [
             "Purpose: during an emergency a Digos City family has to call around to find blood; TABANG puts donors, requests and stock in one place.",
@@ -134,8 +191,8 @@ def build() -> None:
     )
 
     # ================================================ 1. access
-    head("1. Access & Onboarding (Ni\u00f1o)")
-    targets(
+    heading("1. Access & Onboarding (Ni\u00f1o)")
+    target(
         "1.1 Login",
         "Ni\u00f1o",
         "sign in and send each account to the right surface for its role.",
@@ -143,7 +200,7 @@ def build() -> None:
         "the email and password typed in, checked against the credential store.",
         "a local salted SHA-256 store; the session is routed by role, and staff or admin accounts cannot self-register.",
     )
-    targets(
+    target(
         "1.2 Registration",
         "Ni\u00f1o",
         "create a new community account.",
@@ -153,9 +210,9 @@ def build() -> None:
     )
 
     # ================================================ 2. community
-    head("2. Community Application (Sam \u00b7 Hanz \u00b7 Lloyd)")
+    heading("2. Community Application (Sam \u00b7 Hanz \u00b7 Lloyd)")
 
-    targets(
+    target(
         "2.1 Home",
         "Sam",
         "the landing feed and the starting point for community users.",
@@ -163,7 +220,7 @@ def build() -> None:
         "reads the seeded drives, announcements, stories and articles; the drive rail shows one photo per drive.",
         "a single in-app snapshot feeds every rail, so anything staff change appears here immediately.",
     )
-    targets(
+    target(
         "2.2 Blood Bank",
         "Sam",
         "show the public blood stock and let users act on it.",
@@ -171,7 +228,7 @@ def build() -> None:
         "unit records (product, storage bay, expiry, status) and a compatibility check for the user's blood type.",
         "a read-only public view over inventory; expired units are excluded, and requesting opens the documented request dialog pre-filled from the unit.",
     )
-    targets(
+    target(
         "2.3 Find Donor",
         "Sam",
         "find donors by area and blood type.",
@@ -179,7 +236,7 @@ def build() -> None:
         "donor records (barangay, blood type, eligibility) plus facility and drive locations; every donor shows as an alias such as Donor #003.",
         "hand-traced barangay geometry over OpenStreetMap base tiles (no API key); tapping a barangay filters the list instantly.",
     )
-    targets(
+    target(
         "2.4 Requests",
         "Hanz",
         "post a blood need and answer one.",
@@ -187,7 +244,7 @@ def build() -> None:
         "patient alias, blood type, component, urgency, the required documents (doctor's form, transfusion slip, patient ID) and the booked blood-bank slot.",
         "requests start as Awaiting verification and need staff review; responses never consume a unit until the requester selects one.",
     )
-    targets(
+    target(
         "2.5 Messages",
         "Hanz",
         "let people coordinate without giving away their identity.",
@@ -195,7 +252,7 @@ def build() -> None:
         "message text only; the thread keeps who wrote what and when.",
         "donors and patients stay as aliases until both sides agree to proceed; staff can reply as the official chapter identity.",
     )
-    targets(
+    target(
         "2.6 Donor Hub",
         "Hanz",
         "turn a community user into a verified donor.",
@@ -203,7 +260,7 @@ def build() -> None:
         "the clinical details the user submits, confirmed by staff at the chapter.",
         "eligibility rules apply automatically \u2014 age, minimum weight, and the 12-week whole-blood interval \u2014 and the donor directory updates at once.",
     )
-    targets(
+    target(
         "2.7 Profile",
         "Lloyd",
         "let a user see and keep their own record.",
@@ -211,7 +268,7 @@ def build() -> None:
         "the account's own stored details; the avatar picker offers the bundled portrait set.",
         "it reads the same repository record the staff console sees, so both sides always agree.",
     )
-    targets(
+    target(
         "2.8 Settings",
         "Lloyd",
         "let a user adjust how the app looks and behaves.",
@@ -219,7 +276,7 @@ def build() -> None:
         "the preferences chosen on this screen.",
         "preferences are held for the session and shared by both shells; signing out asks for confirmation first.",
     )
-    targets(
+    target(
         "2.9 Guides & Help",
         "Lloyd",
         "explain the app and answer common questions.",
@@ -229,9 +286,9 @@ def build() -> None:
     )
 
     # ================================================ 3. staff
-    head("3. Staff Console (Aeron \u00b7 Kath)")
+    heading("3. Staff Console (Aeron \u00b7 Kath)")
 
-    targets(
+    target(
         "3.1 Overview",
         "Aeron",
         "show the chapter's situation at a glance.",
@@ -239,7 +296,7 @@ def build() -> None:
         "aggregated counts from inventory, donations and requests \u2014 no personal medical detail.",
         "read-only summaries computed from the same records the rest of the app uses; the readiness score follows the chapter's own targets.",
     )
-    targets(
+    target(
         "3.2 Operations \u2014 Map",
         "Aeron",
         "work the request queue and see the chapter's workload on the map.",
@@ -247,7 +304,7 @@ def build() -> None:
         "open requests with their documents, and the donor directory (barangay, blood type, eligibility, last donation).",
         "staff verify or reject a request with a written reason and can undo either; choosing donor density brings the donor directory forward.",
     )
-    targets(
+    target(
         "3.3 Operations \u2014 Inventory",
         "Aeron",
         "track every blood unit from collection to use or disposal.",
@@ -255,7 +312,7 @@ def build() -> None:
         "blood type, component, storage bay, collection date, derived expiry, barcode and the current holder.",
         "expiry comes from each component's shelf life; removing, adding and restoring all offer Undo, and a restored barcode cannot clash with one already in use.",
     )
-    targets(
+    target(
         "3.4 Messages",
         "Kath",
         "answer the community from one inbox.",
@@ -263,7 +320,7 @@ def build() -> None:
         "message text, and which conversation the chapter may reply to as the official identity.",
         "staff and the community share one thread per pair; staff can post as the chapter account instead of a personal alias.",
     )
-    targets(
+    target(
         "3.5 Users",
         "Kath",
         "manage every account and the donor-registration queue.",
@@ -271,7 +328,7 @@ def build() -> None:
         "account details, the pending donor registrations awaiting verification, and the moderation history per account.",
         "warn and suspend write to the account record; Message now opens the Messages tab so staff and community see the same screen.",
     )
-    targets(
+    target(
         "3.6 Moderation",
         "Kath",
         "keep conversations and reports within the rules.",
@@ -279,7 +336,7 @@ def build() -> None:
         "flagged messages and their matched keyword, plus the reports users file.",
         "three warnings suspend an account automatically; resolving or dismissing a report offers Undo back to the open queue.",
     )
-    targets(
+    target(
         "3.7 Operations \u2014 Drives",
         "Aeron",
         "create and manage the chapter's blood drives (added after the first draft).",
@@ -289,8 +346,8 @@ def build() -> None:
     )
 
     # ================================================ 4. admin
-    head("4. Admin & Governance (Iverson)")
-    targets(
+    heading("4. Admin & Governance (Iverson)")
+    target(
         "4.1 Readiness Targets",
         "Iverson",
         "let the chapter set its own goals and score against them.",
@@ -298,7 +355,7 @@ def build() -> None:
         "the numbers the admin enters; the score is computed from live records.",
         "only an admin can change a target, and every change is written to the activity log.",
     )
-    targets(
+    target(
         "4.2 Staff & Account Management",
         "Iverson",
         "control who works in the console.",
@@ -308,18 +365,19 @@ def build() -> None:
     )
 
     # ================================================ 5. roles
-    head("5. Role & Persona Matrix (Iverson)")
-    bullets(
+    plain_target(
+        "5. Role & Persona Matrix",
+        "Iverson",
         [
             "Purpose: one table that says who may do what, so no screen has to guess.",
             "Components: the five accounts \u2014 community user, donor, recipient, clinical staff, administrator \u2014 with the actions each one is allowed.",
             "How to collect data: the role stored on each account, set at registration or by an admin.",
             "How it's made: the app checks the role before every action and hides what the role cannot use, so a donor cannot approve a request and staff cannot approve a drive.",
-        ]
+        ],
     )
 
     # ================================================ 6. technical
-    head("6. Technical Foundations (Iverson)")
+    heading("6. Technical Foundations (Iverson)")
     bullets(
         [
             "Purpose: explain, briefly, what the app is built with and why it needs no server.",
@@ -330,19 +388,61 @@ def build() -> None:
     )
 
     # ================================================ 7. final answers
-    head("7. Demonstration Targets — Final Answers (Iverson)")
-    line(
+    heading("7. Demonstration Targets \u2014 Final Answers (Iverson)")
+    note(
         "These are the closing answers to the four questions the whole "
         "demonstration builds up to. Read them last, after every reporter has "
         "shown their part."
     )
-    bullets(
-        [
-            "Purpose? — So a family in Digos City does not have to call around for blood during an emergency. TABANG puts donors, requests and remaining stock in one place, for three users at once: the community (donors and recipients), the Red Cross chapter staff, and the administrator. It is a research prototype on simulated records, and it is judged on usability (SUS) and on the staff's working system (SEIPS).",
-            "Components? — One app, three surfaces. The community app: Home, Blood Bank, Find Donor, Requests, Messages, Donor Hub, Profile, Settings, Guides & Help. The staff console: Overview, Operations (Map, Inventory, Drives), Messages, Users with Moderation as a tab. Admin and governance: Readiness Targets and Staff & Account Management. Under all of them, the Role & Persona Matrix decides who may do what, and Technical Foundations explains how it is built.",
-            "How to collect data? — From the app: registration details, request documents and the booked slot, unit and donation records, and who joined each drive. From people: every respondent answers the 10-statement SUS questionnaire (a 0–100 score, 68 is average), and the clinical staff also go through SEIPS, which checks the whole working system — people, tasks, tools, organisation and surroundings. Thirty-five respondents in Digos City are chosen on purpose (15 donors, 15 recipients or family, 5 clinical personnel) during Academic Year 2026–2027. Everything shown is simulated; no real hospital or Red Cross records are read (RA 10173).",
-            "How it's made? — Flutter with Dart: one codebase that builds both the Android app and the web version. There is no server and no database — an in-memory repository seeded at launch keeps every demonstration identical. The app itself enforces the rules: donor eligibility and cooldown timers, ABO/Rh and component compatibility, and unit expiry from each component's shelf life. The map draws hand-traced barangay boundaries over keyless OpenStreetMap tiles. Privacy is built in: aliases everywhere and double-blind messaging. It ships as Android APKs per processor (arm64, armv7, x86_64) plus a universal APK and a web build.",
-        ]
+
+    def closing(label: str, value: str) -> None:
+        paragraph = document.add_paragraph(style="List Bullet")
+        run(paragraph, label + " ", 10, BODY, bold=True)
+        run(paragraph, value, 10, MUTED)
+        paragraph.paragraph_format.space_after = Pt(4)
+
+    closing(
+        "Purpose?",
+        "So a family in Digos City does not have to call around for blood during "
+        "an emergency. TABANG puts donors, requests and remaining stock in one "
+        "place, for three users at once: the community (donors and recipients), "
+        "the Red Cross chapter staff, and the administrator. It is a research "
+        "prototype on simulated records, judged on usability (SUS) and on the "
+        "staff's working system (SEIPS).",
+    )
+    closing(
+        "Components?",
+        "One app, three surfaces. The community app: Home, Blood Bank, Find "
+        "Donor, Requests, Messages, Donor Hub, Profile, Settings, Guides & Help. "
+        "The staff console: Overview, Operations (Map, Inventory, Drives), "
+        "Messages, Users with Moderation as a tab. Admin and governance: "
+        "Readiness Targets and Staff & Account Management. Under all of them, the "
+        "Role & Persona Matrix decides who may do what, and Technical Foundations "
+        "explains how it is built.",
+    )
+    closing(
+        "How to collect data?",
+        "From the app: registration details, request documents and the booked "
+        "slot, unit and donation records, and who joined each drive. From people: "
+        "every respondent answers the 10-statement SUS questionnaire (a 0\u2013100 "
+        "score, 68 is average), and the clinical staff also go through SEIPS, "
+        "which checks the whole working system \u2014 people, tasks, tools, "
+        "organisation and surroundings. Thirty-five respondents in Digos City are "
+        "chosen on purpose (15 donors, 15 recipients or family, 5 clinical "
+        "personnel) during Academic Year 2026\u20132027. Everything shown is "
+        "simulated; no real hospital or Red Cross records are read (RA 10173).",
+    )
+    closing(
+        "How it's made?",
+        "Flutter with Dart: one codebase that builds both the Android app and the "
+        "web version. There is no server and no database \u2014 an in-memory "
+        "repository seeded at launch keeps every demonstration identical. The app "
+        "itself enforces the rules: donor eligibility and cooldown timers, ABO/Rh "
+        "and component compatibility, and unit expiry from each component's shelf "
+        "life. The map draws hand-traced barangay boundaries over keyless "
+        "OpenStreetMap tiles. Privacy is built in: aliases everywhere and "
+        "double-blind messaging. It ships as Android APKs per processor (arm64, "
+        "armv7, x86_64) plus a universal APK and a web build.",
     )
 
     document.save(TARGET)
