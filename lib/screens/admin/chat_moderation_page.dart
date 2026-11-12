@@ -559,6 +559,19 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                 ),
               ),
               const SizedBox(height: TabangSpace.sm),
+              // Same person search as the desktop layout: type a name to warn
+              // or suspend from the phone too.
+              TextField(
+                controller: _peopleSearch,
+                onChanged: (value) => setState(() => _peopleQuery = value),
+                style: const TextStyle(fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: 'Find a person to warn or suspend',
+                  isDense: true,
+                  prefixIcon: Icon(Icons.search, size: 16),
+                ),
+              ),
+              const SizedBox(height: TabangSpace.sm),
               Row(
                 children: [
                   Expanded(
@@ -585,7 +598,9 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
         ),
         Divider(height: 1, color: context.border),
         Expanded(
-          child: threads.isEmpty
+          child: _peopleQuery.trim().isNotEmpty
+              ? _buildPeopleResults(context)
+              : threads.isEmpty
               ? const EmptyState(
                   art: TabangArt.messages,
                   title: 'No flagged conversations',
