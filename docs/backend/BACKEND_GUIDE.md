@@ -91,8 +91,31 @@ erDiagram
 | Drives & content | `blood_drives`, `drive_interests`, `content_items` |
 | Messaging | `chat_threads`, `chat_thread_members`, `chat_messages`, `user_blocks`, `user_reports` |
 | Operations | `activity_events`, `readiness_targets`, `chapter_metrics`, `moderation_keywords` |
+| Reference/config | `barangays`, `facilities`, `blood_types`, `blood_components`, `document_requirements`, `donor_requirements`, `donor_screening_questions`, `chapter_settings`, `role_capabilities`, `tab_activity_rules` |
 
 Full column dictionary: **Columns** sheet in the workbook.
+
+### Completeness audit
+
+The workbook now includes a **Coverage Audit** sheet with **282 rows**: every Dart class, enum, field, derived getter, constant list, repository state field and auth artifact is mapped to a table column, a normalized row, a derived view/function, a config table, or explicitly marked client-only/ephemeral. The **Gap Closure** sheet records the differences found during that audit and where each is fixed.
+
+The first draft was not complete enough. The audit found and closed these gaps:
+
+- Missing `barangays` and `facilities` reference data.
+- Missing blood type/component labels, shelf life and cooldown configuration.
+- Missing document requirements, donor requirements and screening questions.
+- Missing chapter identity, staff room, warning reason, blood-bank hours and eligibility constants.
+- Missing role-capability and tab-dot rule tables.
+- Missing `EligibilityBlocker`, `daysRemaining` and donor-type mapping in the donor projection.
+- Missing alias snapshots on warnings, reports, activity, thread members and responses.
+- Missing `legacy_id` on responses, warnings, applications, removals, content, threads, messages, reports and activity.
+- Missing `previewAsset` for seeded request documents.
+- No way to represent the chapter organization account because `profiles.id` requires `auth.users`.
+- No direct-thread pair uniqueness/cardinality rule.
+- No donation rows or trigger to maintain cached totals/last donation.
+- No backend home for unread counts, last message, flagged counts, per-type/barangay stats or shortage lists.
+
+Every one of those is now in the workbook, the SQL starter, or both, and each is called out in **Gap Closure**.
 
 ---
 
@@ -142,7 +165,45 @@ Store every event, message, hold and request timestamp as `timestamptz` in UTC. 
 
 `chapter_metrics` is a derived singleton row refreshed by triggers or a short `pg_cron` job. Do not recompute the readiness score by scanning every table in the Flutter client. The score is still never entered by hand.
 
-### 4.7 Audit first, delete later
+### 4.7 Derived and pre-calculated values
+
+Several values are deliberately not columns. They are computed in one place and consumed everywhere:
+
+| Value | Backend home |
+|---|---|
+| Unit effective status / expiry | `blood_units_public.effective_status`, `expires_on` |
+| Donor eligibility, blocker, days remaining | `donor_directory` projection + eligibility function/job |
+| Public request fields | `request_public` |
+| Public stock fields | `blood_units_public` |
+| Chapter KPIs and readiness score | `chapter_metrics` |
+| Donations vs requests per blood type | `blood_type_stats` view |
+| Donations/donors per barangay | `barangay_stats` view |
+| Eligible donors/open requests/pending applications by barangay | `donor_counts_by_barangay`, `open_requests_by_barangay`, `pending_applications_by_barangay` |
+| Unread messages, last message, flagged count | `thread_unread_counts`, `thread_last_message`, `thread_moderation_summary` |
+| Expiring units, critical shortage types | `expiring_soon`, `critical_shortage_types` |
+| Request can-be-fulfilled/rejected/accepts responses | SQL expression/RPC guard |
+| Role capabilities | `role_capabilities` |
+| Tab-dot rules | `tab_activity_rules` |
+| Age, initials, map handle, unit time-left, size label | UI/date math; `public_handle` for the map handle |
+
+The **Derived & Precomputed** sheet lists **83** of these with their exact formula or backend home. If a value is not in that sheet, it is either stored in the **Columns** sheet or explicitly marked client-only in **Coverage Audit**.
+
+### 4.8 IDs and cardinalities
+
+- Use UUID primary keys. Keep `legacy_id` for `USR-###`, `REQ-###`, `RES-###`, `WRN-###`, `ROOM-###`, `DRV-###`, `RPT-###`, `ACT-...`, `MSG-...` and `DNA-###`.
+- `blood_units.barcode` is the natural key.
+- `USR-CHAPTER` is a real auth user with `profiles.is_system = true`, a random unshared password and interactive login disabled. It is the organization identity, not a staff login.
+- `STAFF-ROOM` is a `chat_threads.legacy_id`.
+- One direct thread per pair: `chat_threads.pair_key` unique.
+- One response per `(request_id, donor_id)`.
+- One document per `(request_id, kind)`.
+- One active hold per barcode: partial unique index on `request_units`.
+- One active block per `(blocker_id, blocked_id)`.
+- One open donor application per user.
+- One donor, one active commitment: enforced in `select_donor_response`, not by a simple unique index.
+- Direct threads have exactly two members; group threads have at least two and a name; chapter threads are the chapter account plus one user. Enforce these in the thread RPC/trigger.
+
+### 4.9 Audit first, delete later
 
 - Requests have `request_status_history`.
 - Inventory removals keep a JSON snapshot.
@@ -547,5 +608,9 @@ Do not start with Realtime. A correct schema and transactional RPCs matter more 
 | Security Checklist | Non-negotiables |
 | Implementation Phases | Suggested build order |
 | SQL Snippets | Copy/paste starters |
+| Coverage Audit | Every Dart class, enum, field, getter, constant and repository state field mapped |
+| Derived & Precomputed | Every computed getter/aggregate and its backend home |
+| IDs & Constraints | ID formats, keys, uniqueness and cardinality |
+| Gap Closure | Differences found in the completeness audit and where each is fixed |
 
 The SQL file is a **starter**, not a tested migration. Review it against your Supabase project, then split it into versioned migrations (`supabase migration new ...`). Do not run it blindly on a project with data.

@@ -52,7 +52,9 @@ does not exist.
 Supabase schema, RLS, Realtime and sync blueprint. The companion workbook is
 [`docs/backend/TABANG_Backend_Guide.xlsx`](docs/backend/TABANG_Backend_Guide.xlsx)
 and the starter DDL is
-[`docs/backend/supabase_schema.sql`](docs/backend/supabase_schema.sql).
+[`docs/backend/supabase_schema.sql`](docs/backend/supabase_schema.sql). The
+workbook includes a 282-row model coverage audit, 83 derived/pre-calculated
+values, ID/cardinality constraints and a gap-closure log.
 
 ### Demo accounts
 

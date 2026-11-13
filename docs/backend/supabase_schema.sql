@@ -35,6 +35,78 @@ do $$ begin create type public.activity_kind as enum ('donation','donation_windo
 do $$ begin create type public.thread_kind as enum ('direct','chapter','group'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.notification_kind as enum ('request','response','message','warning','drive','application','system'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.document_kind as enum ('doctors_form','transfusion_slip','patient_id','typing_result'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.eligibility_blocker as enum ('none','cooldown','underage','overage','underweight','weight_missing','suspended','unverified','unavailable','away','no_blood_type','restricted'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.facility_kind as enum ('chapter','hospital'); exception when duplicate_object then null; end $$;
+
+-- ============================================================ reference data
+create table if not exists public.barangays (
+  name text primary key,
+  province text not null default 'Davao del Sur',
+  is_city boolean not null default false,
+  sort_order smallint not null default 0
+);
+
+create table if not exists public.blood_types (
+  code public.blood_type primary key,
+  label text not null unique,
+  sort_order smallint not null default 0
+);
+
+create table if not exists public.blood_components (
+  code public.blood_component primary key,
+  label text not null,
+  short_code text not null unique,
+  shelf_life_days integer not null check (shelf_life_days > 0),
+  cooldown_days integer not null check (cooldown_days > 0),
+  sort_order smallint not null default 0
+);
+
+create table if not exists public.facilities (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  kind public.facility_kind not null default 'hospital',
+  barangay text not null references public.barangays(name) on delete restrict,
+  address text,
+  lat numeric(9,6),
+  lng numeric(9,6),
+  is_active boolean not null default true
+);
+
+create table if not exists public.document_requirements (
+  kind public.document_kind primary key,
+  label text not null,
+  is_required boolean not null default false,
+  sort_order smallint not null default 0
+);
+
+create table if not exists public.donor_requirements (
+  code text primary key,
+  label text not null,
+  sort_order smallint not null default 0,
+  is_active boolean not null default true
+);
+
+create table if not exists public.donor_screening_questions (
+  id uuid primary key default gen_random_uuid(),
+  question text not null unique,
+  sort_order smallint not null default 0,
+  is_active boolean not null default true,
+  answer_persisted boolean not null default false
+);
+
+create table if not exists public.role_capabilities (
+  role public.user_role not null,
+  capability text not null,
+  allowed boolean not null default false,
+  primary key (role, capability)
+);
+
+create table if not exists public.tab_activity_rules (
+  tab text not null,
+  activity_kind public.activity_kind not null,
+  personal_only boolean not null default false,
+  primary key (tab, activity_kind)
+);
 
 -- ============================================================ profiles
 create table if not exists public.profiles (
@@ -44,7 +116,7 @@ create table if not exists public.profiles (
   alias text not null,
   email text not null,
   phone text not null default '',
-  barangay text not null default 'Zone 1',
+  barangay text not null default 'Zone 1' references public.barangays(name) on delete restrict,
   role public.user_role not null default 'user',
   status public.account_status not null default 'unverified',
   warning_count smallint not null default 0 check (warning_count between 0 and 3),
@@ -66,6 +138,7 @@ create table if not exists public.profiles (
   photo_path text,
   allowed_components public.blood_component[],
   public_handle text not null,
+  is_system boolean not null default false,
   must_change_password boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -91,7 +164,9 @@ create table if not exists public.donor_directory (
   total_donations integer not null default 0,
   last_active_at timestamptz,
   is_eligible boolean not null default false,
+  eligibility_blocker public.eligibility_blocker not null default 'none',
   eligible_from date,
+  days_remaining integer not null default 0 check (days_remaining >= 0),
   eligibility_reason text,
   updated_at timestamptz not null default now()
 );
@@ -102,8 +177,8 @@ create index if not exists donor_directory_eligible_idx on public.donor_director
 -- ============================================================ inventory
 create table if not exists public.blood_units (
   barcode text primary key,
-  blood_type public.blood_type not null,
-  component public.blood_component not null,
+  blood_type public.blood_type not null references public.blood_types(code) on delete restrict,
+  component public.blood_component not null references public.blood_components(code) on delete restrict,
   storage_bay text not null default 'Unassigned',
   status public.unit_status not null default 'available',
   collected_on date not null default current_date,
@@ -136,6 +211,7 @@ create table if not exists public.blood_units_public (
 
 create table if not exists public.inventory_removals (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   barcode text not null,
   unit_snapshot jsonb not null default '{}'::jsonb,
   removed_by uuid not null references public.profiles(id) on delete restrict,
@@ -153,8 +229,8 @@ create table if not exists public.requests (
   legacy_id text unique,
   requester_id uuid not null references public.profiles(id) on delete restrict,
   patient_alias text not null,
-  blood_type public.blood_type not null,
-  component public.blood_component not null,
+  blood_type public.blood_type not null references public.blood_types(code) on delete restrict,
+  component public.blood_component not null references public.blood_components(code) on delete restrict,
   units_needed smallint not null default 1 check (units_needed between 1 and 20),
   hospital text not null,
   barangay text not null,
@@ -203,9 +279,10 @@ create index if not exists request_public_status_idx on public.request_public (s
 create table if not exists public.request_documents (
   id uuid primary key default gen_random_uuid(),
   request_id uuid not null references public.requests(id) on delete cascade,
-  kind public.document_kind not null,
+  kind public.document_kind not null references public.document_requirements(kind) on delete restrict,
   file_name text not null,
   storage_path text not null unique,
+  preview_asset text,
   mime_type text not null,
   size_bytes bigint not null check (size_bytes between 1 and 8388608),
   uploaded_by uuid not null references public.profiles(id) on delete restrict,
@@ -226,6 +303,7 @@ create unique index if not exists request_units_active_barcode_uidx on public.re
 
 create table if not exists public.request_responses (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   request_id uuid not null references public.requests(id) on delete cascade,
   donor_id uuid not null references public.profiles(id) on delete restrict,
   donor_handle_snapshot text not null,
@@ -252,10 +330,12 @@ create index if not exists request_status_history_request_idx on public.request_
 -- ============================================================ donors
 create table if not exists public.account_warnings (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   user_id uuid not null references public.profiles(id) on delete cascade,
   level smallint not null check (level between 1 and 3),
   message text not null,
   issued_by uuid not null references public.profiles(id) on delete restrict,
+  issued_by_alias_snapshot text not null default '',
   issued_at timestamptz not null default now(),
   acknowledged_at timestamptz,
   revoked_at timestamptz,
@@ -265,6 +345,7 @@ create index if not exists account_warnings_user_idx on public.account_warnings 
 
 create table if not exists public.donor_applications (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   user_id uuid not null references public.profiles(id) on delete cascade,
   submitted_at timestamptz not null default now(),
   status public.donor_application_status not null default 'pending',
@@ -285,6 +366,7 @@ create unique index if not exists donor_applications_one_open_uidx
 
 create table if not exists public.donations (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   donor_id uuid not null references public.profiles(id) on delete restrict,
   component public.blood_component not null,
   donated_at timestamptz not null default now(),
@@ -302,7 +384,7 @@ create table if not exists public.blood_drives (
   legacy_id text unique,
   title text not null,
   venue text not null,
-  barangay text not null,
+  barangay text not null references public.barangays(name) on delete restrict,
   starts_at timestamptz not null,
   ends_at timestamptz not null,
   expected_donors integer not null check (expected_donors > 0),
@@ -329,6 +411,7 @@ create table if not exists public.drive_interests (
 
 create table if not exists public.content_items (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   title text not null,
   subtitle text not null default '',
   body text not null,
@@ -343,6 +426,8 @@ create table if not exists public.content_items (
 -- ============================================================ messaging
 create table if not exists public.chat_threads (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
+  pair_key text unique,
   kind public.thread_kind not null default 'direct',
   group_name text,
   identity_revealed boolean not null default false,
@@ -356,6 +441,7 @@ create table if not exists public.chat_threads (
 create table if not exists public.chat_thread_members (
   thread_id uuid not null references public.chat_threads(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
+  alias_snapshot text not null default '',
   joined_at timestamptz not null default now(),
   last_read_at timestamptz,
   primary key (thread_id, user_id)
@@ -364,6 +450,7 @@ create index if not exists chat_thread_members_user_idx on public.chat_thread_me
 
 create table if not exists public.chat_messages (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   thread_id uuid not null references public.chat_threads(id) on delete cascade,
   sender_id uuid references public.profiles(id) on delete set null,
   sender_alias_snapshot text not null,
@@ -389,8 +476,11 @@ create unique index if not exists user_blocks_active_uidx
 
 create table if not exists public.user_reports (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   reporter_id uuid not null references public.profiles(id) on delete cascade,
   reported_user_id uuid not null references public.profiles(id) on delete restrict,
+  reporter_alias_snapshot text not null default '',
+  reported_alias_snapshot text not null default '',
   reason text not null,
   details text,
   thread_id uuid references public.chat_threads(id) on delete set null,
@@ -401,12 +491,33 @@ create table if not exists public.user_reports (
 );
 create index if not exists user_reports_status_idx on public.user_reports (status, created_at);
 
+-- ============================================================ chapter settings
+create table if not exists public.chapter_settings (
+  id smallint primary key default 1 check (id = 1),
+  chapter_name text not null,
+  chapter_subtitle text not null,
+  chapter_account_id uuid references public.profiles(id) on delete set null,
+  staff_room_thread_id uuid references public.chat_threads(id) on delete set null,
+  warning_suspension_reason text not null,
+  min_age integer not null default 18 check (min_age > 0),
+  max_age integer not null default 65 check (max_age > min_age),
+  min_weight_kg numeric(5,2) not null default 50 check (min_weight_kg > 0),
+  away_after_days integer not null default 30 check (away_after_days > 0),
+  default_cooldown_days integer not null default 84 check (default_cooldown_days > 0),
+  blood_bank_weekday_hours smallint[] not null default '{8,9,10,11,13,14,15}',
+  blood_bank_saturday_hours smallint[] not null default '{8,9,10,11}',
+  updated_at timestamptz not null default now()
+);
+
 -- ============================================================ activity, dots, metrics, notifications
 create table if not exists public.activity_events (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   kind public.activity_kind not null,
   actor_id uuid references public.profiles(id) on delete set null,
   subject_id uuid references public.profiles(id) on delete set null,
+  actor_alias_snapshot text not null default '',
+  subject_alias_snapshot text,
   summary text not null,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
@@ -471,6 +582,111 @@ create table if not exists public.moderation_keywords (
 );
 create unique index if not exists moderation_keywords_flag_lower_uidx on public.moderation_keywords (flag, lower(keyword));
 
+-- ============================================================ reference seed
+insert into public.barangays (name, sort_order) values
+  ('Aplaya',1),('Balabag',2),('Binaton',3),('Cogon',4),('Colorado',5),
+  ('Dawis',6),('Dulangan',7),('Goma',8),('Igpit',9),('Kapatagan',10),
+  ('Kiagot',11),('Lungag',12),('Mahayahay',13),('Matti',14),('Ruparan',15),
+  ('San Agustin',16),('San Jose',17),('San Miguel',18),('San Roque',19),
+  ('Sinawilan',20),('Soong',21),('Tiguman',22),('Tres De Mayo',23),
+  ('Zone 1',24),('Zone 2',25),('Zone 3',26)
+on conflict (name) do nothing;
+
+insert into public.blood_types (code, label, sort_order) values
+  ('O_NEG','O−',1),('O_POS','O+',2),('A_NEG','A−',3),('A_POS','A+',4),
+  ('B_NEG','B−',5),('B_POS','B+',6),('AB_NEG','AB−',7),('AB_POS','AB+',8)
+on conflict (code) do nothing;
+
+insert into public.blood_components (code, label, short_code, shelf_life_days, cooldown_days, sort_order) values
+  ('WHOLE_BLOOD','Whole blood','WB',42,84,1),
+  ('PACKED_RBC','Packed red blood cells','RBC',42,84,2),
+  ('PLATELETS','Platelets (apheresis)','PLT',5,14,3),
+  ('PLASMA','Fresh frozen plasma','FFP',365,28,4)
+on conflict (code) do nothing;
+
+insert into public.facilities (name, kind, barangay, address, lat, lng) values
+  ('Philippine Red Cross - Davao del Sur Chapter','chapter','Zone 1','Quezon Avenue, Digos City',6.757051,125.352800),
+  ('Digos Provincial Hospital','hospital','Zone 2','Malvar Street, Digos City',6.743810,125.361265),
+  ('Digos Doctors Hospital','hospital','Zone 3','MacArthur Highway, Digos City',6.764423,125.355069)
+on conflict (name) do nothing;
+
+insert into public.document_requirements (kind, label, is_required, sort_order) values
+  ('doctors_form','Doctor''s request form',true,1),
+  ('transfusion_slip','Blood transfusion slip',true,2),
+  ('patient_id','Valid hospital patient ID',true,3),
+  ('typing_result','Blood typing / cross-match result',false,4)
+on conflict (kind) do nothing;
+
+insert into public.donor_requirements (code, label, sort_order) values
+  ('valid_id','Valid government or school ID',1),
+  ('prc_card','PRC blood donor card, if you have one',2),
+  ('medications','List of current medications',3),
+  ('interview','Chapter interview and physical examination',4),
+  ('screening','Blood typing and infection screening',5)
+on conflict (code) do nothing;
+
+insert into public.donor_screening_questions (question, sort_order) values
+  ('Fever, cough or an infection in the last 7 days',1),
+  ('Alcohol in the last 24 hours',2),
+  ('Aspirin or pain relievers in the last 3 days',3),
+  ('Medication or a vaccine in the last 4 weeks',4),
+  ('Tattoo, piercing or acupuncture in the last 12 months',5),
+  ('Surgery or dental extraction in the last 12 months',6),
+  ('Pregnant or breastfeeding (female donors)',7),
+  ('Hepatitis B/C, HIV or a positive screening test',8),
+  ('Cancer, heart disease or a bleeding disorder',9),
+  ('Travel outside the Philippines in the last 12 months',10)
+on conflict (question) do nothing;
+
+insert into public.role_capabilities (role, capability, allowed) values
+  ('admin','request_blood',true),('admin','register_as_donor',false),('admin','verify_donors',true),
+  ('admin','manage_inventory',true),('admin','fulfill_requests',true),('admin','moderate',true),
+  ('admin','add_staff',true),('admin','manage_staff',true),
+  ('staff','request_blood',false),('staff','register_as_donor',false),('staff','verify_donors',true),
+  ('staff','manage_inventory',true),('staff','fulfill_requests',true),('staff','moderate',true),
+  ('staff','add_staff',false),('staff','manage_staff',false),
+  ('donor','request_blood',true),('donor','register_as_donor',false),('donor','verify_donors',false),
+  ('donor','manage_inventory',false),('donor','fulfill_requests',false),('donor','moderate',false),
+  ('donor','add_staff',false),('donor','manage_staff',false),
+  ('recipient','request_blood',true),('recipient','register_as_donor',true),('recipient','verify_donors',false),
+  ('recipient','manage_inventory',false),('recipient','fulfill_requests',false),('recipient','moderate',false),
+  ('recipient','add_staff',false),('recipient','manage_staff',false),
+  ('user','request_blood',true),('user','register_as_donor',true),('user','verify_donors',false),
+  ('user','manage_inventory',false),('user','fulfill_requests',false),('user','moderate',false),
+  ('user','add_staff',false),('user','manage_staff',false)
+on conflict (role, capability) do update set allowed = excluded.allowed;
+
+insert into public.tab_activity_rules (tab, activity_kind, personal_only) values
+  ('home','donation',false),('home','inventory',false),('home','request_verified',false),
+  ('find_donor','verification',false),('find_donor','request_verified',false),
+  ('requests','request_submitted',false),('requests','request_verified',false),('requests','request_rejected',false),
+  ('bloodbank','inventory',false),
+  ('donor_hub','application',true),('donor_hub','verification',true),('donor_hub','warning',true),
+  ('donor_hub','suspension',true),('donor_hub','donation',true),('donor_hub','donation_window',true),
+  ('overview','donation',false),
+  ('operations','request_submitted',false),('operations','request_verified',false),('operations','request_rejected',false),('operations','inventory',false),
+  ('users','application',false),('users','verification',false),('users','warning',false),('users','suspension',false),('users','profile',false),('users','avatar',false),
+  ('moderation','report',false)
+on conflict (tab, activity_kind) do update set personal_only = excluded.personal_only;
+
+insert into public.chapter_settings (
+  id, chapter_name, chapter_subtitle, warning_suspension_reason,
+  min_age, max_age, min_weight_kg, away_after_days, default_cooldown_days,
+  blood_bank_weekday_hours, blood_bank_saturday_hours
+) values (
+  1,
+  'Philippine Red Cross - Davao del Sur Chapter',
+  'Official chapter account · Quezon Avenue, Digos City',
+  'Three moderation warnings on record.',
+  18, 65, 50, 30, 84,
+  '{8,9,10,11,13,14,15}',
+  '{8,9,10,11}'
+)
+on conflict (id) do nothing;
+
+-- chapter_settings is seeded after the chapter account and staff room exist.
+-- See the commented seed block near the end of this file.
+
 -- ============================================================ shared helpers
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
@@ -520,6 +736,36 @@ returns boolean language sql stable security definer set search_path = public, p
   );
 $$;
 
+create or replace function public.can_donate_component(
+  p_donor public.blood_type,
+  p_recipient public.blood_type,
+  p_component public.blood_component
+)
+returns boolean
+language sql immutable
+as $$
+  select case
+    when p_component = 'plasma' then
+      case
+        when p_donor in ('AB_NEG','AB_POS') then true
+        when p_donor in ('A_NEG','A_POS') then p_recipient in ('A_NEG','A_POS','O_NEG','O_POS')
+        when p_donor in ('B_NEG','B_POS') then p_recipient in ('B_NEG','B_POS','O_NEG','O_POS')
+        else p_recipient in ('O_NEG','O_POS')
+      end
+    else
+      case p_recipient
+        when 'O_NEG' then p_donor = 'O_NEG'
+        when 'O_POS' then p_donor in ('O_NEG','O_POS')
+        when 'A_NEG' then p_donor in ('O_NEG','A_NEG')
+        when 'A_POS' then p_donor in ('O_NEG','O_POS','A_NEG','A_POS')
+        when 'B_NEG' then p_donor in ('O_NEG','B_NEG')
+        when 'B_POS' then p_donor in ('O_NEG','O_POS','B_NEG','B_POS')
+        when 'AB_NEG' then p_donor in ('O_NEG','A_NEG','B_NEG','AB_NEG')
+        when 'AB_POS' then true
+      end
+  end;
+$$;
+
 -- ============================================================ profile creation
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
@@ -565,7 +811,8 @@ begin
     user_id, public_handle, blood_type, barangay, account_status,
     blood_card_verified, is_available, last_donation_date,
     last_donation_component, total_donations, last_active_at,
-    is_eligible, eligible_from, eligibility_reason, updated_at
+    is_eligible, eligibility_blocker, eligible_from, days_remaining,
+    eligibility_reason, updated_at
   )
   select
     p.id,
@@ -590,10 +837,31 @@ begin
       and (p.last_active_at is null or p.last_active_at > now() - interval '30 days')
       and (p.last_donation_date is null or p.last_donation_date + interval '84 days' <= current_date)
     ),
+    (
+      case
+        when p.status = 'suspended' then 'suspended'
+        when p.status = 'unverified' then 'unverified'
+        when p.blood_type is null then 'no_blood_type'
+        when p.birth_date is not null and p.birth_date > current_date - interval '18 years' then 'underage'
+        when p.birth_date is not null and p.birth_date < current_date - interval '65 years' then 'overage'
+        when p.weight_kg is null then 'weight_missing'
+        when p.weight_kg < 50 then 'underweight'
+        when not p.is_available then 'unavailable'
+        when p.last_active_at is not null and p.last_active_at <= now() - interval '30 days' then 'away'
+        when p.last_donation_date is not null and p.last_donation_date + interval '84 days' > current_date then 'cooldown'
+        else 'none'
+      end
+    )::public.eligibility_blocker,
     case
       when p.last_donation_date is not null
       then (p.last_donation_date + interval '84 days')::date
       else null
+    end,
+    case
+      when p.last_donation_date is not null
+        and p.last_donation_date + interval '84 days' > current_date
+      then (p.last_donation_date + interval '84 days' - current_date)::integer
+      else 0
     end,
     case
       when p.role <> 'donor' then 'Not a donor'
@@ -603,7 +871,7 @@ begin
       when p.weight_kg is null then 'Weight not recorded'
       when p.weight_kg < 50 then 'Below minimum weight'
       when not p.is_available then 'Marked unavailable'
-      when p.last_active_at is not null and p.last_active_at <= now() - interval '30 days' then 'Away — no app activity for 30+ days'
+      when p.last_active_at is not null and p.last_active_at <= now() - interval '30 days' then 'Away - no app activity for 30+ days'
       when p.last_donation_date is not null and p.last_donation_date + interval '84 days' > current_date then 'Within donation cooldown'
       else 'Eligible'
     end,
@@ -624,7 +892,9 @@ begin
     total_donations = excluded.total_donations,
     last_active_at = excluded.last_active_at,
     is_eligible = excluded.is_eligible,
+    eligibility_blocker = excluded.eligibility_blocker,
     eligible_from = excluded.eligible_from,
+    days_remaining = excluded.days_remaining,
     eligibility_reason = excluded.eligibility_reason,
     updated_at = now();
 end;
@@ -766,7 +1036,7 @@ declare t text;
 begin
   foreach t in array array[
     'profiles','blood_units','requests','request_responses','donor_applications',
-    'blood_drives','content_items','chat_threads','readiness_targets'
+    'blood_drives','content_items','chat_threads','readiness_targets','chapter_settings'
   ] loop
     execute format('drop trigger if exists %I on public.%I', 'set_updated_at_' || t, t);
     execute format('create trigger %I before update on public.%I for each row execute function public.touch_updated_at()', 'set_updated_at_' || t, t);
@@ -833,6 +1103,52 @@ $$;
 drop trigger if exists apply_donation on public.donations;
 create trigger apply_donation after insert on public.donations
 for each row execute function public.trg_apply_donation();
+
+-- Fill alias snapshots even when a caller omits them.
+create or replace function public.trg_enrich_activity_aliases()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.actor_alias_snapshot = '' and new.actor_id is not null then
+    select coalesce(alias, '') into new.actor_alias_snapshot from public.profiles where id = new.actor_id;
+  end if;
+  if (new.subject_alias_snapshot is null or new.subject_alias_snapshot = '') and new.subject_id is not null then
+    select coalesce(alias, '') into new.subject_alias_snapshot from public.profiles where id = new.subject_id;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists enrich_activity_aliases on public.activity_events;
+create trigger enrich_activity_aliases before insert on public.activity_events
+for each row execute function public.trg_enrich_activity_aliases();
+
+create or replace function public.trg_enrich_thread_member()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.alias_snapshot = '' then
+    select coalesce(alias, '') into new.alias_snapshot from public.profiles where id = new.user_id;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists enrich_thread_member on public.chat_thread_members;
+create trigger enrich_thread_member before insert on public.chat_thread_members
+for each row execute function public.trg_enrich_thread_member();
+
+create or replace function public.trg_enrich_report_aliases()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.reporter_alias_snapshot = '' then
+    select coalesce(alias, '') into new.reporter_alias_snapshot from public.profiles where id = new.reporter_id;
+  end if;
+  if new.reported_alias_snapshot = '' then
+    select coalesce(alias, '') into new.reported_alias_snapshot from public.profiles where id = new.reported_user_id;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists enrich_report_aliases on public.user_reports;
+create trigger enrich_report_aliases before insert on public.user_reports
+for each row execute function public.trg_enrich_report_aliases();
 
 -- Lightweight metrics refresh. For a busy deployment, replace these triggers
 -- with a pg_cron job every 15–30 seconds.
@@ -1105,11 +1421,12 @@ begin
 
   next_level := least(3, p.warning_count + 1)::smallint;
 
-  insert into public.account_warnings (user_id, level, message, issued_by)
+  insert into public.account_warnings (user_id, level, message, issued_by, issued_by_alias_snapshot)
   values (p_user_id, next_level,
           coalesce(nullif(btrim(p_reason), ''),
                    'A chapter moderator flagged activity on your account.'),
-          auth.uid())
+          auth.uid(),
+          (select alias from public.profiles where id = auth.uid()))
   returning * into w;
 
   update public.profiles
@@ -1145,6 +1462,20 @@ begin
 end;
 $$;
 
+create or replace function public.acknowledge_warnings()
+returns integer
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare n integer;
+begin
+  if auth.uid() is null then raise exception 'not_authenticated'; end if;
+  update public.account_warnings
+  set acknowledged_at = now()
+  where user_id = auth.uid() and acknowledged_at is null;
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
 create or replace function public.set_readiness_targets(
   p_unit integer,
   p_donor integer,
@@ -1175,6 +1506,128 @@ begin
 end;
 $$;
 
+-- ============================================================ derived views
+create or replace view public.blood_type_stats
+with (security_invoker = true) as
+select
+  bt.code as blood_type,
+  coalesce(d.donated, 0)::integer as donated,
+  coalesce(r.requested, 0)::integer as requested,
+  (coalesce(d.donated, 0) - coalesce(r.requested, 0))::integer as balance
+from public.blood_types bt
+left join (
+  select p.blood_type, count(*)::integer as donated
+  from public.donations dn
+  join public.profiles p on p.id = dn.donor_id
+  group by p.blood_type
+) d on d.blood_type = bt.code
+left join (
+  select blood_type, sum(units_needed)::integer as requested
+  from public.requests
+  where status <> 'cancelled' and deleted_at is null
+  group by blood_type
+) r on r.blood_type = bt.code;
+
+create or replace view public.barangay_stats
+with (security_invoker = true) as
+select
+  b.name as barangay,
+  coalesce(d.donation_count, 0)::integer as donation_count,
+  coalesce(c.donor_count, 0)::integer as donor_count
+from public.barangays b
+left join (
+  select p.barangay, count(*)::integer as donation_count
+  from public.donations dn
+  join public.profiles p on p.id = dn.donor_id
+  group by p.barangay
+) d on d.barangay = b.name
+left join (
+  select barangay, count(*)::integer as donor_count
+  from public.donor_directory
+  where barangay is not null
+  group by barangay
+) c on c.barangay = b.name
+where coalesce(c.donor_count, 0) > 0;
+
+create or replace view public.donor_counts_by_barangay
+with (security_invoker = true) as
+select barangay, count(*)::integer as donor_count
+from public.donor_directory
+where is_eligible and barangay is not null
+group by barangay;
+
+create or replace view public.open_requests_by_barangay
+with (security_invoker = true) as
+select barangay, count(*)::integer as request_count
+from public.requests
+where status in ('open','matched') and deleted_at is null
+group by barangay;
+
+create or replace view public.pending_applications_by_barangay
+with (security_invoker = true) as
+select p.barangay, count(*)::integer as application_count
+from public.donor_applications a
+join public.profiles p on p.id = a.user_id
+where a.status in ('pending','documents_requested')
+group by p.barangay;
+
+create or replace view public.thread_unread_counts
+with (security_invoker = true) as
+select
+  m.thread_id,
+  m.user_id,
+  count(msg.id)::integer as unread_count,
+  (count(msg.id) > 0) as has_unread
+from public.chat_thread_members m
+left join public.chat_messages msg
+  on msg.thread_id = m.thread_id
+ and msg.deleted_at is null
+ and msg.sender_id is not null
+ and msg.sender_id <> m.user_id
+ and (m.last_read_at is null or msg.sent_at > m.last_read_at)
+group by m.thread_id, m.user_id;
+
+create or replace view public.thread_last_message
+with (security_invoker = true) as
+select distinct on (thread_id)
+  thread_id,
+  id as message_id,
+  sender_id,
+  sender_alias_snapshot,
+  text,
+  sent_at,
+  flag
+from public.chat_messages
+where deleted_at is null
+order by thread_id, sent_at desc;
+
+create or replace view public.thread_moderation_summary
+with (security_invoker = true) as
+select
+  thread_id,
+  count(*) filter (where flag <> 'clean')::integer as flagged_count,
+  bool_or(flag <> 'clean') as has_flagged_messages
+from public.chat_messages
+where deleted_at is null
+group by thread_id;
+
+create or replace view public.expiring_soon
+with (security_invoker = true) as
+select *
+from public.blood_units_public
+where effective_status = 'available'
+  and expires_on > now()
+  and expires_on <= now() + interval '7 days';
+
+create or replace view public.critical_shortage_types
+with (security_invoker = true) as
+select bt.code as blood_type
+from public.blood_types bt
+where not exists (
+  select 1 from public.blood_units_public u
+  where u.blood_type = bt.code and u.effective_status = 'available'
+);
+
 -- ============================================================ RLS
 alter table public.profiles enable row level security;
 alter table public.donor_directory enable row level security;
@@ -1204,6 +1657,16 @@ alter table public.readiness_targets enable row level security;
 alter table public.chapter_metrics enable row level security;
 alter table public.notifications enable row level security;
 alter table public.moderation_keywords enable row level security;
+alter table public.barangays enable row level security;
+alter table public.facilities enable row level security;
+alter table public.blood_types enable row level security;
+alter table public.blood_components enable row level security;
+alter table public.document_requirements enable row level security;
+alter table public.donor_requirements enable row level security;
+alter table public.donor_screening_questions enable row level security;
+alter table public.chapter_settings enable row level security;
+alter table public.role_capabilities enable row level security;
+alter table public.tab_activity_rules enable row level security;
 
 -- profiles: own row or staff. Direct updates are not allowed; use update_own_profile.
 create policy profiles_select_own on public.profiles for select using (id = auth.uid() or public.is_staff());
@@ -1247,7 +1710,6 @@ create policy request_status_history_select on public.request_status_history for
 
 -- donors
 create policy account_warnings_select on public.account_warnings for select using (user_id = auth.uid() or public.is_staff());
-create policy account_warnings_ack on public.account_warnings for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy donor_applications_select on public.donor_applications for select using (user_id = auth.uid() or public.is_staff());
 create policy donations_select on public.donations for select using (donor_id = auth.uid() or public.is_staff());
 
@@ -1285,6 +1747,19 @@ create policy chapter_metrics_staff on public.chapter_metrics for select using (
 create policy notifications_own on public.notifications for select using (user_id = auth.uid());
 create policy notifications_read on public.notifications for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy moderation_keywords_staff on public.moderation_keywords for all using (public.is_staff()) with check (public.is_staff());
+
+-- reference and configuration data
+create policy barangays_read on public.barangays for select using (auth.uid() is not null);
+create policy facilities_read on public.facilities for select using (auth.uid() is not null);
+create policy blood_types_read on public.blood_types for select using (auth.uid() is not null);
+create policy blood_components_read on public.blood_components for select using (auth.uid() is not null);
+create policy document_requirements_read on public.document_requirements for select using (auth.uid() is not null);
+create policy donor_requirements_read on public.donor_requirements for select using (auth.uid() is not null);
+create policy donor_screening_questions_staff on public.donor_screening_questions for select using (public.is_staff());
+create policy chapter_settings_read on public.chapter_settings for select using (auth.uid() is not null);
+create policy chapter_settings_admin_write on public.chapter_settings for update using (public.is_admin()) with check (public.is_admin());
+create policy role_capabilities_read on public.role_capabilities for select using (auth.uid() is not null);
+create policy tab_activity_rules_read on public.tab_activity_rules for select using (auth.uid() is not null);
 
 -- ============================================================ storage
 insert into storage.buckets (id, name, public)
@@ -1334,10 +1809,33 @@ alter publication supabase_realtime add table
   public.readiness_targets,
   public.chapter_metrics,
   public.notifications,
-  public.content_items;
+  public.content_items,
+  public.chapter_settings,
+  public.barangays,
+  public.facilities,
+  public.blood_components,
+  public.role_capabilities,
+  public.tab_activity_rules;
 
 alter table public.requests replica identity full;
 alter table public.chat_messages replica identity full;
+
+-- ============================================================ chapter identity seed
+-- profiles.id references auth.users, so the organization account must be a real
+-- auth user. Create it with a random password (never shared) and disable
+-- interactive login, then:
+--   insert into public.profiles (id, legacy_id, full_name, alias, email, phone,
+--     barangay, role, status, public_handle, is_system)
+--   values ('<uuid>', 'USR-CHAPTER', 'Philippine Red Cross - Davao del Sur Chapter',
+--     'Philippine Red Cross - Davao del Sur Chapter', 'bloodservices@tabang.app',
+--     '+63 82 000 0000', 'Zone 1', 'staff', 'verified', 'Chapter', true);
+--   insert into public.chat_threads (legacy_id, kind, group_name)
+--   values ('STAFF-ROOM', 'group', 'Staff room');
+--   -- add staff/admin rows to chat_thread_members, then:
+--   update public.chapter_settings
+--   set chapter_account_id = '<uuid>',
+--       staff_room_thread_id = (select id from public.chat_threads where legacy_id = 'STAFF-ROOM')
+--   where id = 1;
 
 -- ============================================================ TODO before production
 -- 1. Replace direct profile UPDATE with update_own_profile RPC that whitelists
@@ -1354,3 +1852,7 @@ alter table public.chat_messages replica identity full;
 --    selections, reject-while-response, fulfilled twice, expired bag.
 -- 7. Split this file into versioned migrations and run on a clean project.
 -- 8. Never put the service_role key in Flutter, web JS or a public repo.
+-- 9. Enforce direct-thread/group/chapter member cardinality in get_or_create_thread.
+-- 10. Add the one-active-commitment check to select_donor_response.
+-- 11. Add the derived views/RLS review for per-role column exposure.
+-- 12. Seed the chapter account + staff room + chapter_settings foreign keys.
