@@ -1290,6 +1290,7 @@ class _UnitCardState extends State<_UnitCard> {
     final selectable = effective == UnitStatus.available || widget.selected;
 
     return MouseRegion(
+      key: ValueKey('unitCard-${unit.barcode}'),
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
@@ -1331,6 +1332,11 @@ class _UnitCardState extends State<_UnitCard> {
             borderRadius: BorderRadius.circular(TabangRadius.md),
             onTap: widget.onOpen,
             onHighlightChanged: (value) => setState(() => _pressed = value),
+            // The wash is painted by the AnimatedContainer above, so the ink
+            // layer only adds the press ripple. Leaving InkWell's default hover
+            // tint on top both double-tinted the surface and washed out the
+            // footer divider.
+            hoverColor: Colors.transparent,
             splashColor: TabangColors.crimson.withValues(
               alpha: context.isDark ? 0.16 : 0.08,
             ),
@@ -1420,7 +1426,16 @@ class _UnitCardState extends State<_UnitCard> {
                     ],
                   ),
                   const SizedBox(height: TabangSpace.sm),
-                  Divider(height: 1, color: context.border),
+                  Divider(
+                    height: 1,
+                    // On the hover/press wash the regular border colour sits
+                    // almost exactly on the tinted surface and the line looks
+                    // gone. A stronger muted tone keeps the footer separation
+                    // visible in every card state.
+                    color: widget.selected || _hovered || _pressed
+                        ? context.textMuted.withValues(alpha: 0.32)
+                        : context.border,
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [

@@ -1477,6 +1477,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('blood-bank unit divider stays visible on hover', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: BloodBankPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final unit = repo.units.first;
+    final card = find.byKey(ValueKey('unitCard-${unit.barcode}'));
+    await tester.ensureVisible(card);
+    await tester.pumpAndSettle();
+
+    final divider = find.descendant(of: card, matching: find.byType(Divider));
+    expect(divider, findsOneWidget);
+    Color? dividerColor() => tester.widget<Divider>(divider).color;
+    final resting = dividerColor();
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(card));
+    await tester.pumpAndSettle();
+
+    // The wash lightens the card, so the footer rule must darken with it
+    // instead of blending into the highlighted surface.
+    expect(dividerColor(), isNot(resting));
+    expect(dividerColor(), TabangColors.lightTextMuted.withValues(alpha: 0.32));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('booked slots can be filtered to fulfilled and reopened', (
     tester,
   ) async {
