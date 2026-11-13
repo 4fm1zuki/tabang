@@ -2134,6 +2134,24 @@ void main() {
         reason: 'community accounts cannot propose chapter drives',
       );
     });
+
+    test('a proposed drive keeps the pinned venue coordinates', () {
+      final day = DateTime.now().add(const Duration(days: 10));
+      final drive = repo.proposeBloodDrive(
+        actorId: 'USR-010',
+        title: 'Pinned venue drive',
+        venue: 'Zone 1 Covered Court',
+        barangay: 'Zone 1',
+        startsAt: DateTime(day.year, day.month, day.day, 9),
+        endsAt: DateTime(day.year, day.month, day.day, 15),
+        expectedDonors: 20,
+        lat: 6.8,
+        lng: 125.35,
+      );
+      expect(drive, isNotNull);
+      expect(drive!.lat, 6.8);
+      expect(drive.lng, 125.35);
+    });
   });
 
   group('Donation-type limits and fulfilment undo', () {

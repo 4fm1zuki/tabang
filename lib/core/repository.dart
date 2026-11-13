@@ -971,6 +971,8 @@ class TabangRepository {
     required DateTime startsAt,
     required DateTime endsAt,
     required int expectedDonors,
+    double? lat,
+    double? lng,
     String? note,
   }) {
     final actor = userById(actorId);
@@ -990,6 +992,8 @@ class TabangRepository {
       startsAt: startsAt,
       endsAt: endsAt,
       expectedDonors: expectedDonors,
+      lat: lat,
+      lng: lng,
       approval: DriveApproval.pending,
       proposedById: actorId,
       reviewNote: (note ?? '').trim().isEmpty ? null : note!.trim(),

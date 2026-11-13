@@ -5,6 +5,8 @@ import 'package:tabang/core/image_credits.dart';
 import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
 import 'package:tabang/screens/admin/admin_overview.dart';
+import 'package:tabang/screens/admin/chat_moderation_page.dart';
+import 'package:tabang/screens/admin/drive_management_page.dart';
 import 'package:tabang/screens/admin/inventory_management.dart';
 import 'package:tabang/screens/admin/operations_map_page.dart';
 import 'package:tabang/screens/admin/operations_workspace_page.dart';
@@ -849,12 +851,13 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Donation window'),
-      ),
+    final donationWindow = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text('Donation window'),
     );
+    await tester.ensureVisible(donationWindow);
+    await tester.pumpAndSettle();
+    await tester.tap(donationWindow);
     await tester.pumpAndSettle();
     expect(find.text('Donation window · JuanDC'), findsOneWidget);
 
@@ -1021,6 +1024,62 @@ void main() {
     await tester.tap(openButton);
     await tester.pumpAndSettle();
     expect(opened, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('report rows offer warning and suspend, not dismiss', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1300, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: ChatModerationPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final reportsButton = find.textContaining('User reports').first;
+    await tester.ensureVisible(reportsButton);
+    await tester.pumpAndSettle();
+    await tester.tap(reportsButton);
+    await tester.pumpAndSettle();
+
+    // The seeded report is on Rogel, so both moderation actions are present.
+    expect(find.text('Issue warning'), findsWidgets);
+    expect(find.text('Suspend'), findsWidgets);
+    expect(find.text('Dismiss'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('drive form pins the venue and auto-detects the barangay', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1300, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: DriveManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add drive').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pin the venue on the map'), findsOneWidget);
+    await tester.tap(find.text('Pin the venue on the map'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pin the drive venue'), findsOneWidget);
+    expect(find.text('No location pinned yet.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

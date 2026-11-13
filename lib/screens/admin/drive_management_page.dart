@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/models.dart';
 import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/digos_vector_map.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/tabang_dropdown.dart';
@@ -525,6 +528,8 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
             startsAt: draft.startsAt,
             endsAt: draft.endsAt,
             expectedDonors: draft.expectedDonors,
+            lat: draft.lat,
+            lng: draft.lng,
             note: draft.note,
           );
           if (drive == null) return false;
@@ -551,6 +556,8 @@ class _DriveDraft {
     required this.startsAt,
     required this.endsAt,
     required this.expectedDonors,
+    this.lat,
+    this.lng,
     this.note,
   });
 
@@ -560,6 +567,11 @@ class _DriveDraft {
   final DateTime startsAt;
   final DateTime endsAt;
   final int expectedDonors;
+
+  /// True OSM coordinates of the pinned venue, when the proposer placed it on
+  /// the map. Null falls back to the barangay centroid.
+  final double? lat;
+  final double? lng;
   final String? note;
 }
 
@@ -582,6 +594,10 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
   final _note = TextEditingController();
 
   String? _barangay;
+
+  /// Venue pin in the map frame. The barangay is detected from it when the
+  /// proposer places it on the map.
+  LatLng? _pin;
   DateTime _startDate = DateTime.now().add(const Duration(days: 7));
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 15, minute: 0);
@@ -608,6 +624,20 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
     _donors.dispose();
     _note.dispose();
     super.dispose();
+  }
+
+  /// Opens the map picker; a chosen point fills [_pin] and, when it lands
+  /// inside a barangay, auto-detects [_barangay].
+  Future<void> _pickLocation() async {
+    final result = await showDialog<_PickResult>(
+      context: context,
+      builder: (context) => _LocationPickerDialog(initial: _pin),
+    );
+    if (result == null) return;
+    setState(() {
+      _pin = result.point;
+      if (result.barangay != null) _barangay = result.barangay;
+    });
   }
 
   @override
@@ -651,6 +681,32 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
                   validator: (value) =>
                       (value ?? '').trim().isEmpty ? 'Where is it held?' : null,
                 ),
+                const SizedBox(height: TabangSpace.sm),
+                OutlinedButton.icon(
+                  onPressed: _pickLocation,
+                  icon: const Icon(Icons.place_outlined, size: 16),
+                  label: Text(
+                    _pin == null
+                        ? 'Pin the venue on the map'
+                        : 'Venue pinned · change location',
+                  ),
+                ),
+                if (_pin != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _barangay == null
+                        ? 'That point is outside a barangay — tap inside one.'
+                        : 'Barangay detected: $_barangay (filled in below, '
+                              'editable).',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.4,
+                      color: _barangay == null
+                          ? TabangColors.danger
+                          : context.textMuted,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: TabangSpace.sm),
                 TabangDropdown<String>(
                   initialValue: _barangay,
@@ -768,6 +824,12 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
                 startsAt: _startsAt,
                 endsAt: _endsAt,
                 expectedDonors: int.parse(_donors.text.trim()),
+                lat: _pin == null
+                    ? null
+                    : DigosVectorMap.fromMapFrame(_pin!).latitude,
+                lng: _pin == null
+                    ? null
+                    : DigosVectorMap.fromMapFrame(_pin!).longitude,
                 note: _note.text,
               ),
             );
@@ -801,6 +863,128 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
         decoration: InputDecoration(labelText: label, isDense: true),
         child: Text(value, style: const TextStyle(fontSize: 13)),
       ),
+    );
+  }
+}
+
+/// What the location picker returns: the map-frame point and the barangay
+/// detected under it (null when the tap fell outside every barangay).
+class _PickResult {
+  const _PickResult(this.point, this.barangay);
+
+  final LatLng point;
+  final String? barangay;
+}
+
+/// Tap-to-pin venue picker.
+///
+/// The proposer taps anywhere on the Digos map; the pin lands exactly there and
+/// the barangay under it is detected from the same polygons the rest of the app
+/// uses. The chosen point is returned in the map frame and converted back to
+/// OSM coordinates by the caller, so the drive's marker round-trips.
+class _LocationPickerDialog extends StatefulWidget {
+  const _LocationPickerDialog({this.initial});
+
+  final LatLng? initial;
+
+  @override
+  State<_LocationPickerDialog> createState() => _LocationPickerDialogState();
+}
+
+class _LocationPickerDialogState extends State<_LocationPickerDialog> {
+  final MapController _controller = MapController();
+  late LatLng? _pin = widget.initial;
+  String? _barangay;
+
+  @override
+  void initState() {
+    super.initState();
+    // Resolve the barangay for an already-chosen pin so the footer is correct
+    // on open.
+    final initial = widget.initial;
+    if (initial != null) _barangay = DigosVectorMap.barangayAt(initial);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Pin the drive venue'),
+      content: SizedBox(
+        width: 620,
+        height: 460,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tap the exact spot. The barangay is detected from where you '
+              'pin, then filled into the form.',
+              style: TextStyle(fontSize: 12.5, color: context.textMuted),
+            ),
+            const SizedBox(height: TabangSpace.sm),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(TabangRadius.sm),
+                child: DigosVectorMap(
+                  controller: _controller,
+                  donorCounts: const {},
+                  drives: const [],
+                  selectedBarangay: null,
+                  mapDark: context.isDark,
+                  venuePin: _pin,
+                  onSelectBarangay: (_) {},
+                  onDriveTap: (_) {},
+                  onFacilityTap: (_) {},
+                  onMapTap: (point, barangay) => setState(() {
+                    _pin = point;
+                    _barangay = barangay;
+                  }),
+                ),
+              ),
+            ),
+            const SizedBox(height: TabangSpace.sm),
+            Row(
+              children: [
+                Icon(
+                  Icons.place_outlined,
+                  size: 16,
+                  color: _pin == null
+                      ? context.textMuted
+                      : TabangColors.crimson,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _pin == null
+                        ? 'No location pinned yet.'
+                        : _barangay == null
+                        ? 'Pinned — that point is outside a barangay.'
+                        : 'Pinned in $_barangay.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: context.textColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _pin == null
+              ? null
+              : () => Navigator.pop(
+                  context,
+                  _PickResult(_pin!, _barangay),
+                ),
+          child: const Text('Use this location'),
+        ),
+      ],
     );
   }
 }

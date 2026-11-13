@@ -1541,6 +1541,53 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         color: dialogContext.textMuted,
                       ),
                     ),
+                    // The actions live in the body as a wrapped row instead of
+                    // the AlertDialog action bar: four buttons could not fit on
+                    // one line at this width and the overflow bar stacked them
+                    // right-aligned, which read as broken.
+                    if (!other) ...[
+                      const SizedBox(height: TabangSpace.md),
+                      Wrap(
+                        spacing: TabangSpace.sm,
+                        runSpacing: TabangSpace.sm,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(dialogContext);
+                              _openConversation(context, user);
+                            },
+                            icon: const Icon(
+                              Icons.chat_bubble_outline,
+                              size: 15,
+                            ),
+                            label: const Text('Message'),
+                          ),
+                          if (!user.role.isAdminSide &&
+                              user.status == AccountStatus.verified &&
+                              user.bloodCardVerified)
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                _unverifyUser(context, user);
+                              },
+                              icon: const Icon(Icons.badge_outlined, size: 15),
+                              label: const Text('Unverify'),
+                            ),
+                          if (isDonor)
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(dialogContext);
+                                _editDonationWindow(context, user);
+                              },
+                              icon: const Icon(
+                                Icons.event_repeat_outlined,
+                                size: 15,
+                              ),
+                              label: const Text('Donation window'),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1550,36 +1597,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 onPressed: () => Navigator.pop(dialogContext),
                 child: const Text('Close'),
               ),
-              if (!other) ...[
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                    _openConversation(context, user);
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline, size: 15),
-                  label: const Text('Message'),
-                ),
-                if (!user.role.isAdminSide &&
-                    user.status == AccountStatus.verified &&
-                    user.bloodCardVerified)
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                      _unverifyUser(context, user);
-                    },
-                    icon: const Icon(Icons.badge_outlined, size: 15),
-                    label: const Text('Unverify'),
-                  ),
-                if (isDonor)
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                      _editDonationWindow(context, user);
-                    },
-                    icon: const Icon(Icons.event_repeat_outlined, size: 15),
-                    label: const Text('Donation window'),
-                  ),
-              ],
             ],
           );
         },

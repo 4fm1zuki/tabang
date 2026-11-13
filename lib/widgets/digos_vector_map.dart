@@ -304,6 +304,8 @@ class DigosVectorMap extends StatefulWidget {
     required this.onDriveTap,
     required this.onFacilityTap,
     this.requestCounts,
+    this.venuePin,
+    this.onMapTap,
     this.onInteractionStart,
     this.onInteractionEnd,
   });
@@ -329,6 +331,14 @@ class DigosVectorMap extends StatefulWidget {
 
   final ValueChanged<String?> onSelectBarangay;
   final ValueChanged<String> onDriveTap;
+
+  /// An extra pin the caller drops, in map-frame coordinates. Used by the
+  /// drive form's location picker to show where the venue will sit.
+  final LatLng? venuePin;
+
+  /// Fired with the tapped point (map frame) and the barangay under it, so a
+  /// picker can place a venue and auto-detect its barangay.
+  final void Function(LatLng point, String? barangay)? onMapTap;
 
   /// Fired when a hospital or the PRC chapter pin is tapped.
   final ValueChanged<DigosFacilityPin> onFacilityTap;
@@ -499,6 +509,32 @@ class DigosVectorMap extends StatefulWidget {
       if (name == canonical) return feature.centroid;
     }
     return null;
+  }
+
+  /// The canonical barangay name under a map-frame [point], or null when the
+  /// point falls outside every barangay.
+  static String? barangayAt(LatLng point) {
+    for (final feature in _barangayFeatures()) {
+      if (DigosGeoData.isPointInPolygon(point, feature.ring)) {
+        return DigosBarangays.canonical(feature.name) ?? feature.name;
+      }
+    }
+    return null;
+  }
+
+  /// The inverse of [toMapFrame]: recovers the true OSM coordinate from a
+  /// point in the hand-traced map frame, so a pinned venue round-trips through
+  /// the drive marker layer unchanged.
+  static LatLng fromMapFrame(LatLng point) {
+    const metresPerDegree = 111319.49;
+    final cosLat = math.cos(point.latitude * math.pi / 180);
+    final metresPerPixel =
+        156543.03392 * cosLat / math.pow(2, baseMapOffsetZoom);
+    return LatLng(
+      point.latitude + baseMapOffset.dy * metresPerPixel / metresPerDegree,
+      point.longitude -
+          baseMapOffset.dx * metresPerPixel / (metresPerDegree * cosLat),
+    );
   }
 
   /// Frames the whole city again; used by the page's compass button.
@@ -721,7 +757,9 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                       onTap: (tapPosition, point) {
                         widget.onInteractionStart?.call();
                         widget.onInteractionEnd?.call();
-                        widget.onSelectBarangay(_canonicalAt(point));
+                        final canonical = _canonicalAt(point);
+                        widget.onSelectBarangay(canonical);
+                        widget.onMapTap?.call(point, canonical);
                       },
                       onPointerHover: (event, point) {
                         if (event.kind != PointerDeviceKind.mouse) return;
@@ -878,6 +916,27 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                       // Barangay names at their representative points; all 26 stay
                       // on the map at every zoom, exactly like the standalone map.
                       MarkerLayer(markers: _labelMarkers(labelSize)),
+
+                      // A caller-supplied pin (the drive form's chosen venue),
+                      // drawn above everything so it is never hidden.
+                      if (widget.venuePin != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: widget.venuePin!,
+                              width: 36,
+                              height: 36,
+                              alignment: Alignment.topCenter,
+                              child: Icon(
+                                Icons.location_on,
+                                size: 34,
+                                color: dark
+                                    ? TabangColors.brandOnDark
+                                    : TabangColors.crimson,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),

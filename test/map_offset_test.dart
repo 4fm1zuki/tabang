@@ -181,5 +181,25 @@ void main() {
       expect(rebased.latitude, lessThan(pin.latitude));
       expect(rebased.longitude, greaterThan(pin.longitude));
     });
+
+    test('fromMapFrame is the inverse of toMapFrame', () {
+      const point = LatLng(6.8123, 125.3567);
+      final back = DigosVectorMap.fromMapFrame(
+        DigosVectorMap.toMapFrame(point),
+      );
+      // Sub-metre: the inverse recomputes the metres-per-pixel from the
+      // rebased latitude, so the two are not bit-identical.
+      expect(back.latitude, closeTo(point.latitude, 1e-6));
+      expect(back.longitude, closeTo(point.longitude, 1e-6));
+    });
+
+    test('barangayAt detects the barangay under a centroid', () {
+      final zone = DigosVectorMap.centroidOf('Zone 1');
+      expect(zone, isNotNull);
+      expect(DigosVectorMap.barangayAt(zone!), 'Zone 1');
+
+      // A point outside the city resolves to nothing.
+      expect(DigosVectorMap.barangayAt(const LatLng(0, 0)), isNull);
+    });
   });
 }

@@ -175,21 +175,32 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                       ],
                     ),
                     const SizedBox(height: TabangSpace.sm),
-                    Row(
+                    // Wrap, not Row: inside the 320 px thread column the
+                    // Keywords button could not fit beside the switch and
+                    // overflowed. Wrapping drops it to its own line instead.
+                    Wrap(
+                      spacing: TabangSpace.sm,
+                      runSpacing: TabangSpace.sm,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(
-                          'Flagged only',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: context.textMuted,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Flagged only',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Switch(
+                              value: _onlyFlagged,
+                              onChanged: (v) =>
+                                  setState(() => _onlyFlagged = v),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        Switch(
-                          value: _onlyFlagged,
-                          onChanged: (v) => setState(() => _onlyFlagged = v),
-                        ),
-                        const Spacer(),
                         // The keyword lists used to be reachable only from the
                         // phone layout, so the button was simply missing on a
                         // desktop window.
@@ -197,6 +208,9 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                           onPressed: () => _showKeywordsDialog(context),
                           icon: const Icon(Icons.tag, size: 15),
                           label: const Text('Keywords'),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
                         ),
                       ],
                     ),
@@ -413,8 +427,8 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
     );
   }
 
-  Future<void> _warnPerson(AppUser user) async {
-    final reason = TextEditingController();
+  Future<void> _warnPerson(AppUser user, {String? initialReason}) async {
+    final reason = TextEditingController(text: initialReason);
     String? error;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -429,9 +443,9 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
               children: [
                 Text(
                   'The account holder sees your message at their next sign-in '
-                  'and in Profile > Settings. Explain what happened, why it '
-                  'matters and what they should do differently. Three warnings '
-                  'suspend the account automatically.',
+                  'and in Profile > Account standing. Explain what happened, '
+                  'why it matters and what they should do differently. Three '
+                  'warnings suspend the account automatically.',
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.5,
@@ -1198,10 +1212,14 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                 ),
                               ),
                               if (report.status == ReportStatus.open) ...[
-                                const SizedBox(height: 4),
-                                Row(
+                                const SizedBox(height: TabangSpace.sm),
+                                Wrap(
+                                  spacing: TabangSpace.sm,
+                                  runSpacing: 4,
+                                  crossAxisAlignment:
+                                      WrapCrossAlignment.center,
                                   children: [
-                                    TextButton(
+                                    FilledButton.tonal(
                                       onPressed: () {
                                         _repo.resolveReport(
                                           report.id,
@@ -1216,20 +1234,20 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                       },
                                       child: const Text('Resolve'),
                                     ),
-                                    TextButton(
-                                      onPressed: () {
-                                        _repo.resolveReport(
-                                          report.id,
-                                          ReportStatus.dismissed,
-                                        );
-                                        setDialogState(() {});
-                                        _showReportUndo(
-                                          context,
-                                          report.id,
-                                          'Report dismissed.',
-                                        );
-                                      },
-                                      child: const Text('Dismiss'),
+                                    TextButton.icon(
+                                      onPressed: () =>
+                                          _escalateReport(report),
+                                      icon: const Icon(
+                                        Icons.report_gmailerrorred_outlined,
+                                        size: 16,
+                                      ),
+                                      label: const Text('Issue warning'),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: () =>
+                                          _suspendForReport(report),
+                                      icon: const Icon(Icons.block, size: 16),
+                                      label: const Text('Suspend'),
                                     ),
                                   ],
                                 ),
@@ -1267,6 +1285,75 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
     );
   }
 
+  /// Warns the reported account straight from its report row. Opens the same
+  /// message-required warn dialog every other surface uses, so the account
+  /// holder always gets a specific explanation.
+  Future<void> _escalateReport(UserReport report) async {
+    final user = _repo.userById(report.reportedUserId);
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const TabangSnackBar(content: Text('That account no longer exists.')),
+      );
+      return;
+    }
+    await _warnPerson(
+      user,
+      // Prefill an explanation built from the report so staff can see and edit
+      // it instead of writing from scratch.
+      initialReason:
+          'A community member reported your account: ${report.reason}. '
+          'Please review the community rules in About & Help and avoid '
+          'repeating it.',
+    );
+  }
+
+  /// Suspends (or reinstates) the reported account, recording the report as the
+  /// reason so the account's standing explains the action.
+  Future<void> _suspendForReport(UserReport report) async {
+    final user = _repo.userById(report.reportedUserId);
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const TabangSnackBar(content: Text('That account no longer exists.')),
+      );
+      return;
+    }
+    final suspended = user.status != AccountStatus.suspended;
+    final ok = await confirmAction(
+      context,
+      title: suspended ? 'Suspend ${user.alias}?' : 'Reinstate ${user.alias}?',
+      message: suspended
+          ? '${user.alias} loses access and is removed from the donor '
+                'directory immediately.\n\nReport: ${report.reason}'
+          : '${user.alias} regains access and reappears in the donor '
+                'directory.',
+      confirmLabel: suspended ? 'Suspend' : 'Reinstate',
+      destructive: suspended,
+    );
+    if (!ok || !mounted) return;
+    _repo.setUserStatus(
+      user.id,
+      suspended ? AccountStatus.suspended : AccountStatus.verified,
+      reason: suspended ? 'Suspended after a report: ${report.reason}' : null,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          suspended
+              ? '${user.alias} was suspended.'
+              : '${user.alias} was reinstated.',
+        ),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => _repo.setUserStatus(
+            user.id,
+            suspended ? AccountStatus.verified : AccountStatus.suspended,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showEscalate(
     BuildContext context,
     ChatThread thread,
@@ -1278,61 +1365,112 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
         _repo.isChapterAccount(message.senderId) ||
         sender == null;
 
+    // The automatic wording is offered as a starting point, prefilled and
+    // editable, so staff can see exactly what the account holder will read
+    // before it is issued instead of trusting a hidden template.
+    final reason = TextEditingController(
+      text:
+          'A chat message you sent was flagged as inappropriate: '
+          '"${message.text}". Keep conversations respectful and never ask for '
+          'payment or personal details.',
+    );
+    String? error;
+
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Issue a warning'),
-        content: Text(
-          message.senderId == 'system'
-              ? 'System notices cannot be warned. Clear the flag instead.'
-              : _repo.isChapterAccount(message.senderId)
-              ? 'The official chapter account cannot be warned.'
-              : sender == null
-              ? 'This message was sent by an account that no longer exists.'
-              : 'Issue a formal warning to ${sender.fullName} '
-                    '(${sender.alias}) for this message?\n\n'
-                    'Three warnings suspend the account automatically.',
-          style: const TextStyle(fontSize: 13, height: 1.6),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          if (!protectedSender)
-            ElevatedButton(
-              onPressed: () {
-                _repo.warnUser(
-                  sender.id,
-                  reason:
-                      'A chat message you sent was flagged as inappropriate: '
-                      '"${message.text}". Keep conversations respectful and '
-                      'never ask for payment or personal details.',
-                  actorId: widget.currentUser.id,
-                );
-                _repo.flagMessage(
-                  thread.id,
-                  message.id,
-                  ModerationFlag.inappropriate,
-                );
-                Navigator.pop(dialogContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  TabangSnackBar(
-                    content: Text('Warning recorded for ${sender.alias}.'),
-                    duration: const Duration(seconds: 6),
-                    action: SnackBarAction(
-                      label: 'Undo',
-                      onPressed: () => _repo.revokeWarning(
-                        sender.id,
-                        actorId: widget.currentUser.id,
-                      ),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Escalate to warning'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.senderId == 'system'
+                      ? 'System notices cannot be warned. Clear the flag '
+                            'instead.'
+                      : _repo.isChapterAccount(message.senderId)
+                      ? 'The official chapter account cannot be warned.'
+                      : sender == null
+                      ? 'This message was sent by an account that no longer '
+                            'exists.'
+                      : 'The account holder sees this message at their next '
+                            'sign-in and in Profile > Account standing. Three '
+                            'warnings suspend the account automatically.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.5,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+                if (!protectedSender) ...[
+                  const SizedBox(height: TabangSpace.md),
+                  TextField(
+                    controller: reason,
+                    autofocus: true,
+                    maxLines: 4,
+                    onChanged: (_) {
+                      if (error != null) setDialogState(() => error = null);
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Warning message',
+                      helperText:
+                          'Prefilled from the flagged message — edit it if '
+                          'needed.',
+                      errorText: error,
+                      isDense: true,
                     ),
                   ),
-                );
-              },
-              child: const Text('Issue warning'),
+                ],
+              ],
             ),
-        ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            if (!protectedSender)
+              FilledButton(
+                onPressed: () {
+                  if (reason.text.trim().isEmpty) {
+                    setDialogState(
+                      () => error =
+                          'Enter the specific message the user will see.',
+                    );
+                    return;
+                  }
+                  _repo.warnUser(
+                    sender.id,
+                    reason: reason.text,
+                    actorId: widget.currentUser.id,
+                  );
+                  _repo.flagMessage(
+                    thread.id,
+                    message.id,
+                    ModerationFlag.inappropriate,
+                  );
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    TabangSnackBar(
+                      content: Text('Warning recorded for ${sender.alias}.'),
+                      duration: const Duration(seconds: 6),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () => _repo.revokeWarning(
+                          sender.id,
+                          actorId: widget.currentUser.id,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Issue warning'),
+              ),
+          ],
+        ),
       ),
     );
   }
