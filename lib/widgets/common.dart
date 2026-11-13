@@ -17,10 +17,10 @@ import 'photo.dart';
 ///
 /// One widget so the phone bar, the donor rail and the staff rail cannot drift
 /// apart again. The artwork is transparent, so it is drawn directly on the
-/// surface with no plate and no frame — the old white tile and its border are
-/// gone, which also lets the drop, heart and hand fill the space. Surfaces
-/// where the red-and-blue mark would disappear (the crimson About panel, the
-/// dark theme) pass [plate] to add the white circular backdrop.
+/// surface with no plate and no frame — the app headers no longer draw a white
+/// circle in dark mode. Only surfaces that the red-and-blue mark would vanish
+/// into, such as the crimson About & Help panel, pass [plate] for the white
+/// circular backdrop.
 class TabangLogo extends StatelessWidget {
   const TabangLogo({super.key, this.size = 44, this.plate = false});
 

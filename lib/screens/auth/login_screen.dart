@@ -270,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Row(
           children: [
-            TabangLogo(size: 52, plate: context.isDark),
+            const TabangLogo(size: 52),
             // The wordmark sits closer to the mark than the standard gutter;
             // [kTabangWordmarkGap] matches the shell headers exactly.
             const SizedBox(width: kTabangWordmarkGap),

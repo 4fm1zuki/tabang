@@ -1815,7 +1815,7 @@ class _ResearchGroupCard extends StatelessWidget {
           const SizedBox(height: TabangSpace.xs),
           Text(
             'Grade 12 STEM A & B — Senior High School Computer Studies, '
-            'Cor Jesu College. Alphabetical by surname.',
+            'Cor Jesu College.',
             style: TextStyle(fontSize: 11.5, color: context.textMuted),
           ),
           const SizedBox(height: TabangSpace.sm),

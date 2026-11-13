@@ -656,9 +656,9 @@ class _AdminPhoneHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 52 reads properly beside the wordmark; the plate keeps the red and
-          // blue artwork legible when the header sits on the dark surface.
-          TabangLogo(size: 52, plate: context.isDark),
+          // 52 reads properly beside the wordmark. The mark is transparent, so
+          // no plate is drawn; it sits directly on the header surface.
+          const TabangLogo(size: 52),
           // Same lockup gap as the login header, so both read identically.
           const SizedBox(width: kTabangWordmarkGap),
           // The identity never widens the row: the alias and position share a

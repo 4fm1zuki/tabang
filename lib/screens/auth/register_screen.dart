@@ -143,7 +143,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TabangLogo(size: 48, plate: context.isDark),
+                      const TabangLogo(size: 48),
                       const SizedBox(width: TabangSpace.md),
                       Expanded(
                         child: Text(

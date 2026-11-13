@@ -663,9 +663,9 @@ class _PhoneHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 52 reads properly beside the wordmark; the plate keeps the red and
-          // blue artwork legible when the header sits on the dark surface.
-          TabangLogo(size: 52, plate: context.isDark),
+          // 52 reads properly beside the wordmark. The mark is transparent, so
+          // no plate is drawn; it sits directly on the header surface.
+          const TabangLogo(size: 52),
           // Same lockup gap as the login header, so both read identically.
           const SizedBox(width: kTabangWordmarkGap),
           // Matches the staff header: the identity gets the free space and
@@ -868,10 +868,9 @@ class _Sidebar extends StatelessWidget {
             ? MainAxisAlignment.start
             : MainAxisAlignment.center,
         children: [
-          // 44 matches the phone header's new weight. The rail is crimson in
-          // light mode and near-black in dark mode, so the mark always needs
-          // its white plate here — without it the red artwork disappears.
-          const TabangLogo(size: 44, plate: true),
+          // 44 matches the phone header's weight. The mark is transparent, so
+          // no white plate is drawn in either theme.
+          const TabangLogo(size: 44),
           if (expanded) ...[
             const SizedBox(width: kTabangWordmarkGap),
             Expanded(
