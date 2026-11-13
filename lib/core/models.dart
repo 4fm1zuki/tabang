@@ -298,6 +298,12 @@ enum UserRole {
       'Answer open requests in the community app',
       'Track eligibility and booked slots in Donor Hub',
     ],
+    UserRole.recipient => const [
+      'Request blood for yourself or a patient',
+      'Message donors and chapter staff',
+      'Follow up on the requests you posted',
+      'Register as a donor from Donor Hub',
+    ],
     _ => const [
       'Request blood for yourself or a patient',
       'Message donors and chapter staff',

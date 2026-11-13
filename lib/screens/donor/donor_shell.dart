@@ -67,6 +67,9 @@ class _DonorShellState extends State<DonorShell> {
   int _index = 0;
   bool _hovering = false;
 
+  /// Request the community map asked the Requests tab to scroll to.
+  String? _requestsFocusId;
+
   /// Mirrors [DonorShell.railPinned] so the control still works when the shell
   /// is embedded without a preference owner (widget tests, previews).
   late bool _pinned = widget.railPinned;
@@ -233,6 +236,16 @@ class _DonorShellState extends State<DonorShell> {
     });
   }
 
+  /// Opens the Requests tab, optionally scrolling to one request. Rebuilds the
+  /// cached page so it picks up the new focus target.
+  void _openRequests([String? requestId]) {
+    setState(() {
+      _requestsFocusId = requestId;
+      _pages[3] = _buildPage(3);
+    });
+    _select(3);
+  }
+
   /// Slides the phone bottom bar away when the page scrolls toward its end
   /// and brings it back on scroll up. The bar is pinned automatically at the
   /// top or the bottom, and it needs real room left to scroll before it will
@@ -347,7 +360,7 @@ class _DonorShellState extends State<DonorShell> {
       case 2:
         return FindDonorPage(
           user: widget.user,
-          onOpenRequests: () => _select(3),
+          onOpenRequests: _openRequests,
           onOpenChat: () => _select(4),
           onOpenDiscover: () => _select(0),
           onOpenBloodBank: () => _select(1),
@@ -356,6 +369,7 @@ class _DonorShellState extends State<DonorShell> {
         return RequestsPage(
           user: widget.user,
           onOpenDonorHub: () => _select(5),
+          focusRequestId: _requestsFocusId,
         );
       case 4:
         return ChatPage(user: widget.user);

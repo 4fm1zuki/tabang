@@ -15,6 +15,7 @@ import '../../widgets/donor_list_card.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/map_split_handle.dart';
 import '../../widgets/request_document_list.dart';
+import '../../widgets/request_list_card.dart';
 import '../../widgets/request_review_dialogs.dart';
 import '../../widgets/user_record_dialog.dart';
 
@@ -45,10 +46,8 @@ class OperationsMapPage extends StatefulWidget {
   final AppUser user;
   final VoidCallback? onOpenInventory;
 
-  /// Jumps to the Inventory page's Requests tab. The map request card opens
-  /// this instead of a detail sheet so the map and the request queue stay one
-  /// workflow.
-  final VoidCallback? onOpenRequests;
+  /// Jumps to the Inventory page's Requests tab and scrolls to this request.
+  final ValueChanged<String>? onOpenRequests;
   final VoidCallback? onOpenUsers;
 
   /// Opens the shell's Messages tab on a conversation with the given user id.
@@ -852,118 +851,50 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   }
 
   Widget _requestCard(BuildContext context, BloodRequest request) {
-    return SurfaceCard(
-      padding: const EdgeInsets.all(TabangSpace.md),
-      // Tapping a request hands off to the Requests tab, where the full record
-      // and every action live. The map is a scan-and-jump surface, not a second
-      // request manager with its own copy of the list.
-      onTap:
-          widget.onOpenRequests ?? () => _showRequestDetails(context, request),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Wrap, not a fixed row: "Awaiting verification" is a long
-              // status and used to push the barangay past the card edge on
-              // the narrow panel.
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    StatusPill(
-                      request.urgency.label,
-                      tone: request.urgency == RequestUrgency.critical
-                          ? Tone.danger
-                          : request.urgency == RequestUrgency.urgent
-                          ? Tone.warning
-                          : Tone.neutral,
-                      dense: true,
-                    ),
-                    StatusPill(request.status.label, dense: true),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                request.barangay,
-                style: TextStyle(fontSize: 11, color: context.textMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${request.patientAlias} · ${request.bloodType.label} '
-            '${request.component.label}',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: context.textColor,
+    final requester = _repo.userById(request.requesterId);
+    return RequestListCard(
+      request: request,
+      requester: requester,
+      onTap: widget.onOpenRequests == null
+          ? () => _showRequestDetails(context, request)
+          : null,
+      actions: [
+        if (widget.user.role.canFulfillRequests) ...[
+          if (request.isAwaitingReview) ...[
+            TextButton(
+              onPressed: () => _reject(context, request),
+              child: const Text('Reject'),
             ),
-          ),
-          const SizedBox(height: 2),
-          // One glanceable line; hospital, units, responder counts and the
-          // requester all live behind a tap on the card, so the row stays a
-          // queue entry rather than a details form.
-          Text(
-            '${request.hospital} · ${request.unitsNeeded} unit(s)',
-            style: TextStyle(fontSize: 11, color: context.textMuted),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              if (widget.user.role.canFulfillRequests) ...[
-                if (request.isAwaitingReview) ...[
-                  TextButton(
-                    onPressed: () => _reject(context, request),
-                    child: const Text('Reject'),
-                  ),
-                  FilledButton(
-                    onPressed: () => _verify(context, request),
-                    child: const Text('Verify'),
-                  ),
-                ] else if (request.canBeRejected) ...[
-                  TextButton(
-                    onPressed: () => _reject(context, request),
-                    child: const Text('Reject'),
-                  ),
-                  if (request.canBeFulfilled)
-                    FilledButton(
-                      onPressed: () => _fulfil(context, request),
-                      child: const Text('Mark fulfilled'),
-                    )
-                  else
-                    TextButton(
-                      onPressed: () => _showRequestDetails(context, request),
-                      child: const Text('Awaiting donor'),
-                    ),
-                ],
-              ],
-              // Staff no longer pick donors: verification opens the request
-              // and the requester selects from the people who responded.
-            ],
-          ),
-          if (widget.onOpenRequests != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(Icons.open_in_new, size: 13, color: context.textMuted),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    'Opens the Requests tab for the full record',
-                    style: TextStyle(fontSize: 11, color: context.textMuted),
-                  ),
-                ),
-              ],
+            FilledButton(
+              onPressed: () => _verify(context, request),
+              child: const Text('Verify'),
             ),
+          ] else if (request.canBeRejected) ...[
+            TextButton(
+              onPressed: () => _reject(context, request),
+              child: const Text('Reject'),
+            ),
+            if (request.canBeFulfilled)
+              FilledButton(
+                onPressed: () => _fulfil(context, request),
+                child: const Text('Mark fulfilled'),
+              )
+            else
+              TextButton(
+                onPressed: () => _showRequestDetails(context, request),
+                child: const Text('Awaiting donor'),
+              ),
           ],
         ],
-      ),
+        // Staff no longer pick donors: verification opens the request and the
+        // requester selects from the people who responded.
+        if (widget.onOpenRequests != null)
+          TextButton.icon(
+            onPressed: () => widget.onOpenRequests!(request.id),
+            icon: const Icon(Icons.arrow_forward, size: 15),
+            label: const Text('Open in Requests'),
+          ),
+      ],
     );
   }
 

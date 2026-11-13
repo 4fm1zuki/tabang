@@ -55,8 +55,10 @@ class FindDonorPage extends StatefulWidget {
   final AppUser user;
 
   /// Shell-level navigation hooks. The map never pushes another shell page
-  /// directly, so the bottom bar and rail keep their active destination in sync.
-  final VoidCallback? onOpenRequests;
+  /// directly, so the bottom bar and rail keep their active destination in
+  /// sync. The request id is optional: the request card passes one so the
+  /// Requests tab can scroll to it; the donor and drive cards pass null.
+  final ValueChanged<String?>? onOpenRequests;
   final VoidCallback? onOpenChat;
 
   @override
@@ -1200,7 +1202,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
       actions: [
         if (widget.onOpenRequests != null)
           TextButton.icon(
-            onPressed: widget.onOpenRequests,
+            onPressed: () => widget.onOpenRequests!(request.id),
             style: TextButton.styleFrom(
               minimumSize: const Size(0, 30),
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1355,7 +1357,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
                   ),
                   if (isDonor && widget.onOpenRequests != null)
                     FilledButton.tonalIcon(
-                      onPressed: widget.onOpenRequests,
+                      onPressed: () => widget.onOpenRequests!(null),
                       icon: const Icon(
                         Icons.volunteer_activism_outlined,
                         size: 15,
@@ -1389,7 +1391,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
       actions: [
         if (widget.onOpenRequests != null)
           TextButton.icon(
-            onPressed: widget.onOpenRequests,
+            onPressed: () => widget.onOpenRequests!(null),
             style: _donorCardActionStyle,
             icon: const Icon(Icons.assignment_outlined, size: 16),
             label: const Text('Requests', style: TextStyle(fontSize: 12)),

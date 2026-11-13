@@ -36,6 +36,7 @@ class InventoryManagementPage extends StatefulWidget {
     required this.currentUser,
     this.embedded = false,
     this.openRequestsToken = 0,
+    this.focusRequestId,
   });
 
   final AppUser currentUser;
@@ -48,6 +49,9 @@ class InventoryManagementPage extends StatefulWidget {
   /// asks to land on the Requests tab. A counter rather than a bool so repeated
   /// requests still switch the tab even when it is already the target.
   final int openRequestsToken;
+
+  /// The request to scroll to and highlight after [openRequestsToken] changes.
+  final String? focusRequestId;
 
   @override
   State<InventoryManagementPage> createState() =>
@@ -86,7 +90,29 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.openRequestsToken != oldWidget.openRequestsToken) {
       _tab = 1;
+      _focusRequestId = widget.focusRequestId;
+      // Scroll the freshly-focused request into view after this frame lays the
+      // list out.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
     }
+  }
+
+  /// The request currently highlighted as the jump target.
+  String? _focusRequestId;
+
+  /// Key on the focused request's card, so [Scrollable.ensureVisible] can find
+  /// it.
+  final GlobalKey _focusKey = GlobalKey();
+
+  void _scrollToFocus() {
+    final ctx = _focusKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
+    );
   }
 
   void _refresh() {
@@ -715,8 +741,14 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
         else
           for (final request in requests)
             Padding(
+              key: request.id == _focusRequestId ? _focusKey : null,
               padding: const EdgeInsets.only(bottom: TabangSpace.md),
-              child: _buildRequestCard(context, request, canAct: canAct),
+              child: _buildRequestCard(
+                context,
+                request,
+                canAct: canAct,
+                highlighted: request.id == _focusRequestId,
+              ),
             ),
       ],
     );
@@ -752,9 +784,11 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     BuildContext context,
     BloodRequest request, {
     required bool canAct,
+    bool highlighted = false,
   }) {
     final requester = _repo.userById(request.requesterId);
     return SurfaceCard(
+      highlighted: highlighted,
       onTap: () => _showRequestDetails(context, request),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

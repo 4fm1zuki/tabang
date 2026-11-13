@@ -26,12 +26,21 @@ import '../../widgets/tabang_dropdown.dart';
 enum _DonorRequestsTab { serve, mine, donate }
 
 class RequestsPage extends StatefulWidget {
-  const RequestsPage({super.key, required this.user, this.onOpenDonorHub});
+  const RequestsPage({
+    super.key,
+    required this.user,
+    this.onOpenDonorHub,
+    this.focusRequestId,
+  });
 
   final AppUser user;
 
   /// Opens Donor Hub, where the donor form and verification live.
   final VoidCallback? onOpenDonorHub;
+
+  /// When set, the board scrolls to and highlights this request once it is
+  /// laid out — the map's "Open in Requests" hand-off.
+  final String? focusRequestId;
 
   @override
   State<RequestsPage> createState() => _RequestsPageState();
@@ -50,9 +59,18 @@ class _RequestsPageState extends State<RequestsPage> {
   /// themselves, and the donation side (drives, eligibility, what to bring).
   _DonorRequestsTab _donorTab = _DonorRequestsTab.serve;
 
+  /// The request currently highlighted as the jump target.
+  String? _focusRequestId;
+
+  final GlobalKey _focusKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    _focusRequestId = widget.focusRequestId;
+    if (_focusRequestId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+    }
     _repo.addListener(_refresh);
   }
 
@@ -60,6 +78,27 @@ class _RequestsPageState extends State<RequestsPage> {
   void dispose() {
     _repo.removeListener(_refresh);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(RequestsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusRequestId != oldWidget.focusRequestId &&
+        widget.focusRequestId != null) {
+      _focusRequestId = widget.focusRequestId;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+    }
+  }
+
+  void _scrollToFocus() {
+    final ctx = _focusKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
+    );
   }
 
   void _refresh() {
@@ -321,14 +360,19 @@ class _RequestsPageState extends State<RequestsPage> {
             ),
             sliver: SliverList.builder(
               itemCount: requests.length,
-              itemBuilder: (context, i) => Padding(
-                padding: const EdgeInsets.only(bottom: TabangSpace.md),
-                child: _buildRequestCard(
-                  context,
-                  requests[i],
-                  isOwn: requests[i].requesterId == _user.id,
-                ),
-              ),
+              itemBuilder: (context, i) {
+                final isFocus = requests[i].id == _focusRequestId;
+                return Padding(
+                  key: isFocus ? _focusKey : null,
+                  padding: const EdgeInsets.only(bottom: TabangSpace.md),
+                  child: _buildRequestCard(
+                    context,
+                    requests[i],
+                    isOwn: requests[i].requesterId == _user.id,
+                    highlighted: isFocus,
+                  ),
+                );
+              },
             ),
           ),
       ],
@@ -586,6 +630,7 @@ class _RequestsPageState extends State<RequestsPage> {
     BuildContext context,
     BloodRequest request, {
     required bool isOwn,
+    bool highlighted = false,
   }) {
     final responses = _repo.responsesFor(request.id);
     final myResponse = _isDonor
@@ -605,7 +650,7 @@ class _RequestsPageState extends State<RequestsPage> {
         : (request.unitsFulfilled / request.unitsNeeded).clamp(0.0, 1.0);
 
     return SurfaceCard(
-      highlighted: request.urgency == RequestUrgency.critical && open,
+      highlighted: highlighted || (request.urgency == RequestUrgency.critical && open),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -766,6 +766,15 @@ void main() {
     await tester.tap(find.text('Map'));
     await tester.pumpAndSettle();
     expect(find.text('Open requests'), findsOneWidget);
+
+    // Opening a request from the map lands on the Requests tab, not the units
+    // list, with that request's card focused.
+    final openInRequests = find.text('Open in Requests').first;
+    await tester.ensureVisible(openInRequests);
+    await tester.pumpAndSettle();
+    await tester.tap(openInRequests);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Cards show the essentials'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -995,12 +1004,19 @@ void main() {
     addTearDown(tester.view.reset);
 
     var opened = 0;
+    String? openedId;
     final donor = repo.userById('USR-001')!;
     await tester.pumpWidget(
       MaterialApp(
         theme: TabangTheme.light,
         home: Scaffold(
-          body: FindDonorPage(user: donor, onOpenRequests: () => opened++),
+          body: FindDonorPage(
+            user: donor,
+            onOpenRequests: (id) {
+              opened++;
+              openedId = id;
+            },
+          ),
         ),
       ),
     );
@@ -1025,6 +1041,9 @@ void main() {
     await tester.tap(openButton);
     await tester.pumpAndSettle();
     expect(opened, 1);
+    // The hand-off names the specific request so the Requests tab can scroll
+    // to it, instead of dropping the user at the top of the list.
+    expect(openedId, isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -1183,7 +1202,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('permissions card includes the Voluntary Donor column', (
+  testWidgets('permissions card is a dropdown listing every role', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 1800);
@@ -1201,10 +1220,19 @@ void main() {
 
     expect(find.text('Roles & permissions'), findsOneWidget);
     expect(find.text('Voluntary Donor'), findsWidgets);
+    expect(find.text('Recipient / Patient Representative'), findsWidgets);
     expect(
       find.text('Appear in the donor directory while available'),
       findsOneWidget,
     );
+
+    // Collapsing hides the role columns; expanding brings them back.
+    await tester.tap(find.text('Roles & permissions'));
+    await tester.pumpAndSettle();
+    expect(find.text('Voluntary Donor'), findsNothing);
+    await tester.tap(find.text('Roles & permissions'));
+    await tester.pumpAndSettle();
+    expect(find.text('Voluntary Donor'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

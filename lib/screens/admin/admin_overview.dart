@@ -7,6 +7,7 @@ import '../../core/repository.dart';
 import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/common.dart';
+import '../../widgets/request_list_card.dart';
 import '../../widgets/user_record_dialog.dart';
 
 /// Administrative analytics overview.
@@ -33,6 +34,10 @@ class AdminOverviewPage extends StatefulWidget {
 class _AdminOverviewPageState extends State<AdminOverviewPage> {
   final TabangRepository _repo = TabangRepository.instance;
 
+  /// Roles & permissions starts open (it answers "what can I do here?") but can
+  /// be collapsed to get the card out of the way.
+  bool _permissionsExpanded = true;
+
   @override
   void initState() {
     super.initState();
@@ -49,17 +54,15 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     if (mounted) setState(() {});
   }
 
-  /// Shows all three positions on the platform, not just the staff/admin pair:
-  /// a Community User is a full role (requesting, messaging, donor sign-up),
-  /// and the chapter console is two roles on top of it. The signed-in role is
-  /// highlighted so the card still answers "what can I do here?".
+  /// Shows every position on the platform. Collapsible so the console can put
+  /// it away; the signed-in role is highlighted so the card still answers
+  /// "what can I do here?".
   Widget _buildPermissionsCard(BuildContext context) {
     final current = widget.user?.role ?? UserRole.staff;
-    // Donors are a first-class position: they keep every community capability
-    // and add directory listing, response and Donor Hub tools on top.
     const roles = [
       UserRole.user,
       UserRole.donor,
+      UserRole.recipient,
       UserRole.staff,
       UserRole.admin,
     ];
@@ -67,63 +70,92 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionLabel('Roles & permissions'),
-          const SizedBox(height: 4),
-          Text(
-            'You are signed in as ${current.label}. Community Users request '
-            'blood, message the network and can register as donors. Voluntary '
-            'Donors appear in the directory and answer open requests. Clinical '
-            'Personnel run the chapter, and System Administrators add account '
-            'and staff management on top.',
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.45,
-              color: context.textMuted,
+          InkWell(
+            borderRadius: BorderRadius.circular(TabangRadius.sm),
+            onTap: () => setState(
+              () => _permissionsExpanded = !_permissionsExpanded,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Roles & permissions',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: context.textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'You are signed in as ${current.label}. Tap to '
+                        '${_permissionsExpanded ? 'hide' : 'see'} every role.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _permissionsExpanded
+                      ? Icons.expand_less
+                      : Icons.expand_more,
+                  color: context.textMuted,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: TabangSpace.md),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = [
-                for (final role in roles)
-                  _permissionColumn(
-                    context,
-                    role,
-                    highlight: role == current,
-                  ),
-              ];
-              if (constraints.maxWidth >= 840) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < columns.length; i++) ...[
-                      if (i > 0) const SizedBox(width: TabangSpace.md),
-                      Expanded(child: columns[i]),
-                    ],
-                  ],
-                );
-              }
-              if (constraints.maxWidth >= 560) {
-                final width = (constraints.maxWidth - TabangSpace.md) / 2;
+          if (_permissionsExpanded) ...[
+            const SizedBox(height: TabangSpace.md),
+            Text(
+              'Community Users and Recipients / Patient Representatives '
+              'request blood and message the network. Voluntary Donors appear '
+              'in the directory and answer open requests. Clinical Personnel '
+              'run the chapter, and System Administrators add account and '
+              'staff management on top.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.45,
+                color: context.textMuted,
+              ),
+            ),
+            const SizedBox(height: TabangSpace.md),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = [
+                  for (final role in roles)
+                    _permissionColumn(
+                      context,
+                      role,
+                      highlight: role == current,
+                    ),
+                ];
+                // Up to three per row, then two, then one — five roles no
+                // longer fit a single row without crushing each column.
+                final perRow = constraints.maxWidth >= 1040
+                    ? 3
+                    : constraints.maxWidth >= 560
+                    ? 2
+                    : 1;
+                const gap = TabangSpace.md;
+                final width =
+                    (constraints.maxWidth - gap * (perRow - 1)) / perRow;
                 return Wrap(
-                  spacing: TabangSpace.md,
-                  runSpacing: TabangSpace.md,
+                  spacing: gap,
+                  runSpacing: gap,
                   children: [
                     for (final column in columns)
                       SizedBox(width: width, child: column),
                   ],
                 );
-              }
-              return Column(
-                children: [
-                  for (var i = 0; i < columns.length; i++) ...[
-                    if (i > 0) const SizedBox(height: TabangSpace.md),
-                    columns[i],
-                  ],
-                ],
-              );
-            },
-          ),
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -155,6 +187,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                   UserRole.admin => Icons.admin_panel_settings_outlined,
                   UserRole.staff => Icons.medical_services_outlined,
                   UserRole.donor => Icons.volunteer_activism_outlined,
+                  UserRole.recipient => Icons.support_agent_outlined,
                   _ => Icons.people_outline,
                 },
                 size: 16,
@@ -1650,46 +1683,18 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
               style: TextStyle(fontSize: 12.5, color: context.textMuted),
             )
           else
-            ...requests.take(6).map((request) {
-              return Padding(
+            for (final request in requests.take(4))
+              Padding(
                 padding: const EdgeInsets.only(bottom: TabangSpace.sm),
-                child: Row(
-                  children: [
-                    BloodTypeChip(request.bloodType, size: 24),
-                    const SizedBox(width: TabangSpace.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            request.patientAlias,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: context.textColor,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '${request.hospital} · ${request.unitsNeeded} units',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textMuted,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    StatusPill(
-                      request.urgency.label,
-                      tone: toneForUrgency(request.urgency),
-                      dense: true,
-                    ),
-                  ],
+                child: RequestListCard(
+                  request: request,
+                  requester: _repo.userById(request.requesterId),
+                  onTap: widget.onOpenInventory,
+                  onTapHint: widget.onOpenInventory == null
+                      ? null
+                      : 'Open the request queue',
                 ),
-              );
-            }),
+              ),
         ],
       ),
     );

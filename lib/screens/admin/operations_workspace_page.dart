@@ -46,6 +46,9 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
   /// Bumped when the map asks to land on the Inventory Requests tab.
   int _requestsTabToken = 0;
 
+  /// The request the Requests tab should scroll to, set by the map card.
+  String? _focusRequestId;
+
   @override
   void didUpdateWidget(OperationsWorkspacePage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -59,11 +62,12 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
     setState(() => _section = section);
   }
 
-  /// The map's request card calls this: switch to Inventory and land on its
-  /// Requests tab so staff work the request where the full record lives.
-  void _openRequests() {
+  /// The map's request card calls this: switch to Inventory, land on its
+  /// Requests tab and scroll to that specific request.
+  void _openRequests(String requestId) {
     setState(() {
       _section = 1;
+      _focusRequestId = requestId;
       _requestsTabToken++;
     });
   }
@@ -97,6 +101,7 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
                 currentUser: widget.user,
                 embedded: true,
                 openRequestsToken: _requestsTabToken,
+                focusRequestId: _focusRequestId,
               ),
               DriveManagementPage(currentUser: widget.user, embedded: true),
             ],
