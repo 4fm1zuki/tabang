@@ -19,9 +19,9 @@
   <title>TABANG</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- No mapping SDK is loaded. Find Donor draws the bundled barangay
-       GeoJSON on a Flutter canvas, so there is no API key to leak and no
-       third-party tile traffic. -->
+  <!-- No mapping SDK or API key. The base map uses keyless OSM raster tiles;
+       the barangay geometry, labels and pins are drawn locally on a Flutter
+       canvas, so the city still renders offline. -->
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

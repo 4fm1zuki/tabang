@@ -6,7 +6,7 @@
     "background_color": "#F7F5F4",
     "theme_color": "#B3261E",
     "description": "Transfusion Access, Blood Availability and Network Guidance. A centralized donor management system for Digos City.",
-    "orientation": "landscape-primary",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

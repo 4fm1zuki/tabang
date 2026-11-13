@@ -599,6 +599,9 @@ Future<void> showBloodRequestDialog(
       },
     ),
   );
+  patientController.dispose();
+  unitsController.dispose();
+  noteController.dispose();
 }
 
 /// One attachment row in the request dialog.

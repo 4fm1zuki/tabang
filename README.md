@@ -676,9 +676,10 @@ web renderer and painted over the whole viewport.
 
 ## Bundled imagery
 
-Every photograph and illustration is a local Flutter asset. The app makes no
-image request at runtime, so the interface still works with the network switched
-off and there is no third-party image host to configure or pay for.
+Every photograph and illustration is a local Flutter asset. The interface makes
+no third-party image request for its own content; the only remote images are the
+optional OpenStreetMap base tiles used by the map. Offline, the UI and the
+complete vector map still work.
 
 | Surface | Asset |
 |---|---|
@@ -729,7 +730,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**158 tests** cover:
+**210 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -886,13 +887,29 @@ flutter test
 | Platform | Status |
 |---|---|
 | Web | ✅ builds and runs (`flutter build web --release`) |
-| Android | ✅ debug APK builds; verified package `ph.edu.cjc.tabang`, `minSdk 24`, target SDK 36, `INTERNET` permission |
+| Android | ✅ release APKs build (universal and per-ABI); verified package `ph.edu.cjc.tabang`, `minSdk 24`, target SDK 36, `INTERNET` permission |
 | Windows | ✅ configured; the offline Digos map works natively |
 | Linux | ✅ configured; the offline Digos map works natively |
 | iOS / macOS | ⚠️ requires a Mac to compile; bundle ID `ph.edu.cjc.tabang`; not built by the proponents |
 
 Android release builds currently use the debug signing key. This is documented
 in `android/app/build.gradle.kts` and is not suitable for public distribution.
+
+### Release artifacts
+
+```bash
+flutter build apk --release                    # universal APK
+flutter build apk --release --split-per-abi    # arm64-v8a, armeabi-v7a, x86_64
+flutter build web --release                    # static web bundle
+```
+
+- APKs land in `build/app/outputs/flutter-apk/`.
+- `build/web/` is the complete web bundle. Upload the **contents** of that
+  folder, not the folder itself, to Cloudflare Pages or any static host. It is
+  built for the site root; for a sub-path deployment rebuild with
+  `flutter build web --release --base-href /your-path/`.
+- The web build is a static single-page app. No server process, database or
+  environment file is required for this simulated-data build.
 
 Android is intentionally pinned to **AGP 8.13.2 / Gradle 8.14.3 / Kotlin
 2.4.0**. Flutter 3.47's Gradle plugin still casts AGP 9's new DSL extension to

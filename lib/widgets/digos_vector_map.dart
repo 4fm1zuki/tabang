@@ -807,7 +807,7 @@ class _DigosVectorMapState extends State<DigosVectorMap> {
                             // tiles are Referer-gated.
                             urlTemplate:
                                 'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.digos.barangay_map',
+                            userAgentPackageName: 'ph.edu.cjc.tabang',
                             maxNativeZoom: 19,
                             // The offset is re-evaluated inside the tile builder so
                             // it tracks the live camera during zoom animations.
