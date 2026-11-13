@@ -65,22 +65,16 @@ class _RequestsPageState extends State<RequestsPage> {
   bool get _isDonor => _user.role == UserRole.donor;
 
   List<BloodRequest> get _visible {
-    final donorType = _user.bloodType;
-
     var list = _isDonor
         ? _donorTab == _DonorRequestsTab.mine
               ? _repo.requests.where((r) => r.requesterId == _user.id).toList()
-              : _repo.donorNetworkRequests.where((r) {
-                  // A donor can request blood too; their own request belongs on
-                  // the "Mine" tab, not in the list they can respond to.
-                  if (r.requesterId == _user.id) return false;
-                  if (donorType == null) return false;
-                  return Compatibility.canDonateComponentTo(
-                    donorType,
-                    r.bloodType,
-                    r.component,
-                  );
-                }).toList()
+              // The serve tab shows the same community requests the map lists,
+              // minus the donor's own (those live on the Mine tab). Whether the
+              // donor can actually respond is decided per card, so the two
+              // surfaces show the same count.
+              : _repo.communityRequests
+                    .where((r) => r.requesterId != _user.id)
+                    .toList()
         : _repo.requests.where((r) => r.requesterId == _user.id).toList();
 
     if (_urgencyFilter != null) {
@@ -138,8 +132,9 @@ class _RequestsPageState extends State<RequestsPage> {
                             : _donorTab == _DonorRequestsTab.mine
                             ? 'Requests you posted, with donor responses and '
                                   'fulfilment progress.'
-                            : 'Open donor-network requests your blood type '
-                                  'and component can serve.'
+                            : 'Community requests across Digos City. Respond '
+                                  'to the ones your blood type and component '
+                                  'can serve.'
                       : 'Your requests, donor responses and fulfilment '
                             'progress.',
                   actions: [

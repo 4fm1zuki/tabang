@@ -2258,4 +2258,74 @@ void main() {
       }
     });
   });
+
+  group('Community request visibility', () {
+    test('a posted donor request appears before review, a bank one never does', () {
+      final created = repo.addRequest(
+        requesterId: 'USR-009',
+        patientAlias: 'Community post',
+        bloodType: BloodType.oNeg,
+        component: BloodComponent.packedRbc,
+        unitsNeeded: 1,
+        hospital: DigosFacilities.names.first,
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.urgent,
+        documents: uploadedDocuments(),
+        scheduledFor: repo.bloodBankSlots(days: 7).first,
+      )!;
+      expect(created.status, RequestStatus.pendingReview);
+      expect(
+        repo.communityRequests.map((r) => r.id),
+        contains(created.id),
+        reason: 'a request posted to donors shows in the Requests board at once',
+      );
+
+      final bank = repo.addRequest(
+        requesterId: 'USR-009',
+        patientAlias: 'Bank only',
+        bloodType: BloodType.oNeg,
+        component: BloodComponent.packedRbc,
+        unitsNeeded: 1,
+        hospital: DigosFacilities.names.first,
+        barangay: 'Zone 2',
+        urgency: RequestUrgency.routine,
+        source: RequestSource.bloodBank,
+        documents: uploadedDocuments(),
+        scheduledFor: repo.bloodBankSlots(days: 7).first,
+        postToDonorNetwork: false,
+      )!;
+      expect(
+        repo.communityRequests.map((r) => r.id),
+        isNot(contains(bank.id)),
+        reason: 'blood-bank requests stay with the chapter',
+      );
+    });
+
+    test('the community list is the only actionable donor-network set', () {
+      for (final request in repo.communityRequests) {
+        expect(request.source, RequestSource.donorNetwork);
+        expect(
+          request.status,
+          anyOf(
+            RequestStatus.pendingReview,
+            RequestStatus.open,
+            RequestStatus.matched,
+          ),
+        );
+      }
+      // Everything the Requests board can show is present, so the board and the
+      // map read the same list.
+      final actionable = repo.requests.where(
+        (r) =>
+            r.source == RequestSource.donorNetwork &&
+            (r.status == RequestStatus.pendingReview ||
+                r.status == RequestStatus.open ||
+                r.status == RequestStatus.matched),
+      );
+      expect(
+        repo.communityRequests.map((r) => r.id).toSet(),
+        actionable.map((r) => r.id).toSet(),
+      );
+    });
+  });
 }

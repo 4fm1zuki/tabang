@@ -373,6 +373,22 @@ class TabangRepository {
   List<BloodRequest> get donorNetworkRequests =>
       _requests.where((r) => r.acceptsDonorResponses).toList(growable: false);
 
+  /// Every request the community can see: donor-network requests that are
+  /// awaiting verification, open or matched.
+  ///
+  /// Blood-bank requests are handled by the chapter and are never broadcast, so
+  /// they are excluded. This single list backs both the community map's request
+  /// list and the Requests board, so the two can never show different counts.
+  List<BloodRequest> get communityRequests => _requests
+      .where(
+        (request) =>
+            request.source == RequestSource.donorNetwork &&
+            (request.status == RequestStatus.pendingReview ||
+                request.status == RequestStatus.open ||
+                request.status == RequestStatus.matched),
+      )
+      .toList(growable: false);
+
   /// The staff request queue, in the order the Operations map panel and the
   /// Inventory Requests tab both show it.
   ///

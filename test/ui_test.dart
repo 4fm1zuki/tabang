@@ -983,6 +983,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('community map request cards hand off to the Requests tab', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1300, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    var opened = 0;
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(
+          body: FindDonorPage(user: donor, onOpenRequests: () => opened++),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Switch the side panel to its Requests tab.
+    final panelTab = find
+        .descendant(
+          of: find.byType(SegmentedButton<int>),
+          matching: find.text('Requests'),
+        )
+        .first;
+    await tester.ensureVisible(panelTab);
+    await tester.pumpAndSettle();
+    await tester.tap(panelTab);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open in Requests'), findsWidgets);
+    final openButton = find.text('Open in Requests').first;
+    await tester.ensureVisible(openButton);
+    await tester.pumpAndSettle();
+    await tester.tap(openButton);
+    await tester.pumpAndSettle();
+    expect(opened, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('permissions card includes the Voluntary Donor column', (
     tester,
   ) async {

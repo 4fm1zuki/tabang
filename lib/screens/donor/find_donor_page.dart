@@ -192,21 +192,14 @@ class _FindDonorPageState extends State<FindDonorPage> {
     _donorCounts = _repo.donorCountsByBarangay(bloodType: _bloodType);
   }
 
-  /// Requests the community may see: the district's own donor-network requests.
+  /// Requests the community may see, straight from the shared repository list
+  /// so the map matches the Requests board exactly.
   ///
-  /// Blood-bank requests are excluded on purpose — the chapter processes those
-  /// itself and they were never offered to the community. A freshly posted
-  /// request is included straight away, while it is still *Awaiting
-  /// verification*, so the requester sees their own post land in the Requests
-  /// list and the heat map; donors simply cannot respond until staff verify it
-  /// (`acceptsDonorResponses` still requires the open state).
-  Iterable<BloodRequest> get _broadcastRequests => _repo.requests.where(
-    (request) =>
-        request.source == RequestSource.donorNetwork &&
-        (request.status == RequestStatus.pendingReview ||
-            request.status == RequestStatus.open ||
-            request.status == RequestStatus.matched),
-  );
+  /// Blood-bank requests are excluded there; a freshly posted request is
+  /// included while it is still *Awaiting verification*, and donors simply
+  /// cannot respond until staff verify it (`acceptsDonorResponses` still
+  /// requires the open state).
+  Iterable<BloodRequest> get _broadcastRequests => _repo.communityRequests;
 
   /// Broadcast requests per barangay: the community's request heat layer.
   Map<String, int> get _requestCounts {
@@ -1243,6 +1236,25 @@ class _FindDonorPageState extends State<FindDonorPage> {
             '${request.unitsNeeded == 1 ? '' : 's'}',
             style: TextStyle(fontSize: 11, color: context.textMuted),
           ),
+          if (widget.onOpenRequests != null) ...[
+            const SizedBox(height: TabangSpace.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: widget.onOpenRequests,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 30),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: const Icon(Icons.arrow_forward, size: 15),
+                label: const Text(
+                  'Open in Requests',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
