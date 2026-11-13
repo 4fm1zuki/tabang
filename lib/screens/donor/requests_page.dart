@@ -7,8 +7,10 @@ import '../../theme.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/blood_request_dialog.dart';
 import '../../widgets/common.dart';
+import '../../widgets/filter_bar.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/request_document_list.dart';
+import '../../widgets/tabang_dropdown.dart';
 
 /// Blood request board.
 ///
@@ -182,58 +184,79 @@ class _RequestsPageState extends State<RequestsPage> {
                   ),
                 const SizedBox(height: TabangSpace.lg),
 
+                // Dropdown filters, matching the staff Inventory filter bars.
                 if (_isDonor && _donorTab != _DonorRequestsTab.donate)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Wrap(
-                          spacing: TabangSpace.sm,
-                          runSpacing: TabangSpace.sm,
-                          children: [
-                            _urgencyChip(context, null, 'All'),
-                            ...RequestUrgency.values.map(
-                              (u) => _urgencyChip(context, u, u.label),
-                            ),
-                          ],
+                  TabangFilterBar(
+                    filters: [
+                      TabangDropdown<RequestUrgency?>(
+                        initialValue: _urgencyFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Urgency',
+                          isDense: true,
                         ),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: context.textColor,
+                        ),
+                        items: [
+                          const DropdownMenuItem<RequestUrgency?>(
+                            value: null,
+                            child: Text('All urgencies'),
+                          ),
+                          ...RequestUrgency.values.map(
+                            (u) => DropdownMenuItem<RequestUrgency?>(
+                              value: u,
+                              child: Text(u.label),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _urgencyFilter = v),
                       ),
-                      const HelpTip(
-                        title: 'Urgency levels',
-                        message:
-                            'Critical — the patient needs units now; the '
-                            'request is released as soon as a compatible unit '
-                            'or donor is confirmed (minutes to a few hours).\n\n'
-                            'Urgent — needed within 24–48 hours; the chapter '
-                            'schedules the next available slot or drive.\n\n'
-                            'Routine — planned use (for example before '
-                            'surgery), usually three or more days out.\n\n'
-                            'Urgency is chosen when the request is posted and '
-                            'chapter staff can adjust it.',
+                      TabangDropdown<RequestStatus?>(
+                        initialValue: _statusFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'State',
+                          isDense: true,
+                        ),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: context.textColor,
+                        ),
+                        items: [
+                          const DropdownMenuItem<RequestStatus?>(
+                            value: null,
+                            child: Text('Any state'),
+                          ),
+                          ...RequestStatus.values.map(
+                            (s) => DropdownMenuItem<RequestStatus?>(
+                              value: s,
+                              child: Text(s.label),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _statusFilter = v),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: TabangSpace.sm),
-                  // Lifecycle filter. Every community request now reaches this
-                  // board, so Awaiting verification / Open / Matched can be
-                  // isolated instead of scrolling the whole list.
-                  if (_isDonor && _donorTab != _DonorRequestsTab.donate)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    trailing: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: Wrap(
-                            spacing: TabangSpace.sm,
-                            runSpacing: TabangSpace.sm,
-                            children: [
-                              _statusChip(context, null, 'Any state'),
-                              ...RequestStatus.values.map(
-                                (s) => _statusChip(context, s, s.label),
-                              ),
-                            ],
-                          ),
+                        HelpTip(
+                          title: 'Urgency levels',
+                          message:
+                              'Critical — the patient needs units now; the '
+                              'request is released as soon as a compatible unit '
+                              'or donor is confirmed (minutes to a few hours).\n\n'
+                              'Urgent — needed within 24–48 hours; the chapter '
+                              'schedules the next available slot or drive.\n\n'
+                              'Routine — planned use (for example before '
+                              'surgery), usually three or more days out.\n\n'
+                              'Urgency is chosen when the request is posted and '
+                              'chapter staff can adjust it.',
                         ),
-                        const HelpTip(
+                        SizedBox(width: TabangSpace.xs),
+                        HelpTip(
                           title: 'Request states',
                           message:
                               'Awaiting verification — posted, but chapter staff '
@@ -249,6 +272,7 @@ class _RequestsPageState extends State<RequestsPage> {
                         ),
                       ],
                     ),
+                  ),
                 if (_isDonor && _donorTab != _DonorRequestsTab.donate)
                   const SizedBox(height: TabangSpace.lg),
               ],
@@ -555,47 +579,6 @@ class _RequestsPageState extends State<RequestsPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _urgencyChip(
-    BuildContext context,
-    RequestUrgency? urgency,
-    String label,
-  ) {
-    final selected = _urgencyFilter == urgency;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      showCheckmark: false,
-      selectedColor: TabangColors.crimson,
-      labelStyle: TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w600,
-        color: selected ? Colors.white : context.textColor,
-      ),
-      onSelected: (_) => setState(() => _urgencyFilter = urgency),
-    );
-  }
-
-  /// Lifecycle chip for the Requests board's status filter.
-  Widget _statusChip(
-    BuildContext context,
-    RequestStatus? status,
-    String label,
-  ) {
-    final selected = _statusFilter == status;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      showCheckmark: false,
-      selectedColor: TabangColors.crimson,
-      labelStyle: TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w600,
-        color: selected ? Colors.white : context.textColor,
-      ),
-      onSelected: (_) => setState(() => _statusFilter = status),
     );
   }
 

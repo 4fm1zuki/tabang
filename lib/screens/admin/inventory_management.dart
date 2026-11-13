@@ -13,6 +13,18 @@ import '../../widgets/request_review_dialogs.dart';
 import '../../widgets/user_record_dialog.dart';
 import '../../widgets/tabang_dropdown.dart';
 
+/// Booked-slot states staff can filter by. Fulfilled slots are kept in the
+/// list so the donation history is visible and can be reversed.
+enum _SlotFilter {
+  all('All slots'),
+  awaiting('Awaiting verification'),
+  confirmed('Slot confirmed'),
+  fulfilled('Fulfilled');
+
+  const _SlotFilter(this.label);
+  final String label;
+}
+
 /// Inventory and request management for chapter staff.
 ///
 /// Staff can change a unit's status, see expiry pressure, and work the request
@@ -54,7 +66,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   BloodType? _requestTypeFilter;
   RequestStatus? _requestStatusFilter;
   BloodType? _slotTypeFilter;
-  bool? _slotAwaitingFilter;
+  _SlotFilter _slotFilter = _SlotFilter.all;
   bool? _removedRestoredFilter;
 
   @override
@@ -1331,13 +1343,24 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
       if (_slotTypeFilter != null && r.bloodType != _slotTypeFilter) {
         return false;
       }
-      if (_slotAwaitingFilter != null &&
-          r.isAwaitingReview != _slotAwaitingFilter) {
-        return false;
+      switch (_slotFilter) {
+        case _SlotFilter.all:
+          break;
+        case _SlotFilter.awaiting:
+          if (!r.isAwaitingReview) return false;
+        case _SlotFilter.confirmed:
+          if (r.isAwaitingReview || r.status == RequestStatus.fulfilled) {
+            return false;
+          }
+        case _SlotFilter.fulfilled:
+          if (r.status != RequestStatus.fulfilled) return false;
       }
       return true;
     }).toList(growable: false);
     final pending = all.where((r) => r.isAwaitingReview).length;
+    final fulfilled = all
+        .where((r) => r.status == RequestStatus.fulfilled)
+        .length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1348,29 +1371,23 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               value: _slotTypeFilter,
               onChanged: (v) => setState(() => _slotTypeFilter = v),
             ),
-            TabangDropdown<bool?>(
-              initialValue: _slotAwaitingFilter,
+            TabangDropdown<_SlotFilter>(
+              initialValue: _slotFilter,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Slot state',
                 isDense: true,
               ),
               style: TextStyle(fontSize: 12.5, color: context.textColor),
-              items: const [
-                DropdownMenuItem<bool?>(
-                  value: null,
-                  child: Text('All slots'),
-                ),
-                DropdownMenuItem<bool?>(
-                  value: true,
-                  child: Text('Awaiting verification'),
-                ),
-                DropdownMenuItem<bool?>(
-                  value: false,
-                  child: Text('Slot confirmed'),
-                ),
+              items: [
+                for (final filter in _SlotFilter.values)
+                  DropdownMenuItem<_SlotFilter>(
+                    value: filter,
+                    child: Text(filter.label),
+                  ),
               ],
-              onChanged: (v) => setState(() => _slotAwaitingFilter = v),
+              onChanged: (v) =>
+                  setState(() => _slotFilter = v ?? _SlotFilter.all),
             ),
           ],
         ),
@@ -1384,6 +1401,14 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     'and its slot.',
           style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
         ),
+        if (fulfilled > 0) ...[
+          const SizedBox(height: 2),
+          Text(
+            '$fulfilled fulfilled slot${fulfilled == 1 ? '' : 's'} on record — '
+            'filter by Fulfilled to review or reopen them.',
+            style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
+          ),
+        ],
         const SizedBox(height: TabangSpace.md),
         if (all.isEmpty)
           const EmptyState(
@@ -1410,7 +1435,13 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   Widget _buildBookedSlotCard(BuildContext context, BloodRequest request) {
     final requester = _repo.userById(request.requesterId);
     final pending = request.isAwaitingReview;
+    final fulfilled = request.status == RequestStatus.fulfilled;
     final canAct = widget.currentUser.role.canFulfillRequests;
+    final (label, tone) = fulfilled
+        ? ('Fulfilled', Tone.success)
+        : pending
+        ? ('Awaiting verification', Tone.warning)
+        : ('Slot confirmed', Tone.success);
     return SurfaceCard(
       onTap: () => _showRequestDetails(context, request),
       child: Column(
@@ -1444,11 +1475,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                   ],
                 ),
               ),
-              StatusPill(
-                pending ? 'Awaiting verification' : 'Slot confirmed',
-                tone: pending ? Tone.warning : Tone.success,
-                dense: true,
-              ),
+              StatusPill(label, tone: tone, dense: true),
             ],
           ),
           const SizedBox(height: TabangSpace.sm),
@@ -1483,7 +1510,17 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               ),
             ],
           ),
-          if (canAct && (pending || request.canBeFulfilled)) ...[
+          if (canAct && fulfilled) ...[
+            const SizedBox(height: TabangSpace.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _reopenRequest(context, request),
+                icon: const Icon(Icons.undo, size: 15),
+                label: const Text('Reopen (undo fulfilled)'),
+              ),
+            ),
+          ] else if (canAct && (pending || request.canBeFulfilled)) ...[
             const SizedBox(height: TabangSpace.sm),
             Align(
               alignment: Alignment.centerLeft,
@@ -1499,6 +1536,34 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Reverses a mistaken fulfilment from the Booked-slots list, mirroring the
+  /// Undo on the fulfil snackbar.
+  void _reopenRequest(BuildContext context, BloodRequest request) {
+    final ok = _repo.reopenFulfilledRequest(
+      request.id,
+      actorId: widget.currentUser.id,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      TabangSnackBar(
+        content: Text(
+          ok
+              ? 'Request ${request.id} reopened — no longer fulfilled.'
+              : 'Request ${request.id} could not be reopened.',
+        ),
+        duration: const Duration(seconds: 6),
+        action: ok
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _repo.markRequestFulfilled(
+                  request.id,
+                  actorId: widget.currentUser.id,
+                ),
+              )
+            : null,
       ),
     );
   }

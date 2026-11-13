@@ -1101,10 +1101,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Any state'), findsOneWidget);
-    // The seeded board has requests awaiting verification.
-    await tester.tap(
-      find.widgetWithText(ChoiceChip, RequestStatus.pendingReview.label),
-    );
+    // Lifecycle filter is a dropdown now; open it and pick a value.
+    await tester.tap(find.text('Any state'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(RequestStatus.pendingReview.label).last);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
@@ -1139,6 +1139,47 @@ void main() {
     await tester.tap(find.text('Removed units'));
     await tester.pumpAndSettle();
     expect(find.text('Ledger state'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('booked slots can be filtered to fulfilled and reopened', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    final target = repo.scheduledRequests.firstWhere(
+      (r) => r.canBeFulfilled,
+      orElse: () => throw StateError('no fulfillable seeded slot'),
+    );
+    expect(repo.markRequestFulfilled(target.id, actorId: staff.id), isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: InventoryManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Booked slots'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('All slots'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fulfilled').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Reopen (undo fulfilled)'), findsWidgets);
+    await tester.tap(find.text('Reopen (undo fulfilled)').first);
+    await tester.pumpAndSettle();
+
+    expect(
+      repo.requests.firstWhere((r) => r.id == target.id).status,
+      isNot(RequestStatus.fulfilled),
+    );
     expect(tester.takeException(), isNull);
   });
 
