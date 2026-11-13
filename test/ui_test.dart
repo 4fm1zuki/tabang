@@ -15,6 +15,7 @@ import 'package:tabang/screens/donor/chat_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_hub_page.dart';
 import 'package:tabang/screens/donor/find_donor_page.dart';
+import 'package:tabang/screens/donor/requests_page.dart';
 import 'package:tabang/screens/shared/about_help_page.dart';
 import 'package:tabang/screens/shared/profile_page.dart';
 import 'package:tabang/theme.dart';
@@ -1080,6 +1081,64 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Pin the drive venue'), findsOneWidget);
     expect(find.text('No location pinned yet.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('community requests board filters by lifecycle state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: RequestsPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Any state'), findsOneWidget);
+    // The seeded board has requests awaiting verification.
+    await tester.tap(
+      find.widgetWithText(ChoiceChip, RequestStatus.pendingReview.label),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inventory tabs each carry filters', (tester) async {
+    tester.view.physicalSize = const Size(1280, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: InventoryManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Units tab: blood type + status.
+    expect(find.text('Blood type'), findsOneWidget);
+    expect(find.text('Status'), findsOneWidget);
+
+    await tester.tap(find.text('Requests'));
+    await tester.pumpAndSettle();
+    expect(find.text('Blood type'), findsOneWidget);
+    expect(find.text('Status'), findsOneWidget);
+
+    await tester.tap(find.text('Booked slots'));
+    await tester.pumpAndSettle();
+    expect(find.text('Slot state'), findsOneWidget);
+
+    await tester.tap(find.text('Removed units'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ledger state'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

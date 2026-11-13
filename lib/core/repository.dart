@@ -3480,6 +3480,9 @@ class TabangRepository {
       int collectedDaysAgo,
       int shelfLifeDays, {
       UnitStatus status = UnitStatus.available,
+      String? reservedBy,
+      DateTime? reservedAt,
+      String? reservationNote,
     }) {
       final collected = daysAgo(collectedDaysAgo);
       _units.add(
@@ -3491,6 +3494,9 @@ class TabangRepository {
           status: status,
           collectedOn: collected,
           expiresOn: collected.add(Duration(days: shelfLifeDays)),
+          reservedBy: reservedBy,
+          reservedAt: reservedAt,
+          reservationNote: reservationNote,
         ),
       );
     }
@@ -3535,6 +3541,11 @@ class TabangRepository {
       28,
       42,
       status: UnitStatus.reserved,
+      // A held bag must name its holder, or the row reads "Reserved" while the
+      // details say nobody holds it.
+      reservedBy: 'USR-009',
+      reservedAt: daysAgo(1),
+      reservationNote: 'Held for Patient 209 (cross-match complete)',
     );
     addUnit(
       'PLT-4019-A+',

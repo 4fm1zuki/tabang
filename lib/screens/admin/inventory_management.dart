@@ -49,6 +49,14 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   UnitStatus? _statusFilter;
   int _tab = 0;
 
+  /// Per-tab filters. Requests, booked slots and removed units each had none,
+  /// so a busy queue could not be narrowed.
+  BloodType? _requestTypeFilter;
+  RequestStatus? _requestStatusFilter;
+  BloodType? _slotTypeFilter;
+  bool? _slotAwaitingFilter;
+  bool? _removedRestoredFilter;
+
   @override
   void initState() {
     super.initState();
@@ -298,49 +306,32 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
             title: 'No units match these filters',
           )
         else
-          SurfaceCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (var i = 0; i < units.length; i++)
-                  _buildUnitRow(context, units[i], now, first: i == 0),
-              ],
+          for (final unit in units)
+            Padding(
+              padding: const EdgeInsets.only(bottom: TabangSpace.md),
+              child: _buildUnitCard(context, unit, now),
             ),
-          ),
       ],
     );
   }
 
-  /// One inventory row: blood type chip, product, time left and status on the
-  /// first line, the unit ID barcode and its holder (when reserved) beneath it,
-  /// and the status menu on the right. The barcode graphic, storage bay and
-  /// collected date stay behind the row tap in the unit sheet.
-  Widget _buildUnitRow(
-    BuildContext context,
-    BloodUnit unit,
-    DateTime now, {
-    required bool first,
-  }) {
+  /// One inventory card: blood type chip, product and barcode up top, status
+  /// and remaining shelf life, then the storage/collection facts and a slim
+  /// shelf-life bar — the same card anatomy as the request and booked-slot
+  /// queues, so the whole Inventory page reads as one surface.
+  Widget _buildUnitCard(BuildContext context, BloodUnit unit, DateTime now) {
     final days = unit.daysUntilExpiry(now);
     final effective = unit.effectiveStatus(now);
     final expiring = days >= 0 && days <= 5 && unit.isUsableAt(now);
     final holder = unit.reservedBy == null
         ? null
         : _repo.userById(unit.reservedBy!);
+    final total = unit.expiresOn.difference(unit.collectedOn);
+    final remaining = unit.expiresOn.difference(now);
+    final remainingFraction = total.inMinutes <= 0
+        ? 0.0
+        : (remaining.inMinutes / total.inMinutes).clamp(0.0, 1.0).toDouble();
 
-    final timeLeft = Text(
-      unit.timeLeft(now),
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: expiring ? FontWeight.w700 : FontWeight.w600,
-        color: expiring ? TabangColors.danger : context.textMuted,
-      ),
-    );
-    final statusPill = StatusPill(
-      effective.label,
-      tone: toneForUnit(effective),
-      dense: true,
-    );
     final menu = PopupMenuButton<UnitStatus>(
       tooltip: 'Change status',
       icon: Icon(Icons.more_horiz, size: 18, color: context.textMuted),
@@ -366,94 +357,121 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           )
           .toList(),
     );
-    final identity = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          unit.product,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'ID ${unit.barcode}'
-          '${holder == null ? '' : ' · held by ${holder.alias}'}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12,
-            fontFamily: 'monospace',
-            color: context.textMuted,
-          ),
-        ),
-      ],
-    );
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: first ? null : Border(top: BorderSide(color: context.border)),
-      ),
-      child: InkWell(
-        onTap: () => _showUnitDetails(context, unit, now),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: TabangSpace.lg,
-            vertical: TabangSpace.md,
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // At phone width the chip, product, expiry, status and menu
-              // cannot share one line, so expiry and status drop to a second
-              // row instead of squeezing the product name.
-              if (constraints.maxWidth < 480) {
-                return Column(
+    return SurfaceCard(
+      onTap: () => _showUnitDetails(context, unit, now),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BloodTypeChip(unit.bloodType, size: 34),
+              const SizedBox(width: TabangSpace.md),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        BloodTypeChip(unit.bloodType, size: 32),
-                        const SizedBox(width: TabangSpace.md),
-                        Expanded(child: identity),
-                        menu,
-                      ],
+                    Text(
+                      unit.product,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: context.textColor,
+                      ),
                     ),
-                    const SizedBox(height: 6),
-                    // Wrap rather than Row: a long expiry string and a wide
-                    // status pill can still run out of width on the second
-                    // line. Tapping the row itself opens the unit's full
-                    // record, so the row carries no separate Details button.
-                    Wrap(
-                      spacing: TabangSpace.sm,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [timeLeft, statusPill],
+                    const SizedBox(height: 2),
+                    Text(
+                      'ID ${unit.barcode}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontFamily: 'monospace',
+                        color: context.textMuted,
+                      ),
                     ),
                   ],
-                );
-              }
-              return Row(
-                children: [
-                  BloodTypeChip(unit.bloodType, size: 32),
-                  const SizedBox(width: TabangSpace.md),
-                  Expanded(child: identity),
-                  const SizedBox(width: TabangSpace.sm),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [timeLeft, const SizedBox(height: 4), statusPill],
-                  ),
-                  const SizedBox(width: 4),
-                  menu,
-                ],
-              );
-            },
+                ),
+              ),
+              const SizedBox(width: TabangSpace.sm),
+              StatusPill(
+                effective.label,
+                tone: toneForUnit(effective),
+                dense: true,
+              ),
+              menu,
+            ],
           ),
-        ),
+          const SizedBox(height: TabangSpace.sm),
+          Wrap(
+            spacing: TabangSpace.md,
+            runSpacing: 4,
+            children: [
+              _unitFact(context, Icons.warehouse_outlined, unit.storageBay),
+              _unitFact(
+                context,
+                Icons.event_outlined,
+                'Collected ${formatDate(unit.collectedOn)}',
+              ),
+              _unitFact(
+                context,
+                Icons.schedule,
+                unit.timeLeft(now),
+                color: expiring ? TabangColors.danger : null,
+              ),
+            ],
+          ),
+          if (holder != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(
+                  Icons.lock_clock_outlined,
+                  size: 14,
+                  color: TabangColors.info,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'Reserved for ${holder.alias} (${holder.role.label})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: context.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: TabangSpace.sm),
+          ProportionBar(
+            value: remainingFraction,
+            max: 1,
+            color: expiring ? TabangColors.danger : TabangColors.success,
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _unitFact(
+    BuildContext context,
+    IconData icon,
+    String text, {
+    Color? color,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color ?? context.textMuted),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(fontSize: 11.5, color: color ?? context.textMuted),
+        ),
+      ],
     );
   }
 
@@ -623,19 +641,53 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   Widget _buildRequestsTab(BuildContext context) {
     // Same queue and order as the Operations map panel, so the two lists can
     // never disagree about which requests are open.
-    final requests = _repo.staffRequestQueue;
-
-    if (requests.isEmpty) {
-      return const EmptyState(
-        art: TabangArt.requests,
-        title: 'No requests in the queue',
-      );
-    }
+    final all = _repo.staffRequestQueue;
+    final requests = all.where((r) {
+      if (_requestTypeFilter != null && r.bloodType != _requestTypeFilter) {
+        return false;
+      }
+      if (_requestStatusFilter != null && r.status != _requestStatusFilter) {
+        return false;
+      }
+      return true;
+    }).toList(growable: false);
 
     final canAct = widget.currentUser.role.canFulfillRequests;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        TabangFilterBar(
+          filters: [
+            _bloodTypeDropdown(
+              label: 'Blood type',
+              value: _requestTypeFilter,
+              onChanged: (v) => setState(() => _requestTypeFilter = v),
+            ),
+            TabangDropdown<RequestStatus?>(
+              initialValue: _requestStatusFilter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Status',
+                isDense: true,
+              ),
+              style: TextStyle(fontSize: 12.5, color: context.textColor),
+              items: [
+                const DropdownMenuItem<RequestStatus?>(
+                  value: null,
+                  child: Text('All statuses'),
+                ),
+                ...RequestStatus.values.map(
+                  (s) => DropdownMenuItem<RequestStatus?>(
+                    value: s,
+                    child: Text(s.label),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _requestStatusFilter = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: TabangSpace.md),
         Text(
           'Cards show the essentials. Open one for the attachments, donor '
           'responses and full record. Staff can reject any active request; '
@@ -643,12 +695,42 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
         ),
         const SizedBox(height: TabangSpace.md),
-        for (final request in requests)
-          Padding(
-            padding: const EdgeInsets.only(bottom: TabangSpace.md),
-            child: _buildRequestCard(context, request, canAct: canAct),
-          ),
+        if (requests.isEmpty)
+          const EmptyState(
+            art: TabangArt.requests,
+            title: 'No requests match these filters',
+          )
+        else
+          for (final request in requests)
+            Padding(
+              padding: const EdgeInsets.only(bottom: TabangSpace.md),
+              child: _buildRequestCard(context, request, canAct: canAct),
+            ),
       ],
+    );
+  }
+
+  /// Blood-type filter shared by the request, slot and unit tabs.
+  Widget _bloodTypeDropdown({
+    required String label,
+    required BloodType? value,
+    required ValueChanged<BloodType?> onChanged,
+  }) {
+    return TabangDropdown<BloodType?>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(labelText: label, isDense: true),
+      style: TextStyle(fontSize: 12.5, color: context.textColor),
+      items: [
+        const DropdownMenuItem<BloodType?>(
+          value: null,
+          child: Text('All types'),
+        ),
+        ...BloodType.values.map(
+          (t) => DropdownMenuItem<BloodType?>(value: t, child: Text(t.label)),
+        ),
+      ],
+      onChanged: onChanged,
     );
   }
 
@@ -1093,18 +1175,37 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
 
   /// The removed-units ledger: every deletion stays visible and reversible.
   Widget _buildRemovedUnitsTab(BuildContext context) {
-    final records = _repo.removedUnits;
-    if (records.isEmpty) {
-      return const EmptyState(
-        art: TabangArt.inventory,
-        title: 'No removed units',
-        message:
-            'Bags removed from the ledger appear here, with a restore action.',
-      );
-    }
+    final all = _repo.removedUnits;
+    final records = all.where((record) {
+      if (_removedRestoredFilter != null &&
+          record.restored != _removedRestoredFilter) {
+        return false;
+      }
+      return true;
+    }).toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        TabangFilterBar(
+          filters: [
+            TabangDropdown<bool?>(
+              initialValue: _removedRestoredFilter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Ledger state',
+                isDense: true,
+              ),
+              style: TextStyle(fontSize: 12.5, color: context.textColor),
+              items: const [
+                DropdownMenuItem<bool?>(value: null, child: Text('All records')),
+                DropdownMenuItem<bool?>(value: false, child: Text('Removed')),
+                DropdownMenuItem<bool?>(value: true, child: Text('Restored')),
+              ],
+              onChanged: (v) => setState(() => _removedRestoredFilter = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: TabangSpace.md),
         Text(
           'Every removal is recorded and can be undone. Restoring a bag puts '
           'it back on the shelf at its original expiry; both actions stay in '
@@ -1112,7 +1213,20 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
         ),
         const SizedBox(height: TabangSpace.md),
-        for (final record in records)
+        if (all.isEmpty)
+          const EmptyState(
+            art: TabangArt.inventory,
+            title: 'No removed units',
+            message:
+                'Bags removed from the ledger appear here, with a restore action.',
+          )
+        else if (records.isEmpty)
+          const EmptyState(
+            art: TabangArt.inventory,
+            title: 'No records match this filter',
+          )
+        else
+          for (final record in records)
           Padding(
             padding: const EdgeInsets.only(bottom: TabangSpace.md),
             child: SurfaceCard(
@@ -1212,18 +1326,55 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   /// described one scheduled blood need. This view reads the same requests and
   /// confirms a slot when staff verify its request.
   Widget _buildBookedSlotsTab(BuildContext context) {
-    final requests = _repo.scheduledRequests;
-    if (requests.isEmpty) {
-      return const EmptyState(
-        art: TabangArt.requests,
-        title: 'No booked slots',
-        message: 'Requester slots appear here once someone submits a request.',
-      );
-    }
-    final pending = _repo.pendingScheduledRequests.length;
+    final all = _repo.scheduledRequests;
+    final requests = all.where((r) {
+      if (_slotTypeFilter != null && r.bloodType != _slotTypeFilter) {
+        return false;
+      }
+      if (_slotAwaitingFilter != null &&
+          r.isAwaitingReview != _slotAwaitingFilter) {
+        return false;
+      }
+      return true;
+    }).toList(growable: false);
+    final pending = all.where((r) => r.isAwaitingReview).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        TabangFilterBar(
+          filters: [
+            _bloodTypeDropdown(
+              label: 'Blood type',
+              value: _slotTypeFilter,
+              onChanged: (v) => setState(() => _slotTypeFilter = v),
+            ),
+            TabangDropdown<bool?>(
+              initialValue: _slotAwaitingFilter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Slot state',
+                isDense: true,
+              ),
+              style: TextStyle(fontSize: 12.5, color: context.textColor),
+              items: const [
+                DropdownMenuItem<bool?>(
+                  value: null,
+                  child: Text('All slots'),
+                ),
+                DropdownMenuItem<bool?>(
+                  value: true,
+                  child: Text('Awaiting verification'),
+                ),
+                DropdownMenuItem<bool?>(
+                  value: false,
+                  child: Text('Slot confirmed'),
+                ),
+              ],
+              onChanged: (v) => setState(() => _slotAwaitingFilter = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: TabangSpace.md),
         Text(
           pending == 0
               ? 'All booked slots are confirmed. Staff verify a request and '
@@ -1234,11 +1385,24 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
         ),
         const SizedBox(height: TabangSpace.md),
-        for (final request in requests)
-          Padding(
-            padding: const EdgeInsets.only(bottom: TabangSpace.md),
-            child: _buildBookedSlotCard(context, request),
-          ),
+        if (all.isEmpty)
+          const EmptyState(
+            art: TabangArt.requests,
+            title: 'No booked slots',
+            message:
+                'Requester slots appear here once someone submits a request.',
+          )
+        else if (requests.isEmpty)
+          const EmptyState(
+            art: TabangArt.requests,
+            title: 'No slots match these filters',
+          )
+        else
+          for (final request in requests)
+            Padding(
+              padding: const EdgeInsets.only(bottom: TabangSpace.md),
+              child: _buildBookedSlotCard(context, request),
+            ),
       ],
     );
   }

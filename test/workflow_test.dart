@@ -1388,6 +1388,15 @@ void main() {
   });
 
   group('Inventory holds and booked slots', () {
+    test('a reserved seed unit names its holder', () {
+      final held = repo.units.firstWhere((u) => u.barcode == 'RBC-9014-AB-');
+      expect(held.status, UnitStatus.reserved);
+      // A reserved bag must always carry a holder, or the row reads "Reserved"
+      // while its details say nobody holds it.
+      expect(held.reservedBy, isNotNull);
+      expect(repo.userById(held.reservedBy!), isNotNull);
+    });
+
     test('a usable unit can be held once and released by its holder', () {
       final unit = repo.availableUnits.first;
       expect(

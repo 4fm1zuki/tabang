@@ -40,6 +40,10 @@ class _RequestsPageState extends State<RequestsPage> {
 
   RequestUrgency? _urgencyFilter;
 
+  /// Lifecycle filter: All, Awaiting verification, Open or Matched. The board
+  /// now lists every community request, so staff and donors need to narrow it.
+  RequestStatus? _statusFilter;
+
   /// Donors get three tabs: requests they can serve, requests they posted
   /// themselves, and the donation side (drives, eligibility, what to bring).
   _DonorRequestsTab _donorTab = _DonorRequestsTab.serve;
@@ -79,6 +83,9 @@ class _RequestsPageState extends State<RequestsPage> {
 
     if (_urgencyFilter != null) {
       list = list.where((r) => r.urgency == _urgencyFilter).toList();
+    }
+    if (_statusFilter != null) {
+      list = list.where((r) => r.status == _statusFilter).toList();
     }
 
     final urgencyRank = {
@@ -206,6 +213,42 @@ class _RequestsPageState extends State<RequestsPage> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: TabangSpace.sm),
+                  // Lifecycle filter. Every community request now reaches this
+                  // board, so Awaiting verification / Open / Matched can be
+                  // isolated instead of scrolling the whole list.
+                  if (_isDonor && _donorTab != _DonorRequestsTab.donate)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Wrap(
+                            spacing: TabangSpace.sm,
+                            runSpacing: TabangSpace.sm,
+                            children: [
+                              _statusChip(context, null, 'Any state'),
+                              ...RequestStatus.values.map(
+                                (s) => _statusChip(context, s, s.label),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const HelpTip(
+                          title: 'Request states',
+                          message:
+                              'Awaiting verification — posted, but chapter staff '
+                              'have not checked the documents and booked slot '
+                              'yet; donors cannot respond until it is verified.\n\n'
+                              'Open — verified and broadcast to the donor '
+                              'network; compatible donors can respond.\n\n'
+                              'Matched — the requester has chosen donor(s); the '
+                              'chapter records the donation and marks it '
+                              'fulfilled.\n\n'
+                              'Fulfilled, Rejected and Cancelled are the closed '
+                              'records.',
+                        ),
+                      ],
+                    ),
                 if (_isDonor && _donorTab != _DonorRequestsTab.donate)
                   const SizedBox(height: TabangSpace.lg),
               ],
@@ -532,6 +575,27 @@ class _RequestsPageState extends State<RequestsPage> {
         color: selected ? Colors.white : context.textColor,
       ),
       onSelected: (_) => setState(() => _urgencyFilter = urgency),
+    );
+  }
+
+  /// Lifecycle chip for the Requests board's status filter.
+  Widget _statusChip(
+    BuildContext context,
+    RequestStatus? status,
+    String label,
+  ) {
+    final selected = _statusFilter == status;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      selectedColor: TabangColors.crimson,
+      labelStyle: TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
+        color: selected ? Colors.white : context.textColor,
+      ),
+      onSelected: (_) => setState(() => _statusFilter = status),
     );
   }
 

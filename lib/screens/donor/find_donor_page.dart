@@ -15,6 +15,7 @@ import '../../widgets/donor_list_card.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/layout.dart';
 import '../../widgets/map_split_handle.dart';
+import '../../widgets/request_list_card.dart';
 
 /// How the map and donor directory share a screen.
 ///
@@ -1189,74 +1190,29 @@ class _FindDonorPageState extends State<FindDonorPage> {
   }
 
   /// One open request, read-only. Community users see the need and where it is;
-  /// verification and fulfilment stay with chapter staff.
+  /// verification and fulfilment stay with chapter staff. Uses the shared
+  /// [RequestListCard] so it matches the donor cards beside it.
   Widget _buildRequestCard(BuildContext context, BloodRequest request) {
-    return SurfaceCard(
-      padding: const EdgeInsets.all(TabangSpace.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    StatusPill(
-                      request.urgency.label,
-                      tone: toneForUrgency(request.urgency),
-                      dense: true,
-                    ),
-                    StatusPill(request.status.label, dense: true),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                request.barangay,
-                style: TextStyle(fontSize: 11, color: context.textMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${request.patientAlias} · ${request.bloodType.label} '
-            '${request.component.label}',
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: context.textColor,
+    final requester = _repo.userById(request.requesterId);
+    return RequestListCard(
+      request: request,
+      requester: requester,
+      actions: [
+        if (widget.onOpenRequests != null)
+          TextButton.icon(
+            onPressed: widget.onOpenRequests,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 30),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.arrow_forward, size: 15),
+            label: const Text(
+              'Open in Requests',
+              style: TextStyle(fontSize: 12),
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            '${request.hospital} · ${request.unitsNeeded} unit'
-            '${request.unitsNeeded == 1 ? '' : 's'}',
-            style: TextStyle(fontSize: 11, color: context.textMuted),
-          ),
-          if (widget.onOpenRequests != null) ...[
-            const SizedBox(height: TabangSpace.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: widget.onOpenRequests,
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(0, 30),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                icon: const Icon(Icons.arrow_forward, size: 15),
-                label: const Text(
-                  'Open in Requests',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
+      ],
     );
   }
 
