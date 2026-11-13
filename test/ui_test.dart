@@ -25,7 +25,6 @@ import 'package:tabang/widgets/digos_vector_map.dart';
 import 'package:tabang/widgets/illustrations.dart';
 import 'package:tabang/widgets/photo.dart';
 import 'package:tabang/widgets/request_document_list.dart';
-import 'package:tabang/widgets/user_record_dialog.dart';
 
 /// Flutter decodes JPEG, PNG and WebP. A download named `.jpg` whose bytes are
 /// actually AVIF (or HEIC) is not an error the loader reports: it silently draws
@@ -679,13 +678,12 @@ void main() {
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
 
-    // Request cards stay compact, so the requester name is still tappable on
-    // the card and the attachments/responders move into the details dialog.
+    // Request cards stay compact, so the requester and attachments move into
+    // the details dialog behind a tap on the card.
     await tester.tap(find.text('Requests'));
     await tester.pumpAndSettle();
-    expect(find.byType(UserMention), findsWidgets);
     expect(find.byType(RequestDocumentList), findsNothing);
-    await tester.tap(find.textContaining('REQ-').first);
+    await tester.tap(find.textContaining('Patient ').first);
     await tester.pumpAndSettle();
     expect(find.byType(RequestDocumentList), findsWidgets);
     await tester.tap(find.text('Close'));
@@ -775,6 +773,15 @@ void main() {
     await tester.tap(openInRequests);
     await tester.pumpAndSettle();
     expect(find.textContaining('Cards show the essentials'), findsOneWidget);
+    // The jump target is outlined, then the outline clears so it cannot stay
+    // stuck on the first request the map opened.
+    bool hasHighlightedCard() => tester
+        .widgetList<SurfaceCard>(find.byType(SurfaceCard))
+        .any((card) => card.highlighted);
+    expect(hasHighlightedCard(), isTrue);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(hasHighlightedCard(), isFalse);
     expect(tester.takeException(), isNull);
   });
 
@@ -1047,6 +1054,78 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('map hand-off focuses a request that is not the viewer own', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    // Maria is a recipient. The community map lists every request, so the
+    // hand-off must land on one she did not post instead of dropping her at
+    // the top of a Mine-only list. REQ-007 is critical, which also proves the
+    // outline is the locator and not a permanent critical-urgency border.
+    final recipient = repo.userById('USR-009')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(
+          body: RequestsPage(
+            user: recipient,
+            focusRequestId: 'REQ-007',
+            focusRequestToken: 1,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.ancestor(
+      of: find.text('Patient 205'),
+      matching: find.byType(SurfaceCard),
+    );
+    expect(card, findsOneWidget);
+    expect(tester.widget<SurfaceCard>(card).highlighted, isTrue);
+
+    // The outline is a locator, not a permanent state: it clears after the
+    // user has had time to see where they landed.
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(tester.widget<SurfaceCard>(card).highlighted, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('request queues lead with critical and then urgent', (
+    tester,
+  ) async {
+    // Same urgency bands on both sides of the app, oldest request first within
+    // a band.
+    final community = repo.communityRequests;
+    final urgencyRank = {
+      for (final (i, urgency) in const [
+        RequestUrgency.critical,
+        RequestUrgency.urgent,
+        RequestUrgency.routine,
+      ].indexed)
+        urgency: i,
+    };
+    for (var i = 1; i < community.length; i++) {
+      final previous = community[i - 1];
+      final current = community[i];
+      final byUrgency = urgencyRank[previous.urgency]!.compareTo(
+        urgencyRank[current.urgency]!,
+      );
+      expect(byUrgency, lessThanOrEqualTo(0));
+      if (byUrgency == 0) {
+        expect(
+          previous.createdAt.isAfter(current.createdAt),
+          isFalse,
+          reason: 'older requests come first inside an urgency band',
+        );
+      }
+    }
+  });
+
   testWidgets('report rows offer warning and suspend, not dismiss', (
     tester,
   ) async {
@@ -1149,7 +1228,18 @@ void main() {
     await tester.tap(find.text('Requests'));
     await tester.pumpAndSettle();
     expect(find.text('Blood type'), findsOneWidget);
+    expect(find.text('Urgency'), findsOneWidget);
+    expect(find.text('All urgencies'), findsOneWidget);
     expect(find.text('Status'), findsOneWidget);
+
+    // The urgency filter is a real dropdown; pick Critical and make sure the
+    // picker closes and applies without changing tab.
+    await tester.tap(find.text('All urgencies'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(RequestUrgency.critical.label).last);
+    await tester.pumpAndSettle();
+    expect(find.text('All urgencies'), findsNothing);
+    expect(find.text('Requests'), findsWidgets);
 
     await tester.tap(find.text('Booked slots'));
     await tester.pumpAndSettle();
@@ -1233,7 +1323,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('permissions card is a dropdown listing every role', (
+  testWidgets('each role in the permissions card is its own dropdown', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 1800);
@@ -1252,18 +1342,37 @@ void main() {
     expect(find.text('Roles & permissions'), findsOneWidget);
     expect(find.text('Voluntary Donor'), findsWidgets);
     expect(find.text('Recipient / Patient Representative'), findsWidgets);
+    // The signed-in role starts open; the others start collapsed so the card
+    // stays scannable.
+    expect(
+      find.text('Appear in the donor directory while available'),
+      findsNothing,
+    );
+
+    // Expanding one role must not expand the others or collapse the card.
+    await tester.tap(find.text('Voluntary Donor').first);
+    await tester.pumpAndSettle();
     expect(
       find.text('Appear in the donor directory while available'),
       findsOneWidget,
     );
+    expect(find.text('Recipient / Patient Representative'), findsWidgets);
+    expect(
+      find.text('Create and manage all accounts, including staff'),
+      findsOneWidget,
+    );
 
-    // Collapsing hides the role columns; expanding brings them back.
-    await tester.tap(find.text('Roles & permissions'));
+    // It is a dropdown: a second tap closes only that role again.
+    await tester.tap(find.text('Voluntary Donor').first);
     await tester.pumpAndSettle();
-    expect(find.text('Voluntary Donor'), findsNothing);
-    await tester.tap(find.text('Roles & permissions'));
-    await tester.pumpAndSettle();
-    expect(find.text('Voluntary Donor'), findsWidgets);
+    expect(
+      find.text('Appear in the donor directory while available'),
+      findsNothing,
+    );
+    expect(
+      find.text('Create and manage all accounts, including staff'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

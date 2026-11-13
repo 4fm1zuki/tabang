@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
 import '../../core/eligibility.dart';
 import '../../core/models.dart';
@@ -31,6 +34,7 @@ class RequestsPage extends StatefulWidget {
     required this.user,
     this.onOpenDonorHub,
     this.focusRequestId,
+    this.focusRequestToken = 0,
   });
 
   final AppUser user;
@@ -41,6 +45,11 @@ class RequestsPage extends StatefulWidget {
   /// When set, the board scrolls to and highlights this request once it is
   /// laid out — the map's "Open in Requests" hand-off.
   final String? focusRequestId;
+
+  /// Bumped by the shell on every hand-off. A counter rather than only the id
+  /// so tapping the same request twice still scrolls back to it after the
+  /// first highlight has cleared.
+  final int focusRequestToken;
 
   @override
   State<RequestsPage> createState() => _RequestsPageState();
@@ -64,18 +73,22 @@ class _RequestsPageState extends State<RequestsPage> {
 
   final GlobalKey _focusKey = GlobalKey();
 
+  /// Clears the transient crimson outline once the user has had time to see
+  /// where they landed. Without this the first jump target stayed outlined
+  /// forever, even after another request was opened.
+  Timer? _focusClearTimer;
+
   @override
   void initState() {
     super.initState();
     _focusRequestId = widget.focusRequestId;
-    if (_focusRequestId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
-    }
+    if (_focusRequestId != null) _scheduleFocusScroll();
     _repo.addListener(_refresh);
   }
 
   @override
   void dispose() {
+    _focusClearTimer?.cancel();
     _repo.removeListener(_refresh);
     super.dispose();
   }
@@ -83,11 +96,51 @@ class _RequestsPageState extends State<RequestsPage> {
   @override
   void didUpdateWidget(RequestsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.focusRequestId != oldWidget.focusRequestId &&
-        widget.focusRequestId != null) {
-      _focusRequestId = widget.focusRequestId;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+    if (widget.focusRequestToken != oldWidget.focusRequestToken) {
+      _beginFocus(widget.focusRequestId);
     }
+  }
+
+  /// Makes the focused request visible before scrolling: filters may hide it,
+  /// and a donor's own request lives on the Mine tab instead of the community
+  /// serve list.
+  void _beginFocus(String? requestId) {
+    _focusClearTimer?.cancel();
+    if (requestId == null) {
+      _focusRequestId = null;
+      return;
+    }
+    _focusRequestId = requestId;
+    _urgencyFilter = null;
+    _statusFilter = null;
+    final request = _requestById(requestId);
+    if (_isDonor && request != null) {
+      _donorTab = request.requesterId == _user.id
+          ? _DonorRequestsTab.mine
+          : _DonorRequestsTab.serve;
+    }
+    _scheduleFocusScroll();
+  }
+
+  BloodRequest? _requestById(String id) {
+    for (final request in _repo.requests) {
+      if (request.id == id) return request;
+    }
+    return null;
+  }
+
+  void _scheduleFocusScroll() {
+    // The list is lazy, so the target card may not exist on the first frame.
+    // `cacheExtent` builds it when a focus is active; a second post-frame pass
+    // covers the frame where that extent has only just been applied.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+    });
+    _focusClearTimer = Timer(const Duration(milliseconds: 2800), () {
+      if (!mounted || _focusRequestId == null) return;
+      setState(() => _focusRequestId = null);
+    });
   }
 
   void _scrollToFocus() {
@@ -110,9 +163,12 @@ class _RequestsPageState extends State<RequestsPage> {
   bool get _isDonor => _user.role == UserRole.donor;
 
   List<BloodRequest> get _visible {
+    final own = _repo.requests
+        .where((r) => r.requesterId == _user.id)
+        .toList(growable: false);
     var list = _isDonor
         ? _donorTab == _DonorRequestsTab.mine
-              ? _repo.requests.where((r) => r.requesterId == _user.id).toList()
+              ? own
               // The serve tab shows the same community requests the map lists,
               // minus the donor's own (those live on the Mine tab). Whether the
               // donor can actually respond is decided per card, so the two
@@ -120,7 +176,13 @@ class _RequestsPageState extends State<RequestsPage> {
               : _repo.communityRequests
                     .where((r) => r.requesterId != _user.id)
                     .toList()
-        : _repo.requests.where((r) => r.requesterId == _user.id).toList();
+        // Community users and recipients see the community board their map
+        // lists, plus their own chapter-only requests. That way a map card's
+        // "Open in Requests" hand-off always has a card to land on.
+        : [
+            ...own,
+            ..._repo.communityRequests.where((r) => r.requesterId != _user.id),
+          ];
 
     if (_urgencyFilter != null) {
       list = list.where((r) => r.urgency == _urgencyFilter).toList();
@@ -128,37 +190,22 @@ class _RequestsPageState extends State<RequestsPage> {
     if (_statusFilter != null) {
       list = list.where((r) => r.status == _statusFilter).toList();
     }
-
-    final urgencyRank = {
-      RequestUrgency.critical: 0,
-      RequestUrgency.urgent: 1,
-      RequestUrgency.routine: 2,
-    };
-
-    int rank(BloodRequest request) => switch (request.status) {
-      RequestStatus.pendingReview => 0,
-      RequestStatus.open => 1,
-      RequestStatus.matched => 2,
-      _ => 3,
-    };
-
-    return [...list]..sort((a, b) {
-      final byRank = rank(a).compareTo(rank(b));
-      if (byRank != 0) return byRank;
-      final ur = urgencyRank[a.urgency]!.compareTo(urgencyRank[b.urgency]!);
-      if (ur != 0) return ur;
-      return b.createdAt.compareTo(a.createdAt);
-    });
+    // Priority order: critical, then urgent, then routine; longest-waiting
+    // first inside each band.
+    return _repo.prioritizedRequests(list);
   }
 
   @override
   Widget build(BuildContext context) {
     final requests = _visible;
 
-    // A sliver list builds only the cards that are actually on screen. The
-    // previous eager Column built every card (and each card runs repository
-    // lookups and eligibility checks) before the first frame.
+    // A sliver list builds only the cards that are actually on screen. When a
+    // map hand-off asks for one specific request, a large cache extent makes
+    // sure that card exists so `ensureVisible` can find it.
     return CustomScrollView(
+      scrollCacheExtent: _focusRequestId == null
+          ? null
+          : const ScrollCacheExtent.pixels(12000),
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(
@@ -183,8 +230,9 @@ class _RequestsPageState extends State<RequestsPage> {
                             : 'Community requests across Digos City. Respond '
                                   'to the ones your blood type and component '
                                   'can serve.'
-                      : 'Your requests, donor responses and fulfilment '
-                            'progress.',
+                      : 'Community requests across Digos City, plus the ones '
+                            'you posted. Only chapter staff can verify and '
+                            'fulfil a request.',
                   actions: [
                     // Donors can need blood too: the same request form is
                     // available to every signed-in role.
@@ -224,7 +272,7 @@ class _RequestsPageState extends State<RequestsPage> {
                 const SizedBox(height: TabangSpace.lg),
 
                 // Dropdown filters, matching the staff Inventory filter bars.
-                if (_isDonor && _donorTab != _DonorRequestsTab.donate)
+                if (!_isDonor || _donorTab != _DonorRequestsTab.donate)
                   TabangFilterBar(
                     filters: [
                       TabangDropdown<RequestUrgency?>(
@@ -312,7 +360,7 @@ class _RequestsPageState extends State<RequestsPage> {
                       ],
                     ),
                   ),
-                if (_isDonor && _donorTab != _DonorRequestsTab.donate)
+                if (!_isDonor || _donorTab != _DonorRequestsTab.donate)
                   const SizedBox(height: TabangSpace.lg),
               ],
             ),
@@ -644,13 +692,15 @@ class _RequestsPageState extends State<RequestsPage> {
         )
         .length;
 
-    final open = request.status == RequestStatus.open;
     final progress = request.unitsNeeded == 0
         ? 0.0
         : (request.unitsFulfilled / request.unitsNeeded).clamp(0.0, 1.0);
 
+    // Only the transient jump target outlines the card. Urgency is already a
+    // pill, so a permanent crimson border on every critical request made the
+    // locator outline ambiguous and look stuck after the next hand-off.
     return SurfaceCard(
-      highlighted: highlighted || (request.urgency == RequestUrgency.critical && open),
+      highlighted: highlighted,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

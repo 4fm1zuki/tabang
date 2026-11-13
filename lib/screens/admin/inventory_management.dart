@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/models.dart';
@@ -9,6 +11,7 @@ import '../../widgets/common.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/illustrations.dart';
 import '../../widgets/request_document_list.dart';
+import '../../widgets/request_list_card.dart';
 import '../../widgets/request_review_dialogs.dart';
 import '../../widgets/user_record_dialog.dart';
 import '../../widgets/tabang_dropdown.dart';
@@ -69,6 +72,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   /// so a busy queue could not be narrowed.
   BloodType? _requestTypeFilter;
   RequestStatus? _requestStatusFilter;
+  RequestUrgency? _requestUrgencyFilter;
   BloodType? _slotTypeFilter;
   _SlotFilter _slotFilter = _SlotFilter.all;
   bool? _removedRestoredFilter;
@@ -81,6 +85,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
 
   @override
   void dispose() {
+    _focusClearTimer?.cancel();
     _repo.removeListener(_refresh);
     super.dispose();
   }
@@ -90,15 +95,33 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.openRequestsToken != oldWidget.openRequestsToken) {
       _tab = 1;
+      // A jump target must be visible: clear the per-tab filters that could
+      // hide it before scrolling.
+      _requestTypeFilter = null;
+      _requestStatusFilter = null;
+      _requestUrgencyFilter = null;
       _focusRequestId = widget.focusRequestId;
-      // Scroll the freshly-focused request into view after this frame lays the
-      // list out.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+      if (_focusRequestId == null) {
+        _focusClearTimer?.cancel();
+      } else {
+        // Scroll the freshly-focused request into view after this frame lays
+        // the list out.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus());
+        _focusClearTimer?.cancel();
+        _focusClearTimer = Timer(const Duration(milliseconds: 2800), () {
+          if (!mounted || _focusRequestId == null) return;
+          setState(() => _focusRequestId = null);
+        });
+      }
     }
   }
 
   /// The request currently highlighted as the jump target.
   String? _focusRequestId;
+
+  /// Removes the transient crimson outline so it does not stay on the first
+  /// request the map opened.
+  Timer? _focusClearTimer;
 
   /// Key on the focused request's card, so [Scrollable.ensureVisible] can find
   /// it.
@@ -680,15 +703,22 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     // Same queue and order as the Operations map panel, so the two lists can
     // never disagree about which requests are open.
     final all = _repo.staffRequestQueue;
-    final requests = all.where((r) {
-      if (_requestTypeFilter != null && r.bloodType != _requestTypeFilter) {
-        return false;
-      }
-      if (_requestStatusFilter != null && r.status != _requestStatusFilter) {
-        return false;
-      }
-      return true;
-    }).toList(growable: false);
+    final requests = all
+        .where((r) {
+          if (_requestTypeFilter != null && r.bloodType != _requestTypeFilter) {
+            return false;
+          }
+          if (_requestStatusFilter != null &&
+              r.status != _requestStatusFilter) {
+            return false;
+          }
+          if (_requestUrgencyFilter != null &&
+              r.urgency != _requestUrgencyFilter) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
 
     final canAct = widget.currentUser.role.canFulfillRequests;
     return Column(
@@ -700,6 +730,28 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               label: 'Blood type',
               value: _requestTypeFilter,
               onChanged: (v) => setState(() => _requestTypeFilter = v),
+            ),
+            TabangDropdown<RequestUrgency?>(
+              initialValue: _requestUrgencyFilter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Urgency',
+                isDense: true,
+              ),
+              style: TextStyle(fontSize: 12.5, color: context.textColor),
+              items: [
+                const DropdownMenuItem<RequestUrgency?>(
+                  value: null,
+                  child: Text('All urgencies'),
+                ),
+                ...RequestUrgency.values.map(
+                  (u) => DropdownMenuItem<RequestUrgency?>(
+                    value: u,
+                    child: Text(u.label),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _requestUrgencyFilter = v),
             ),
             TabangDropdown<RequestStatus?>(
               initialValue: _requestStatusFilter,
@@ -778,8 +830,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     );
   }
 
-  /// A compact queue card. Details are deliberately kept in the dialog so the
-  /// list stays scannable; actions remain one tap away.
+  /// One request card, shared with the community board, the staff map and the
+  /// Overview so the queue reads like the rest of the app. The slot, request id
+  /// and requester stay in the click-through record; the card keeps only the
+  /// facts needed to scan.
   Widget _buildRequestCard(
     BuildContext context,
     BloodRequest request, {
@@ -787,136 +841,57 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     bool highlighted = false,
   }) {
     final requester = _repo.userById(request.requesterId);
-    return SurfaceCard(
+    final textStyle = TextButton.styleFrom(
+      minimumSize: const Size(0, 30),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final filledStyle = FilledButton.styleFrom(
+      minimumSize: const Size(0, 30),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    return RequestListCard(
+      request: request,
+      requester: requester,
       highlighted: highlighted,
       onTap: () => _showRequestDetails(context, request),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              BloodTypeChip(request.bloodType, size: 34),
-              const SizedBox(width: TabangSpace.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        Text(
-                          request.patientAlias,
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
-                            color: context.textColor,
-                          ),
-                        ),
-                        StatusPill(
-                          request.urgency.label,
-                          tone: toneForUrgency(request.urgency),
-                          dense: true,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${request.component.label} · '
-                      '${request.unitsNeeded} unit'
-                      '${request.unitsNeeded == 1 ? '' : 's'} · '
-                      '${request.hospital}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: context.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: TabangSpace.sm),
-              StatusPill(
-                request.status.label,
-                tone: toneForRequest(request.status),
-                dense: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: TabangSpace.sm),
-          Row(
-            children: [
-              const Icon(
-                Icons.event_available_outlined,
-                size: 15,
-                color: TabangColors.crimson,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  request.scheduledFor == null
-                      ? 'No slot booked'
-                      : formatDateTime(request.scheduledFor!),
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: context.textColor,
-                  ),
-                ),
-              ),
-              Text(
-                '${request.id} · ',
-                style: TextStyle(fontSize: 11, color: context.textMuted),
-              ),
-              UserMention(
-                userId: request.requesterId,
-                fallback: requester?.alias,
-                style: TextStyle(fontSize: 11, color: context.textMuted),
-              ),
-            ],
-          ),
-          if (canAct && request.canBeRejected) ...[
-            const SizedBox(height: TabangSpace.sm),
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: [
-                TextButton(
-                  onPressed: () => showRejectRequestDialog(
-                    context,
-                    request,
-                    actor: widget.currentUser,
-                  ),
-                  child: const Text('Reject'),
-                ),
-                if (request.isAwaitingReview)
-                  FilledButton(
-                    onPressed: () => showVerifyRequestDialog(
-                      context,
-                      request,
-                      actor: widget.currentUser,
-                    ),
-                    child: const Text('Verify'),
-                  )
-                else if (request.canBeFulfilled)
-                  FilledButton(
-                    onPressed: () => _fulfilRequest(context, request),
-                    child: const Text('Mark fulfilled'),
-                  )
-                else
-                  TextButton(
-                    onPressed: () => _showRequestDetails(context, request),
-                    child: const Text('Awaiting donor'),
-                  ),
-              ],
+      onTapHint: 'Open request details',
+      actions: [
+        if (canAct && request.canBeRejected) ...[
+          TextButton(
+            onPressed: () => showRejectRequestDialog(
+              context,
+              request,
+              actor: widget.currentUser,
             ),
-          ],
+            style: textStyle,
+            child: const Text('Reject'),
+          ),
+          if (request.isAwaitingReview)
+            FilledButton(
+              onPressed: () => showVerifyRequestDialog(
+                context,
+                request,
+                actor: widget.currentUser,
+              ),
+              style: filledStyle,
+              child: const Text('Verify'),
+            )
+          else if (request.canBeFulfilled)
+            FilledButton(
+              onPressed: () => _fulfilRequest(context, request),
+              style: filledStyle,
+              child: const Text('Mark fulfilled'),
+            )
+          else
+            TextButton(
+              onPressed: () => _showRequestDetails(context, request),
+              style: textStyle,
+              child: const Text('Awaiting donor'),
+            ),
         ],
-      ),
+      ],
     );
   }
 
@@ -1222,13 +1197,15 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   /// The removed-units ledger: every deletion stays visible and reversible.
   Widget _buildRemovedUnitsTab(BuildContext context) {
     final all = _repo.removedUnits;
-    final records = all.where((record) {
-      if (_removedRestoredFilter != null &&
-          record.restored != _removedRestoredFilter) {
-        return false;
-      }
-      return true;
-    }).toList(growable: false);
+    final records = all
+        .where((record) {
+          if (_removedRestoredFilter != null &&
+              record.restored != _removedRestoredFilter) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1243,7 +1220,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               ),
               style: TextStyle(fontSize: 12.5, color: context.textColor),
               items: const [
-                DropdownMenuItem<bool?>(value: null, child: Text('All records')),
+                DropdownMenuItem<bool?>(
+                  value: null,
+                  child: Text('All records'),
+                ),
                 DropdownMenuItem<bool?>(value: false, child: Text('Removed')),
                 DropdownMenuItem<bool?>(value: true, child: Text('Restored')),
               ],
@@ -1263,8 +1243,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           const EmptyState(
             art: TabangArt.inventory,
             title: 'No removed units',
-            message:
-                'Bags removed from the ledger appear here, with a restore action.',
+            message: 'Bags removed from the ledger appear here, with a restore action.',
           )
         else if (records.isEmpty)
           const EmptyState(
@@ -1273,95 +1252,95 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           )
         else
           for (final record in records)
-          Padding(
-            padding: const EdgeInsets.only(bottom: TabangSpace.md),
-            child: SurfaceCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      BloodTypeChip(record.unit.bloodType, size: 34),
-                      const SizedBox(width: TabangSpace.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            UnitBarcode(record.unit.barcode),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${record.unit.component.label} · '
-                              '${record.unit.storageBay} · expires '
-                              '${formatDate(record.unit.expiresOn)}',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: context.textMuted,
+            Padding(
+              padding: const EdgeInsets.only(bottom: TabangSpace.md),
+              child: SurfaceCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        BloodTypeChip(record.unit.bloodType, size: 34),
+                        const SizedBox(width: TabangSpace.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              UnitBarcode(record.unit.barcode),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${record.unit.component.label} · '
+                                '${record.unit.storageBay} · expires '
+                                '${formatDate(record.unit.expiresOn)}',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: context.textMuted,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      StatusPill(
-                        record.restored ? 'Restored' : 'Removed',
-                        tone: record.restored ? Tone.success : Tone.warning,
-                        dense: true,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: TabangSpace.sm),
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 4,
-                    children: [
-                      Icon(Icons.history, size: 15, color: context.textMuted),
-                      Text(
-                        'Removed ${formatDateTime(record.removedAt)} by',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.textMuted,
+                        StatusPill(
+                          record.restored ? 'Restored' : 'Removed',
+                          tone: record.restored ? Tone.success : Tone.warning,
+                          dense: true,
                         ),
-                      ),
-                      UserMention(
-                        userId: record.removedById,
-                        fallback: 'chapter staff',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (!record.restored &&
-                      widget.currentUser.role.canManageInventory) ...[
-                    const SizedBox(height: TabangSpace.sm),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          final ok = _repo.restoreRemovedUnit(
-                            record.unit.barcode,
-                            actorId: widget.currentUser.id,
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            TabangSnackBar(
-                              content: Text(
-                                ok
-                                    ? '${record.unit.barcode} restored to stock.'
-                                    : 'Could not restore ${record.unit.barcode}; '
-                                          'its barcode may already be in use.',
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.undo, size: 15),
-                        label: const Text('Restore to stock'),
-                      ),
+                      ],
                     ),
+                    const SizedBox(height: TabangSpace.sm),
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 4,
+                      children: [
+                        Icon(Icons.history, size: 15, color: context.textMuted),
+                        Text(
+                          'Removed ${formatDateTime(record.removedAt)} by',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.textMuted,
+                          ),
+                        ),
+                        UserMention(
+                          userId: record.removedById,
+                          fallback: 'chapter staff',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!record.restored &&
+                        widget.currentUser.role.canManageInventory) ...[
+                      const SizedBox(height: TabangSpace.sm),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            final ok = _repo.restoreRemovedUnit(
+                              record.unit.barcode,
+                              actorId: widget.currentUser.id,
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              TabangSnackBar(
+                                content: Text(
+                                  ok
+                                      ? '${record.unit.barcode} restored to stock.'
+                                      : 'Could not restore ${record.unit.barcode}; '
+                                            'its barcode may already be in use.',
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.undo, size: 15),
+                          label: const Text('Restore to stock'),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
       ],
     );
   }
@@ -1373,24 +1352,26 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   /// confirms a slot when staff verify its request.
   Widget _buildBookedSlotsTab(BuildContext context) {
     final all = _repo.scheduledRequests;
-    final requests = all.where((r) {
-      if (_slotTypeFilter != null && r.bloodType != _slotTypeFilter) {
-        return false;
-      }
-      switch (_slotFilter) {
-        case _SlotFilter.all:
-          break;
-        case _SlotFilter.awaiting:
-          if (!r.isAwaitingReview) return false;
-        case _SlotFilter.confirmed:
-          if (r.isAwaitingReview || r.status == RequestStatus.fulfilled) {
+    final requests = all
+        .where((r) {
+          if (_slotTypeFilter != null && r.bloodType != _slotTypeFilter) {
             return false;
           }
-        case _SlotFilter.fulfilled:
-          if (r.status != RequestStatus.fulfilled) return false;
-      }
-      return true;
-    }).toList(growable: false);
+          switch (_slotFilter) {
+            case _SlotFilter.all:
+              break;
+            case _SlotFilter.awaiting:
+              if (!r.isAwaitingReview) return false;
+            case _SlotFilter.confirmed:
+              if (r.isAwaitingReview || r.status == RequestStatus.fulfilled) {
+                return false;
+              }
+            case _SlotFilter.fulfilled:
+              if (r.status != RequestStatus.fulfilled) return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
     final pending = all.where((r) => r.isAwaitingReview).length;
     final fulfilled = all
         .where((r) => r.status == RequestStatus.fulfilled)
@@ -1440,7 +1421,11 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           Text(
             '$fulfilled fulfilled slot${fulfilled == 1 ? '' : 's'} on record — '
             'filter by Fulfilled to review or reopen them.',
-            style: TextStyle(fontSize: 12, height: 1.5, color: context.textMuted),
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.5,
+              color: context.textMuted,
+            ),
           ),
         ],
         const SizedBox(height: TabangSpace.md),

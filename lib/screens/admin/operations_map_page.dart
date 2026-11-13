@@ -852,6 +852,19 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
 
   Widget _requestCard(BuildContext context, BloodRequest request) {
     final requester = _repo.userById(request.requesterId);
+    // Same compact action rhythm as the community map: the narrow side panel
+    // cannot take the default 48 px buttons, which wrapped each card into a
+    // ragged third row.
+    final textStyle = TextButton.styleFrom(
+      minimumSize: const Size(0, 30),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    final filledStyle = FilledButton.styleFrom(
+      minimumSize: const Size(0, 30),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
     return RequestListCard(
       request: request,
       requester: requester,
@@ -863,25 +876,30 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           if (request.isAwaitingReview) ...[
             TextButton(
               onPressed: () => _reject(context, request),
+              style: textStyle,
               child: const Text('Reject'),
             ),
             FilledButton(
               onPressed: () => _verify(context, request),
+              style: filledStyle,
               child: const Text('Verify'),
             ),
           ] else if (request.canBeRejected) ...[
             TextButton(
               onPressed: () => _reject(context, request),
+              style: textStyle,
               child: const Text('Reject'),
             ),
             if (request.canBeFulfilled)
               FilledButton(
                 onPressed: () => _fulfil(context, request),
+                style: filledStyle,
                 child: const Text('Mark fulfilled'),
               )
             else
               TextButton(
                 onPressed: () => _showRequestDetails(context, request),
+                style: textStyle,
                 child: const Text('Awaiting donor'),
               ),
           ],
@@ -891,6 +909,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
         if (widget.onOpenRequests != null)
           TextButton.icon(
             onPressed: () => widget.onOpenRequests!(request.id),
+            style: textStyle,
             icon: const Icon(Icons.arrow_forward, size: 15),
             label: const Text('Open in Requests'),
           ),

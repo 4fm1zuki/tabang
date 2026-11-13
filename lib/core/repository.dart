@@ -374,38 +374,70 @@ class TabangRepository {
       _requests.where((r) => r.acceptsDonorResponses).toList(growable: false);
 
   /// Every request the community can see: donor-network requests that are
-  /// awaiting verification, open or matched.
+  /// awaiting verification, open or matched, ordered by priority.
   ///
   /// Blood-bank requests are handled by the chapter and are never broadcast, so
   /// they are excluded. This single list backs both the community map's request
   /// list and the Requests board, so the two can never show different counts.
-  List<BloodRequest> get communityRequests => _requests
-      .where(
-        (request) =>
-            request.source == RequestSource.donorNetwork &&
-            (request.status == RequestStatus.pendingReview ||
-                request.status == RequestStatus.open ||
-                request.status == RequestStatus.matched),
-      )
-      .toList(growable: false);
+  List<BloodRequest> get communityRequests => prioritizedRequests(
+    _requests.where(
+      (request) =>
+          request.source == RequestSource.donorNetwork &&
+          (request.status == RequestStatus.pendingReview ||
+              request.status == RequestStatus.open ||
+              request.status == RequestStatus.matched),
+    ),
+  );
+
+  /// Orders requests the way both staff and donors need to read them: the most
+  /// urgent first (critical, then urgent, then routine) and, inside the same
+  /// urgency, the one that has been waiting longest — a critical request that
+  /// was posted this morning must not sit under an older routine one.
+  List<BloodRequest> prioritizedRequests(Iterable<BloodRequest> requests) {
+    const urgencyRank = {
+      RequestUrgency.critical: 0,
+      RequestUrgency.urgent: 1,
+      RequestUrgency.routine: 2,
+    };
+    final list = List<BloodRequest>.of(requests);
+    list.sort((a, b) => _byPriority(a, b, urgencyRank));
+    return List.unmodifiable(list);
+  }
+
+  static int _byPriority(
+    BloodRequest a,
+    BloodRequest b,
+    Map<RequestUrgency, int> urgencyRank,
+  ) {
+    final byUrgency = urgencyRank[a.urgency]!.compareTo(
+      urgencyRank[b.urgency]!,
+    );
+    if (byUrgency != 0) return byUrgency;
+    return a.createdAt.compareTo(b.createdAt);
+  }
 
   /// The staff request queue, in the order the Operations map panel and the
   /// Inventory Requests tab both show it.
   ///
   /// Requests that still need action come first (awaiting verification, open,
-  /// matched), then the closed records, newest first inside each group. One
-  /// source so the two surfaces can never list different requests.
+  /// matched), then the closed records. Inside each group the most urgent comes
+  /// first and the longest-waiting request breaks ties. One source so the two
+  /// surfaces can never list different requests.
   List<BloodRequest> get staffRequestQueue {
-    final list = List<BloodRequest>.of(_requests);
-    int rank(BloodRequest r) => switch (r.status) {
-      RequestStatus.pendingReview => 0,
-      RequestStatus.open => 1,
-      RequestStatus.matched => 2,
-      _ => 3,
+    const urgencyRank = {
+      RequestUrgency.critical: 0,
+      RequestUrgency.urgent: 1,
+      RequestUrgency.routine: 2,
     };
+    bool actionable(BloodRequest r) =>
+        r.status == RequestStatus.pendingReview ||
+        r.status == RequestStatus.open ||
+        r.status == RequestStatus.matched;
+    final list = List<BloodRequest>.of(_requests);
     list.sort((a, b) {
-      final byRank = rank(a).compareTo(rank(b));
-      return byRank != 0 ? byRank : b.createdAt.compareTo(a.createdAt);
+      final byGroup = (actionable(a) ? 0 : 1).compareTo(actionable(b) ? 0 : 1);
+      if (byGroup != 0) return byGroup;
+      return _byPriority(a, b, urgencyRank);
     });
     return List.unmodifiable(list);
   }

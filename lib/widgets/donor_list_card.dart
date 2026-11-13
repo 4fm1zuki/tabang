@@ -115,27 +115,29 @@ class DonorListCard extends StatelessWidget {
               ),
             ],
           ),
-          if (commitmentId != null || actions.isNotEmpty) ...[
+          if (commitmentId != null) ...[
             const SizedBox(height: TabangSpace.sm),
+            Tooltip(
+              message:
+                  'This donor is already selected for another active '
+                  'request. They stay visible, but cannot be reserved for '
+                  'two requests at once.',
+              child: StatusPill(
+                'Coordinating · $commitmentId',
+                tone: Tone.info,
+                dense: true,
+              ),
+            ),
+          ],
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: TabangSpace.sm),
+            // The coordinating pill sits on its own line above, so the action
+            // buttons share one row instead of wrapping raggedly around it.
             Wrap(
               spacing: 6,
               runSpacing: 6,
               crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (commitmentId != null)
-                  Tooltip(
-                    message:
-                        'This donor is already selected for another active '
-                        'request. They stay visible, but cannot be reserved for '
-                        'two requests at once.',
-                    child: StatusPill(
-                      'Coordinating · $commitmentId',
-                      tone: Tone.info,
-                      dense: true,
-                    ),
-                  ),
-                ...actions,
-              ],
+              children: actions,
             ),
           ],
         ],

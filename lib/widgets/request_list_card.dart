@@ -20,6 +20,7 @@ class RequestListCard extends StatelessWidget {
     this.actions = const [],
     this.onTap,
     this.onTapHint,
+    this.highlighted = false,
   });
 
   final BloodRequest request;
@@ -36,12 +37,18 @@ class RequestListCard extends StatelessWidget {
   /// Tooltip for the card tap, when [onTap] is set.
   final String? onTapHint;
 
+  /// Outlines the card as the transient jump target after an "Open in
+  /// Requests" hand-off.
+  final bool highlighted;
+
   @override
   Widget build(BuildContext context) {
-    final units = '${request.unitsNeeded} unit${request.unitsNeeded == 1 ? '' : 's'}';
+    final units =
+        '${request.unitsNeeded} unit${request.unitsNeeded == 1 ? '' : 's'}';
     final card = SurfaceCard(
       padding: const EdgeInsets.all(TabangSpace.lg),
       onTap: onTap,
+      highlighted: highlighted,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -54,7 +61,8 @@ class RequestListCard extends StatelessWidget {
                   height: 42,
                   child: TabangPhoto(
                     requester?.photoAsset,
-                    semanticLabel: '${request.patientAlias} request illustration',
+                    semanticLabel:
+                        '${request.patientAlias} request illustration',
                     creditLabel: request.patientAlias,
                     fallbackIcon: Icons.person_outline,
                     fallbackIconSize: 20,
@@ -157,10 +165,7 @@ class RequestListCard extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: context.textMuted),
         const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(fontSize: 11.5, color: context.textMuted),
-        ),
+        Text(text, style: TextStyle(fontSize: 11.5, color: context.textMuted)),
       ],
     );
   }

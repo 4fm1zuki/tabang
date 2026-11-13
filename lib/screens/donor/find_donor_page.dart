@@ -220,9 +220,10 @@ class _FindDonorPageState extends State<FindDonorPage> {
   /// fulfilment stay with chapter staff.
   List<BloodRequest> get _visibleRequests {
     final q = _query.trim().toLowerCase();
-    final list = _broadcastRequests.where((request) {
-      if (_selectedBarangay != null &&
-          request.barangay != _selectedBarangay) {
+    // `_broadcastRequests` is already in priority order (critical, urgent,
+    // routine; longest-waiting first), so filtering preserves it.
+    return _broadcastRequests.where((request) {
+      if (_selectedBarangay != null && request.barangay != _selectedBarangay) {
         return false;
       }
       if (q.isEmpty) return true;
@@ -232,8 +233,6 @@ class _FindDonorPageState extends State<FindDonorPage> {
           request.barangay.toLowerCase().contains(q) ||
           request.bloodType.label.toLowerCase().contains(q);
     }).toList();
-    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return list;
   }
 
   List<AppUser> get _visibleDonors {
@@ -1000,18 +999,22 @@ class _FindDonorPageState extends State<FindDonorPage> {
         .where((d) => d.status != 'Completed')
         .toList(growable: false);
     final heading = switch (_paneTab) {
-      0 => _selectedBarangay == null
-          ? 'Available donors'
-          : 'Available donors in $_selectedBarangay',
-      1 => _selectedBarangay == null
-          ? 'Hospitals & chapter'
-          : 'Facilities in $_selectedBarangay',
-      2 => _selectedBarangay == null
-          ? 'Upcoming drives'
-          : 'Drives in $_selectedBarangay',
-      _ => _selectedBarangay == null
-          ? 'Requests'
-          : 'Requests in $_selectedBarangay',
+      0 =>
+        _selectedBarangay == null
+            ? 'Available donors'
+            : 'Available donors in $_selectedBarangay',
+      1 =>
+        _selectedBarangay == null
+            ? 'Hospitals & chapter'
+            : 'Facilities in $_selectedBarangay',
+      2 =>
+        _selectedBarangay == null
+            ? 'Upcoming drives'
+            : 'Drives in $_selectedBarangay',
+      _ =>
+        _selectedBarangay == null
+            ? 'Requests'
+            : 'Requests in $_selectedBarangay',
     };
     final count = switch (_paneTab) {
       0 => donors.length,

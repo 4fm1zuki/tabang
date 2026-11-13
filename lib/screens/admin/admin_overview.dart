@@ -34,10 +34,6 @@ class AdminOverviewPage extends StatefulWidget {
 class _AdminOverviewPageState extends State<AdminOverviewPage> {
   final TabangRepository _repo = TabangRepository.instance;
 
-  /// Roles & permissions starts open (it answers "what can I do here?") but can
-  /// be collapsed to get the card out of the way.
-  bool _permissionsExpanded = true;
-
   @override
   void initState() {
     super.initState();
@@ -54,9 +50,10 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
     if (mounted) setState(() {});
   }
 
-  /// Shows every position on the platform. Collapsible so the console can put
-  /// it away; the signed-in role is highlighted so the card still answers
-  /// "what can I do here?".
+  /// Shows every position on the platform, one disclosure per role. Opening a
+  /// role only expands that card; the old card-wide collapse hid all five at
+  /// once. The signed-in role starts open so the card still answers "what can I
+  /// do here?" without a tap.
   Widget _buildPermissionsCard(BuildContext context) {
     final current = widget.user?.role ?? UserRole.staff;
     const roles = [
@@ -70,169 +67,64 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(TabangRadius.sm),
-            onTap: () => setState(
-              () => _permissionsExpanded = !_permissionsExpanded,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Roles & permissions',
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: context.textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'You are signed in as ${current.label}. Tap to '
-                        '${_permissionsExpanded ? 'hide' : 'see'} every role.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: context.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  _permissionsExpanded
-                      ? Icons.expand_less
-                      : Icons.expand_more,
-                  color: context.textMuted,
-                ),
-              ],
+          Text(
+            'Roles & permissions',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: context.textColor,
             ),
           ),
-          if (_permissionsExpanded) ...[
-            const SizedBox(height: TabangSpace.md),
-            Text(
-              'Community Users and Recipients / Patient Representatives '
-              'request blood and message the network. Voluntary Donors appear '
-              'in the directory and answer open requests. Clinical Personnel '
-              'run the chapter, and System Administrators add account and '
-              'staff management on top.',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.45,
-                color: context.textMuted,
-              ),
-            ),
-            const SizedBox(height: TabangSpace.md),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = [
-                  for (final role in roles)
-                    _permissionColumn(
-                      context,
-                      role,
-                      highlight: role == current,
-                    ),
-                ];
-                // Up to three per row, then two, then one — five roles no
-                // longer fit a single row without crushing each column.
-                final perRow = constraints.maxWidth >= 1040
-                    ? 3
-                    : constraints.maxWidth >= 560
-                    ? 2
-                    : 1;
-                const gap = TabangSpace.md;
-                final width =
-                    (constraints.maxWidth - gap * (perRow - 1)) / perRow;
-                return Wrap(
-                  spacing: gap,
-                  runSpacing: gap,
-                  children: [
-                    for (final column in columns)
-                      SizedBox(width: width, child: column),
-                  ],
-                );
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _permissionColumn(
-    BuildContext context,
-    UserRole role, {
-    required bool highlight,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(TabangSpace.md),
-      decoration: BoxDecoration(
-        color: context.surfaceAlt,
-        borderRadius: BorderRadius.circular(TabangRadius.sm),
-        border: Border.all(
-          color: highlight
-              ? TabangColors.crimson.withValues(alpha: 0.45)
-              : context.border,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                switch (role) {
-                  UserRole.admin => Icons.admin_panel_settings_outlined,
-                  UserRole.staff => Icons.medical_services_outlined,
-                  UserRole.donor => Icons.volunteer_activism_outlined,
-                  UserRole.recipient => Icons.support_agent_outlined,
-                  _ => Icons.people_outline,
-                },
-                size: 16,
-                color: highlight ? TabangColors.crimson : context.textMuted,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  role.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: context.textColor,
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(height: 2),
+          Text(
+            'You are signed in as ${current.label}. Expand any role to see '
+            'what it can do.',
+            style: TextStyle(fontSize: 12, color: context.textMuted),
           ),
-          const SizedBox(height: 6),
-          for (final line in role.capabilities)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: TabangSpace.md),
+          Text(
+            'Community Users and Recipients / Patient Representatives '
+            'request blood and message the network. Voluntary Donors appear '
+            'in the directory and answer open requests. Clinical Personnel '
+            'run the chapter, and System Administrators add account and '
+            'staff management on top.',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: context.textMuted,
+            ),
+          ),
+          const SizedBox(height: TabangSpace.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Up to three per row, then two, then one — five roles no
+              // longer fit a single row without crushing each column.
+              final perRow = constraints.maxWidth >= 1040
+                  ? 3
+                  : constraints.maxWidth >= 560
+                  ? 2
+                  : 1;
+              const gap = TabangSpace.md;
+              final width =
+                  (constraints.maxWidth - gap * (perRow - 1)) / perRow;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
                 children: [
-                  const Icon(
-                    Icons.check,
-                    size: 13,
-                    color: TabangColors.success,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      line,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        height: 1.4,
-                        color: context.textMuted,
+                  for (final role in roles)
+                    SizedBox(
+                      width: width,
+                      child: _PermissionRoleCard(
+                        key: ValueKey(role),
+                        role: role,
+                        highlight: role == current,
+                        initiallyExpanded: role == current,
                       ),
                     ),
-                  ),
                 ],
-              ),
-            ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -1910,10 +1802,8 @@ class _KpiCard extends StatelessWidget {
   Color _color(BuildContext context) {
     final dark = context.isDark;
     return switch (tone) {
-      Tone.success =>
-        dark ? TabangColors.successOnDark : TabangColors.success,
-      Tone.warning =>
-        dark ? TabangColors.warningOnDark : TabangColors.warning,
+      Tone.success => dark ? TabangColors.successOnDark : TabangColors.success,
+      Tone.warning => dark ? TabangColors.warningOnDark : TabangColors.warning,
       Tone.danger => dark ? TabangColors.dangerOnDark : TabangColors.danger,
       Tone.info => dark ? TabangColors.infoOnDark : TabangColors.info,
       Tone.brand => dark ? TabangColors.brandOnDark : TabangColors.crimson,
@@ -1981,6 +1871,143 @@ class _KpiCard extends StatelessWidget {
               color: color,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One role in the Roles & permissions card. The header is the disclosure
+/// control, so each role expands independently instead of one switch hiding
+/// the whole card.
+class _PermissionRoleCard extends StatefulWidget {
+  const _PermissionRoleCard({
+    super.key,
+    required this.role,
+    required this.highlight,
+    required this.initiallyExpanded,
+  });
+
+  final UserRole role;
+  final bool highlight;
+  final bool initiallyExpanded;
+
+  @override
+  State<_PermissionRoleCard> createState() => _PermissionRoleCardState();
+}
+
+class _PermissionRoleCardState extends State<_PermissionRoleCard> {
+  late bool _expanded = widget.initiallyExpanded;
+
+  @override
+  void didUpdateWidget(_PermissionRoleCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initiallyExpanded != widget.initiallyExpanded &&
+        widget.initiallyExpanded) {
+      _expanded = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final role = widget.role;
+    return Container(
+      decoration: BoxDecoration(
+        color: context.surfaceAlt,
+        borderRadius: BorderRadius.circular(TabangRadius.sm),
+        border: Border.all(
+          color: widget.highlight
+              ? TabangColors.crimson.withValues(alpha: 0.45)
+              : context.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(TabangRadius.sm),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.all(TabangSpace.md),
+              child: Row(
+                children: [
+                  Icon(
+                    switch (role) {
+                      UserRole.admin => Icons.admin_panel_settings_outlined,
+                      UserRole.staff => Icons.medical_services_outlined,
+                      UserRole.donor => Icons.volunteer_activism_outlined,
+                      UserRole.recipient => Icons.support_agent_outlined,
+                      _ => Icons.people_outline,
+                    },
+                    size: 16,
+                    color: widget.highlight
+                        ? TabangColors.crimson
+                        : context.textMuted,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      role.label,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: context.textColor,
+                      ),
+                    ),
+                  ),
+                  if (widget.highlight)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6, right: 2),
+                      child: StatusPill('You', tone: Tone.info, dense: true),
+                    ),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: context.textMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                TabangSpace.md,
+                0,
+                TabangSpace.md,
+                TabangSpace.md,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final line in role.capabilities)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.check,
+                            size: 13,
+                            color: TabangColors.success,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              line,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                height: 1.4,
+                                color: context.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );

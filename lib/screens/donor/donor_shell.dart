@@ -70,6 +70,10 @@ class _DonorShellState extends State<DonorShell> {
   /// Request the community map asked the Requests tab to scroll to.
   String? _requestsFocusId;
 
+  /// Bumped on every hand-off so tapping the same request again still scrolls
+  /// back to it after the last highlight cleared.
+  int _requestsFocusToken = 0;
+
   /// Mirrors [DonorShell.railPinned] so the control still works when the shell
   /// is embedded without a preference owner (widget tests, previews).
   late bool _pinned = widget.railPinned;
@@ -241,6 +245,7 @@ class _DonorShellState extends State<DonorShell> {
   void _openRequests([String? requestId]) {
     setState(() {
       _requestsFocusId = requestId;
+      _requestsFocusToken++;
       _pages[3] = _buildPage(3);
     });
     _select(3);
@@ -370,6 +375,7 @@ class _DonorShellState extends State<DonorShell> {
           user: widget.user,
           onOpenDonorHub: () => _select(5),
           focusRequestId: _requestsFocusId,
+          focusRequestToken: _requestsFocusToken,
         );
       case 4:
         return ChatPage(user: widget.user);
