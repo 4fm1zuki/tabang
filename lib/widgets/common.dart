@@ -134,7 +134,12 @@ Future<bool> confirmAction(
 }
 
 /// A bordered surface used for every panel in the app.
-class SurfaceCard extends StatelessWidget {
+///
+/// When [onTap] is supplied the card behaves like a button: the pointer becomes
+/// a hand, hovering warms the surface and border, and pressing adds a crimson
+/// ripple. Previously the [InkWell] sat behind the opaque card decoration, so
+/// clickable cards gave no feedback and looked inert.
+class SurfaceCard extends StatefulWidget {
   const SurfaceCard({
     super.key,
     required this.child,
@@ -149,29 +154,74 @@ class SurfaceCard extends StatelessWidget {
   final bool highlighted;
 
   @override
+  State<SurfaceCard> createState() => _SurfaceCardState();
+}
+
+class _SurfaceCardState extends State<SurfaceCard> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    final content = Container(
-      padding: padding,
+    final radius = BorderRadius.circular(TabangRadius.md);
+    final interactive = widget.onTap != null;
+    final hovered = interactive && _hovered;
+    final pressed = interactive && _pressed;
+
+    // The card itself owns the hover/press wash, so it is visible above the
+    // opaque surface; the InkWell below paints only the ripple.
+    final background = pressed
+        ? Color.alphaBlend(
+            TabangColors.crimson.withValues(alpha: 0.06),
+            context.surfaceAlt,
+          )
+        : hovered
+        ? context.surfaceAlt
+        : context.surface;
+    final borderColor = widget.highlighted
+        ? TabangColors.crimson
+        : pressed
+        ? TabangColors.crimson.withValues(alpha: 0.55)
+        : hovered
+        ? TabangColors.crimson.withValues(alpha: 0.35)
+        : context.border;
+    final borderWidth = widget.highlighted
+        ? 1.6
+        : (pressed || hovered)
+        ? 1.2
+        : 1.0;
+
+    final content = Padding(padding: widget.padding, child: widget.child);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: context.surface,
-        borderRadius: BorderRadius.circular(TabangRadius.md),
-        border: Border.all(
-          color: highlighted ? TabangColors.crimson : context.border,
-          width: highlighted ? 1.6 : 1,
-        ),
+        color: background,
+        borderRadius: radius,
+        border: Border.all(color: borderColor, width: borderWidth),
       ),
-      child: child,
-    );
-
-    if (onTap == null) return content;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TabangRadius.md),
-        onTap: onTap,
-        child: content,
-      ),
+      child: interactive
+          ? Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: radius,
+                onTap: widget.onTap,
+                onHover: (value) => setState(() => _hovered = value),
+                onHighlightChanged: (value) => setState(() => _pressed = value),
+                hoverColor: Colors.transparent,
+                focusColor: TabangColors.crimson.withValues(
+                  alpha: context.isDark ? 0.16 : 0.08,
+                ),
+                splashColor: TabangColors.crimson.withValues(
+                  alpha: context.isDark ? 0.16 : 0.08,
+                ),
+                highlightColor: Colors.transparent,
+                mouseCursor: SystemMouseCursors.click,
+                child: content,
+              ),
+            )
+          : content,
     );
   }
 }

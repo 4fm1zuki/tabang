@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1087,6 +1088,38 @@ void main() {
       matching: find.byType(SurfaceCard),
     );
     expect(card, findsOneWidget);
+
+    // Clickable cards warm their surface and border on hover, then return to
+    // rest when the pointer leaves.
+    BoxDecoration decorationOf() =>
+        tester
+                .widget<AnimatedContainer>(
+                  find
+                      .descendant(
+                        of: card,
+                        matching: find.byType(AnimatedContainer),
+                      )
+                      .first,
+                )
+                .decoration!
+            as BoxDecoration;
+    final resting = decorationOf().color;
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(tester.getCenter(card));
+    await tester.pumpAndSettle();
+    expect(decorationOf().color, isNot(resting));
+    expect(
+      (decorationOf().border! as Border).top.color,
+      TabangColors.crimson.withValues(alpha: 0.35),
+    );
+
+    await mouse.moveTo(Offset.zero);
+    await tester.pumpAndSettle();
+    expect(decorationOf().color, resting);
+
     await tester.tap(card);
     await tester.pumpAndSettle();
 

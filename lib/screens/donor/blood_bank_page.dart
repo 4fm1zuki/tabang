@@ -1131,7 +1131,8 @@ class _BloodBankPageState extends State<BloodBankPage> {
                           BloodTypeChip(recipient, size: 28),
                           const SizedBox(width: TabangSpace.md),
                           Tooltip(
-                            message: 'These donor types can give to '
+                            message:
+                                'These donor types can give to '
                                 '${recipient.label}',
                             child: Icon(
                               Icons.arrow_back,
@@ -1208,6 +1209,7 @@ class _UnitCard extends StatefulWidget {
 
 class _UnitCardState extends State<_UnitCard> {
   bool _hovered = false;
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1226,158 +1228,182 @@ class _UnitCardState extends State<_UnitCard> {
       cursor: SystemMouseCursors.click,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
           color: widget.selected
               ? (context.isDark
                     ? TabangColors.crimson.withValues(alpha: 0.18)
                     : TabangColors.crimsonSoft.withValues(alpha: 0.55))
+              : _pressed
+              ? Color.alphaBlend(
+                  TabangColors.crimson.withValues(alpha: 0.06),
+                  context.surfaceAlt,
+                )
               : _hovered
               ? context.surfaceAlt
               : context.surface,
           borderRadius: BorderRadius.circular(TabangRadius.md),
           border: Border.all(
-            color: widget.selected ? TabangColors.crimson : context.border,
-            width: widget.selected ? 1.6 : 1,
+            color: widget.selected
+                ? TabangColors.crimson
+                : _pressed
+                ? TabangColors.crimson.withValues(alpha: 0.55)
+                : _hovered
+                ? TabangColors.crimson.withValues(alpha: 0.35)
+                : context.border,
+            width: widget.selected
+                ? 1.6
+                : (_pressed || _hovered)
+                ? 1.2
+                : 1,
           ),
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(TabangRadius.md),
-          onTap: widget.onOpen,
-          child: Padding(
-            padding: const EdgeInsets.all(TabangSpace.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    BloodTypeChip(unit.bloodType, size: 38),
-                    const SizedBox(width: TabangSpace.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            unit.product,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              height: 1.25,
-                              color: context.textColor,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            unit.storageBay,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    StatusPill(
-                      effective.label,
-                      tone: toneForUnit(effective),
-                      dense: true,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: TabangSpace.md),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.schedule,
-                      size: 14,
-                      color: expiringSoon
-                          ? TabangColors.danger
-                          : context.textMuted,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      unit.timeLeft(now),
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: expiringSoon
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                        color: expiringSoon
-                            ? TabangColors.danger
-                            : context.textMuted,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (mine)
-                      const StatusPill(
-                        'Held by you',
-                        tone: Tone.brand,
-                        dense: true,
-                      )
-                    else if (held)
-                      const StatusPill(
-                        'On hold',
-                        tone: Tone.neutral,
-                        dense: true,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: TabangSpace.sm),
-                Divider(height: 1, color: context.border),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(TabangRadius.xs),
-                      onTap: selectable ? widget.onToggleSelected : null,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(TabangRadius.md),
+            onTap: widget.onOpen,
+            onHighlightChanged: (value) => setState(() => _pressed = value),
+            splashColor: TabangColors.crimson.withValues(
+              alpha: context.isDark ? 0.16 : 0.08,
+            ),
+            highlightColor: Colors.transparent,
+            child: Padding(
+              padding: const EdgeInsets.all(TabangSpace.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      BloodTypeChip(unit.bloodType, size: 38),
+                      const SizedBox(width: TabangSpace.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: Checkbox(
-                                value: widget.selected,
-                                onChanged: selectable
-                                    ? (_) => widget.onToggleSelected()
-                                    : null,
-                                visualDensity: VisualDensity.compact,
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+                            Text(
+                              unit.product,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                height: 1.25,
+                                color: context.textColor,
                               ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(height: 3),
                             Text(
-                              'Select',
+                              unit.storageBay,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: selectable
-                                    ? context.textColor
-                                    : context.textMuted,
+                                fontSize: 12,
+                                color: context.textMuted,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    const Spacer(),
-                    _buildAction(
-                      context,
-                      effective: effective,
-                      mine: mine,
-                      held: held,
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 6),
+                      StatusPill(
+                        effective.label,
+                        tone: toneForUnit(effective),
+                        dense: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: TabangSpace.md),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        size: 14,
+                        color: expiringSoon
+                            ? TabangColors.danger
+                            : context.textMuted,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        unit.timeLeft(now),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: expiringSoon
+                              ? FontWeight.w700
+                              : FontWeight.w600,
+                          color: expiringSoon
+                              ? TabangColors.danger
+                              : context.textMuted,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (mine)
+                        const StatusPill(
+                          'Held by you',
+                          tone: Tone.brand,
+                          dense: true,
+                        )
+                      else if (held)
+                        const StatusPill(
+                          'On hold',
+                          tone: Tone.neutral,
+                          dense: true,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: TabangSpace.sm),
+                  Divider(height: 1, color: context.border),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(TabangRadius.xs),
+                        onTap: selectable ? widget.onToggleSelected : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: widget.selected,
+                                  onChanged: selectable
+                                      ? (_) => widget.onToggleSelected()
+                                      : null,
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Select',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: selectable
+                                      ? context.textColor
+                                      : context.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      _buildAction(
+                        context,
+                        effective: effective,
+                        mine: mine,
+                        held: held,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
