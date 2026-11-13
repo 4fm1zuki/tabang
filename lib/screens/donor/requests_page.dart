@@ -272,66 +272,78 @@ class _RequestsPageState extends State<RequestsPage> {
                 const SizedBox(height: TabangSpace.lg),
 
                 // Dropdown filters, matching the staff Inventory filter bars.
+                // One guide button sits at the end of the row and explains
+                // both controls; two separate tips floated above the filters
+                // and broke the toolbar rhythm.
                 if (!_isDonor || _donorTab != _DonorRequestsTab.donate)
-                  TabangFilterBar(
-                    filters: [
-                      TabangDropdown<RequestUrgency?>(
-                        initialValue: _urgencyFilter,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Urgency',
-                          isDense: true,
-                        ),
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: context.textColor,
-                        ),
-                        items: [
-                          const DropdownMenuItem<RequestUrgency?>(
-                            value: null,
-                            child: Text('All urgencies'),
-                          ),
-                          ...RequestUrgency.values.map(
-                            (u) => DropdownMenuItem<RequestUrgency?>(
-                              value: u,
-                              child: Text(u.label),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TabangFilterBar(
+                          filters: [
+                            TabangDropdown<RequestUrgency?>(
+                              initialValue: _urgencyFilter,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Urgency',
+                                isDense: true,
+                              ),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: context.textColor,
+                              ),
+                              items: [
+                                const DropdownMenuItem<RequestUrgency?>(
+                                  value: null,
+                                  child: Text('All urgencies'),
+                                ),
+                                ...RequestUrgency.values.map(
+                                  (u) => DropdownMenuItem<RequestUrgency?>(
+                                    value: u,
+                                    child: Text(u.label),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (v) =>
+                                  setState(() => _urgencyFilter = v),
                             ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => _urgencyFilter = v),
-                      ),
-                      TabangDropdown<RequestStatus?>(
-                        initialValue: _statusFilter,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'State',
-                          isDense: true,
-                        ),
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: context.textColor,
-                        ),
-                        items: [
-                          const DropdownMenuItem<RequestStatus?>(
-                            value: null,
-                            child: Text('Any state'),
-                          ),
-                          ...RequestStatus.values.map(
-                            (s) => DropdownMenuItem<RequestStatus?>(
-                              value: s,
-                              child: Text(s.label),
+                            TabangDropdown<RequestStatus?>(
+                              initialValue: _statusFilter,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'State',
+                                isDense: true,
+                              ),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: context.textColor,
+                              ),
+                              items: [
+                                const DropdownMenuItem<RequestStatus?>(
+                                  value: null,
+                                  child: Text('Any state'),
+                                ),
+                                ...RequestStatus.values.map(
+                                  (s) => DropdownMenuItem<RequestStatus?>(
+                                    value: s,
+                                    child: Text(s.label),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (v) =>
+                                  setState(() => _statusFilter = v),
                             ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => _statusFilter = v),
+                          ],
+                        ),
                       ),
-                    ],
-                    trailing: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        HelpTip(
-                          title: 'Urgency levels',
+                      const SizedBox(width: TabangSpace.sm),
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 2),
+                        child: HelpTip(
+                          title: 'Urgency & request states',
                           message:
+                              'Urgency\n'
                               'Critical — the patient needs units now; the '
                               'request is released as soon as a compatible unit '
                               'or donor is confirmed (minutes to a few hours).\n\n'
@@ -340,12 +352,8 @@ class _RequestsPageState extends State<RequestsPage> {
                               'Routine — planned use (for example before '
                               'surgery), usually three or more days out.\n\n'
                               'Urgency is chosen when the request is posted and '
-                              'chapter staff can adjust it.',
-                        ),
-                        SizedBox(width: TabangSpace.xs),
-                        HelpTip(
-                          title: 'Request states',
-                          message:
+                              'chapter staff can adjust it.\n\n'
+                              'Request states\n'
                               'Awaiting verification — posted, but chapter staff '
                               'have not checked the documents and booked slot '
                               'yet; donors cannot respond until it is verified.\n\n'
@@ -357,8 +365,8 @@ class _RequestsPageState extends State<RequestsPage> {
                               'Fulfilled, Rejected and Cancelled are the closed '
                               'records.',
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 if (!_isDonor || _donorTab != _DonorRequestsTab.donate)
                   const SizedBox(height: TabangSpace.lg),
@@ -699,8 +707,13 @@ class _RequestsPageState extends State<RequestsPage> {
     // Only the transient jump target outlines the card. Urgency is already a
     // pill, so a permanent crimson border on every critical request made the
     // locator outline ambiguous and look stuck after the next hand-off.
+    //
+    // The whole card is the affordance for the full record: the three-dot menu
+    // repeated "View details" and made the request board look like a settings
+    // list. Cancel request stays as an explicit button in the footer.
     return SurfaceCard(
       highlighted: highlighted,
+      onTap: () => _showRequestDetails(context, request, isOwn: isOwn),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -761,45 +774,6 @@ class _RequestsPageState extends State<RequestsPage> {
                 request.urgency.label,
                 tone: toneForUrgency(request.urgency),
                 dense: true,
-              ),
-              // Details live behind the three-dot menu so the card stays
-              // scannable; the menu is the only place the full record and the
-              // cancel action are repeated.
-              PopupMenuButton<String>(
-                tooltip: 'Request options',
-                icon: Icon(Icons.more_vert, size: 19, color: context.textMuted),
-                onSelected: (value) {
-                  if (value == 'details') {
-                    _showRequestDetails(context, request, isOwn: isOwn);
-                  } else if (value == 'cancel') {
-                    final ok = _repo.cancelRequest(
-                      request.id,
-                      actorId: _user.id,
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      TabangSnackBar(
-                        content: Text(
-                          ok
-                              ? 'Request cancelled.'
-                              : 'This request can no longer be cancelled.',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'details',
-                    child: Text('View details'),
-                  ),
-                  if (isOwn &&
-                      request.status != RequestStatus.fulfilled &&
-                      request.status != RequestStatus.cancelled)
-                    const PopupMenuItem(
-                      value: 'cancel',
-                      child: Text('Cancel request'),
-                    ),
-                ],
               ),
             ],
           ),
@@ -1079,7 +1053,7 @@ class _RequestsPageState extends State<RequestsPage> {
     );
   }
 
-  /// Full record for one request, opened from the card's three-dot menu.
+  /// Full record for one request, opened by tapping its card.
   void _showRequestDetails(
     BuildContext context,
     BloodRequest request, {

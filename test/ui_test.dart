@@ -1054,6 +1054,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('request cards open details and show one filter guide', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: RequestsPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Urgency and state now share one guide beside the filter row instead of
+    // two tips stacked above it.
+    expect(find.byIcon(Icons.help_outline), findsOneWidget);
+    expect(find.byTooltip('Request options'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.help_outline));
+    await tester.pumpAndSettle();
+    expect(find.text('Urgency & request states'), findsOneWidget);
+    await tester.tap(find.text('Got it'));
+    await tester.pumpAndSettle();
+
+    // The whole card opens the full record; there is no three-dot menu.
+    final card = find.ancestor(
+      of: find.text('Patient 205'),
+      matching: find.byType(SurfaceCard),
+    );
+    expect(card, findsOneWidget);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Request ID'), findsOneWidget);
+    expect(find.text('REQ-007'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('map hand-off focuses a request that is not the viewer own', (
     tester,
   ) async {
