@@ -910,7 +910,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 else
                   TextButton(
                     onPressed: () => _showRequestDetails(context, request),
-                    child: const Text('Waiting for donor'),
+                    child: const Text('Awaiting donor'),
                   ),
               ],
             ),
@@ -1544,28 +1544,34 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               ),
             ],
           ),
-          if (canAct && fulfilled) ...[
+          if (canAct) ...[
             const SizedBox(height: TabangSpace.sm),
             Align(
               alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => _reopenRequest(context, request),
-                icon: const Icon(Icons.undo, size: 15),
-                label: const Text('Reopen (undo fulfilled)'),
-              ),
-            ),
-          ] else if (canAct && (pending || request.canBeFulfilled)) ...[
-            const SizedBox(height: TabangSpace.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: pending
+              child: fulfilled
+                  ? OutlinedButton.icon(
+                      onPressed: () => _reopenRequest(context, request),
+                      icon: const Icon(Icons.undo, size: 15),
+                      label: const Text('Reopen (undo fulfilled)'),
+                    )
+                  : pending
                   ? FilledButton(
                       onPressed: () => _showRequestDetails(context, request),
                       child: const Text('Review slot'),
                     )
-                  : OutlinedButton(
+                  : request.canBeFulfilled
+                  ? OutlinedButton(
                       onPressed: () => _fulfilRequest(context, request),
                       child: const Text('Mark fulfilled'),
+                    )
+                  // Slot confirmed but the requester has not chosen a donor yet:
+                  // a donor-network request can only be fulfilled once Matched.
+                  // Without this the card looked broken — a status with no
+                  // action at all.
+                  : TextButton.icon(
+                      onPressed: () => _showRequestDetails(context, request),
+                      icon: const Icon(Icons.hourglass_empty, size: 15),
+                      label: const Text('Awaiting donor'),
                     ),
             ),
           ],

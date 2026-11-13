@@ -1202,6 +1202,37 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a confirmed slot with no donor yet still offers an action', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final staff = repo.userById('USR-010')!;
+    // A donor-network request that is open (no donor chosen) still needs an
+    // action on its booked-slot card, not a dead "Slot confirmed" pill.
+    final open = repo.scheduledRequests.firstWhere(
+      (r) => r.status == RequestStatus.open && !r.canBeFulfilled,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: InventoryManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Booked slots'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Slot confirmed'), findsWidgets);
+    expect(find.text('Awaiting donor'), findsWidgets);
+    expect(open.canBeFulfilled, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('permissions card is a dropdown listing every role', (
     tester,
   ) async {

@@ -96,4 +96,79 @@ void main() {
     expect(formKey.currentState!.validate(), isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the null "All" option can be chosen, not just dismissed', (
+    tester,
+  ) async {
+    String? picked = 'sentinel';
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(
+          body: TabangDropdown<String?>(
+            initialValue: 'Open',
+            items: const [
+              DropdownMenuItem<String?>(
+                value: null,
+                child: Text('All states'),
+              ),
+              DropdownMenuItem<String?>(value: 'Open', child: Text('Open')),
+            ],
+            decoration: const InputDecoration(labelText: 'State'),
+            onChanged: (value) {
+              picked = value;
+              calls++;
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All states'));
+    await tester.pumpAndSettle();
+
+    // Reset must actually fire: the null value is a real choice, not a dismiss.
+    expect(calls, 1);
+    expect(picked, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dismissing the sheet leaves the selection unchanged', (
+    tester,
+  ) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(
+          body: TabangDropdown<String?>(
+            initialValue: 'Open',
+            items: const [
+              DropdownMenuItem<String?>(
+                value: null,
+                child: Text('All states'),
+              ),
+              DropdownMenuItem<String?>(value: 'Open', child: Text('Open')),
+            ],
+            decoration: const InputDecoration(labelText: 'State'),
+            onChanged: (_) => calls++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    // Tap the barrier above the sheet to dismiss it.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(calls, 0);
+    expect(tester.takeException(), isNull);
+  });
 }

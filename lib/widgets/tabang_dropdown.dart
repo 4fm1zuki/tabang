@@ -108,7 +108,10 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
   Future<void> _pick(FormFieldState<T> field) async {
     if (!widget.enabled) return;
     setState(() => _open = true);
-    final value = await showModalBottomSheet<T?>(
+    // The sheet returns a _Picked wrapper, not the bare value: several filters
+    // use a null value for their "All …" option, which would otherwise be
+    // indistinguishable from dismissing the sheet and could never be chosen.
+    final picked = await showModalBottomSheet<_Picked<T>>(
       context: context,
       backgroundColor: context.surface,
       showDragHandle: true,
@@ -130,11 +133,11 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
     );
     if (!mounted) return;
     setState(() => _open = false);
-    // A sheet dismissed by tapping outside returns null; only a real choice
-    // changes the field.
-    if (value == null) return;
-    field.didChange(value);
-    widget.onChanged?.call(value);
+    // A sheet dismissed by tapping outside returns null; a real choice — even
+    // one that clears the filter — returns a wrapper.
+    if (picked == null) return;
+    field.didChange(picked.value);
+    widget.onChanged?.call(picked.value);
   }
 
   @override
@@ -243,9 +246,15 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
   }
 }
 
+/// Wrapper so a chosen option with a null value (an "All …" filter) can be
+/// told apart from the sheet being dismissed.
+class _Picked<T> {
+  const _Picked(this.value);
+  final T? value;
+}
+
 /// The option list: search first (for long lists), then the rows.
-class _Picker<T> extends StatefulWidget {
-  const _Picker({
+class _Picker<T> extends StatefulWidget {  const _Picker({
     required this.items,
     required this.labelOf,
     required this.selected,
@@ -347,7 +356,8 @@ class _PickerState<T> extends State<_Picker<T>> {
                           final item = items[index];
                           final isSelected = item.value == widget.selected;
                           return InkWell(
-                            onTap: () => Navigator.pop(context, item.value),
+                            onTap: () =>
+                                Navigator.pop(context, _Picked<T>(item.value)),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: TabangSpace.md,
