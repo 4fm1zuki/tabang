@@ -56,6 +56,11 @@ and the starter DDL is
 workbook includes a 282-row model coverage audit, 83 derived/pre-calculated
 values, ID/cardinality constraints and a gap-closure log.
 
+**AI handoff:** give another assistant
+[`docs/ai/TABANG_AI_CONTEXT.md`](docs/ai/TABANG_AI_CONTEXT.md) first; the
+machine-readable version and ready-to-paste prompts are in
+[`docs/ai/`](docs/ai/).
+
 ### Demo accounts
 
 Sign in with any of these. The login screen lists them too; click a row to

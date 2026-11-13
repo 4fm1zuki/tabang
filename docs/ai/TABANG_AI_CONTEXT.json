@@ -1,0 +1,739 @@
+{
+  "schema_version": "1.0",
+  "project": {
+    "name": "TABANG",
+    "expanded_name": "Transfusion Access, Blood Availability and Network Guidance",
+    "description": "A centralized donor-management and blood-request research prototype for Digos City, Davao del Sur.",
+    "institution": "Cor Jesu College, Inc.",
+    "status": "base research prototype; simulated data; no live backend",
+    "release": "v2.0.0",
+    "release_commit": "c54125c"
+  },
+  "stack": {
+    "framework": "Flutter 3.47.5",
+    "language": "Dart 3.13.4",
+    "ui": "Material 3",
+    "maps": [
+      "flutter_map",
+      "latlong2"
+    ],
+    "files": [
+      "file_picker"
+    ],
+    "auth": "prototype salted SHA-256 in-memory store",
+    "backend": "none yet; Supabase blueprint prepared",
+    "unused": [
+      "firebase_core",
+      "firebase_auth",
+      "firebase.json",
+      "google-services plugin"
+    ]
+  },
+  "commands": {
+    "install": "flutter pub get",
+    "run_web": "flutter run -d chrome",
+    "run_windows": "flutter run -d windows",
+    "run_android": "flutter run -d android",
+    "analyze": "flutter analyze --no-pub",
+    "test": "flutter test --no-pub",
+    "build_apk": "flutter build apk --release",
+    "build_apk_split": "flutter build apk --release --split-per-abi",
+    "build_web": "flutter build web --release"
+  },
+  "demo_accounts": [
+    {
+      "role": "donor",
+      "email": "juan.delacruz@tabang.app",
+      "password": "donor1234"
+    },
+    {
+      "role": "donor",
+      "email": "tere.santos@tabang.app",
+      "password": "donor1234"
+    },
+    {
+      "role": "donor_away",
+      "email": "rafael.mendoza@tabang.app",
+      "password": "donor1234"
+    },
+    {
+      "role": "recipient",
+      "email": "maria.santos@tabang.app",
+      "password": "recipient1234"
+    },
+    {
+      "role": "community",
+      "email": "community@tabang.app",
+      "password": "community1234"
+    },
+    {
+      "role": "staff",
+      "email": "marco.villanueva@tabang.app",
+      "password": "staff1234"
+    },
+    {
+      "role": "admin",
+      "email": "admin@tabang.app",
+      "password": "admin1234"
+    }
+  ],
+  "roles": {
+    "user": "Community User",
+    "donor": "Voluntary Donor",
+    "recipient": "Recipient / Patient Representative",
+    "staff": "Clinical Personnel",
+    "admin": "System Administrator"
+  },
+  "entities": {
+    "AppUser": {
+      "fields": [
+        "id",
+        "fullName",
+        "alias",
+        "email",
+        "phone",
+        "barangay",
+        "role",
+        "photoAsset",
+        "registeredOn",
+        "bloodType",
+        "birthDate",
+        "weightKg",
+        "status",
+        "warningCount",
+        "suspensionReason",
+        "lastDonationDate",
+        "lastDonationComponent",
+        "totalDonations",
+        "isAvailable",
+        "lastActiveAt",
+        "bloodCardVerified",
+        "shareBarangay",
+        "notifyRequests",
+        "notifyChat",
+        "notifyNews",
+        "onboardingCompleted",
+        "allowedComponents"
+      ],
+      "derived": [
+        "initials",
+        "age",
+        "isDonor",
+        "mapHandle",
+        "allowsComponent"
+      ]
+    },
+    "BloodUnit": {
+      "fields": [
+        "barcode",
+        "bloodType",
+        "component",
+        "storageBay",
+        "status",
+        "collectedOn",
+        "expiresOn",
+        "reservedBy",
+        "reservationNote",
+        "reservedAt"
+      ],
+      "derived": [
+        "product",
+        "daysUntilExpiry",
+        "timeLeft",
+        "isExpiredAt",
+        "isUsableAt",
+        "effectiveStatus",
+        "isUsable"
+      ]
+    },
+    "RemovedUnitRecord": {
+      "fields": [
+        "unit",
+        "removedAt",
+        "removedById",
+        "restored"
+      ]
+    },
+    "AccountWarning": {
+      "fields": [
+        "id",
+        "userId",
+        "level",
+        "message",
+        "issuedById",
+        "issuedByAlias",
+        "issuedAt",
+        "acknowledgedAt"
+      ],
+      "derived": [
+        "isUnacknowledged"
+      ]
+    },
+    "BloodRequest": {
+      "fields": [
+        "id",
+        "requesterId",
+        "patientAlias",
+        "bloodType",
+        "component",
+        "unitsNeeded",
+        "hospital",
+        "barangay",
+        "urgency",
+        "createdAt",
+        "status",
+        "unitsFulfilled",
+        "source",
+        "note",
+        "documents",
+        "scheduledFor",
+        "postToDonorNetwork",
+        "reviewNote",
+        "reviewedById",
+        "assignedUnitIds"
+      ],
+      "derived": [
+        "unitsOutstanding",
+        "isAwaitingReview",
+        "canBeRejected",
+        "canBeFulfilled",
+        "staffFulfilmentNote",
+        "acceptsDonorResponses"
+      ]
+    },
+    "RequestDocument": {
+      "fields": [
+        "kind",
+        "fileName",
+        "bytes",
+        "previewAsset",
+        "sizeBytes"
+      ],
+      "derived": [
+        "hasFile",
+        "hasPreview",
+        "sizeLabel"
+      ]
+    },
+    "RequestResponse": {
+      "fields": [
+        "id",
+        "requestId",
+        "donorId",
+        "donorAlias",
+        "createdAt",
+        "message",
+        "status"
+      ]
+    },
+    "UserReport": {
+      "fields": [
+        "id",
+        "reporterId",
+        "reporterAlias",
+        "reportedUserId",
+        "reportedAlias",
+        "reason",
+        "details",
+        "createdAt",
+        "threadId",
+        "status"
+      ]
+    },
+    "ChatMessage": {
+      "fields": [
+        "id",
+        "senderId",
+        "senderAlias",
+        "text",
+        "sentAt",
+        "flag",
+        "flagReason",
+        "sentAsChapter"
+      ]
+    },
+    "ChatThread": {
+      "fields": [
+        "id",
+        "participantAId",
+        "participantAAlias",
+        "participantBId",
+        "participantBAlias",
+        "messages",
+        "identityRevealed",
+        "groupName",
+        "memberIds",
+        "memberReadAt",
+        "identityRevealRequestedBy",
+        "isMuted",
+        "unblockedAt",
+        "participantAReadAt",
+        "participantBReadAt"
+      ],
+      "derived": [
+        "isGroup",
+        "includes",
+        "readAtFor",
+        "unreadCountFor",
+        "hasUnreadFor",
+        "hasFlaggedMessages",
+        "flaggedCount",
+        "lastMessage"
+      ]
+    },
+    "DonorApplication": {
+      "fields": [
+        "id",
+        "userId",
+        "submittedAt",
+        "status",
+        "hasExistingCard",
+        "cardNumber",
+        "preferredVisit",
+        "note",
+        "requestedDocuments",
+        "staffNote"
+      ]
+    },
+    "BloodDrive": {
+      "fields": [
+        "id",
+        "title",
+        "venue",
+        "barangay",
+        "startsAt",
+        "endsAt",
+        "expectedDonors",
+        "isOpenForRegistration",
+        "photoAsset",
+        "approval",
+        "proposedById",
+        "reviewedById",
+        "reviewNote",
+        "lat",
+        "lng"
+      ],
+      "derived": [
+        "isLive",
+        "status"
+      ]
+    },
+    "ContentItem": {
+      "fields": [
+        "id",
+        "title",
+        "subtitle",
+        "body",
+        "tag",
+        "category",
+        "imageAsset"
+      ]
+    },
+    "AnalyticsSummary": {
+      "fields": [
+        "donationsToday",
+        "donationsThisMonth",
+        "registeredUsers",
+        "activeDonors",
+        "activeDrives",
+        "topBarangay",
+        "unitsAvailable",
+        "openRequests"
+      ]
+    },
+    "ReadinessTargets": {
+      "fields": [
+        "unitTarget",
+        "donorTarget",
+        "requestPressureCap",
+        "communityTarget"
+      ],
+      "derived": [
+        "defaults",
+        "isValid",
+        "describe"
+      ]
+    },
+    "ActivityEvent": {
+      "fields": [
+        "id",
+        "kind",
+        "actorId",
+        "actorAlias",
+        "subjectId",
+        "subjectAlias",
+        "summary",
+        "at"
+      ],
+      "derived": [
+        "isDonation"
+      ]
+    },
+    "BloodTypeStat": {
+      "fields": [
+        "bloodType",
+        "donated",
+        "requested"
+      ],
+      "derived": [
+        "balance"
+      ]
+    },
+    "BarangayStat": {
+      "fields": [
+        "barangay",
+        "donationCount",
+        "donorCount"
+      ]
+    },
+    "EligibilityResult": {
+      "fields": [
+        "isEligible",
+        "blocker",
+        "eligibleFrom",
+        "daysRemaining",
+        "donorType"
+      ],
+      "derived": [
+        "summary"
+      ]
+    }
+  },
+  "enums": {
+    "BloodType": [
+      "O_NEG",
+      "O_POS",
+      "A_NEG",
+      "A_POS",
+      "B_NEG",
+      "B_POS",
+      "AB_NEG",
+      "AB_POS"
+    ],
+    "BloodComponent": [
+      "WHOLE_BLOOD",
+      "PACKED_RBC",
+      "PLATELETS",
+      "PLASMA"
+    ],
+    "UnitStatus": [
+      "AVAILABLE",
+      "RESERVED",
+      "QUARANTINED",
+      "DISPATCHED",
+      "EXPIRED"
+    ],
+    "AccountStatus": [
+      "UNVERIFIED",
+      "VERIFIED",
+      "WARNED",
+      "SUSPENDED"
+    ],
+    "UserRole": [
+      "USER",
+      "DONOR",
+      "RECIPIENT",
+      "STAFF",
+      "ADMIN"
+    ],
+    "RequestUrgency": [
+      "ROUTINE",
+      "URGENT",
+      "CRITICAL"
+    ],
+    "RequestStatus": [
+      "PENDING_REVIEW",
+      "OPEN",
+      "MATCHED",
+      "FULFILLED",
+      "REJECTED",
+      "CANCELLED"
+    ],
+    "RequestSource": [
+      "BLOOD_BANK",
+      "DONOR_NETWORK"
+    ],
+    "ResponseStatus": [
+      "PENDING",
+      "SELECTED",
+      "DECLINED",
+      "WITHDRAWN"
+    ],
+    "ReportStatus": [
+      "OPEN",
+      "RESOLVED",
+      "DISMISSED"
+    ],
+    "ModerationFlag": [
+      "CLEAN",
+      "FLAGGED",
+      "INAPPROPRIATE",
+      "SPAM"
+    ],
+    "DonorApplicationStatus": [
+      "PENDING",
+      "DOCUMENTS_REQUESTED",
+      "VERIFIED",
+      "REJECTED"
+    ],
+    "DriveApproval": [
+      "PENDING",
+      "APPROVED",
+      "REJECTED",
+      "CANCELLED"
+    ],
+    "ContentCategory": [
+      "EXPLORE",
+      "TIPS",
+      "ELIGIBILITY",
+      "DRIVES",
+      "STORIES"
+    ],
+    "ActivityKind": [
+      "DONATION",
+      "DONATION_WINDOW",
+      "PROFILE",
+      "AVATAR",
+      "VERIFICATION",
+      "WARNING",
+      "SUSPENSION",
+      "APPLICATION",
+      "REPORT",
+      "REQUEST_SUBMITTED",
+      "REQUEST_VERIFIED",
+      "REQUEST_REJECTED",
+      "REQUEST_REOPENED",
+      "DRIVE_UPDATE",
+      "INVENTORY",
+      "READINESS_TARGETS"
+    ],
+    "EligibilityBlocker": [
+      "NONE",
+      "COOLDOWN",
+      "UNDERAGE",
+      "OVERAGE",
+      "UNDERWEIGHT",
+      "WEIGHT_MISSING",
+      "SUSPENDED",
+      "UNVERIFIED",
+      "UNAVAILABLE",
+      "AWAY",
+      "NO_BLOOD_TYPE",
+      "RESTRICTED"
+    ],
+    "ThreadKind": [
+      "DIRECT",
+      "CHAPTER",
+      "GROUP"
+    ],
+    "NotificationKind": [
+      "REQUEST",
+      "RESPONSE",
+      "MESSAGE",
+      "WARNING",
+      "DRIVE",
+      "APPLICATION",
+      "SYSTEM"
+    ],
+    "DocumentKind": [
+      "DOCTORS_FORM",
+      "TRANSFUSION_SLIP",
+      "PATIENT_ID",
+      "TYPING_RESULT"
+    ],
+    "FacilityKind": [
+      "CHAPTER",
+      "HOSPITAL"
+    ]
+  },
+  "business_rules": {
+    "eligibility": [
+      "role donor",
+      "verified account",
+      "verified blood card",
+      "not suspended",
+      "blood type recorded",
+      "age 18-65",
+      "weight >= 50 kg",
+      "available",
+      "active within 30 days",
+      "component allowed by staff",
+      "outside component cooldown"
+    ],
+    "cooldowns_days": {
+      "WHOLE_BLOOD": 84,
+      "PACKED_RBC": 84,
+      "PLATELETS": 14,
+      "PLASMA": 28
+    },
+    "compatibility": [
+      "red cells use standard ABO/Rh matrix",
+      "plasma uses reverse ABO rule",
+      "platelets use red-cell baseline"
+    ],
+    "request": [
+      "starts pending review",
+      "3 required documents",
+      "slot inside published blood-bank hours",
+      "staff verify/reject",
+      "donor responses only when open donor-network",
+      "requester selects",
+      "reciprocal human chat required before selection",
+      "one active commitment per donor",
+      "matched when enough selected",
+      "staff/admin fulfil",
+      "rejection releases holds/offers",
+      "undo only from expected state"
+    ],
+    "inventory": [
+      "expiry is effective",
+      "barcode unique",
+      "one active hold per bag",
+      "hold is not a transfusion order",
+      "expired cannot return to available",
+      "removal ledger + restore"
+    ],
+    "drives": [
+      "staff propose",
+      "admin approves/rejects/cancels",
+      "only approved public",
+      "undo from expected state",
+      "donor interest only"
+    ],
+    "warnings": [
+      "max 3",
+      "third suspends",
+      "reinstatement clears ladder",
+      "revoke steps down",
+      "staff suspension separate"
+    ],
+    "privacy": [
+      "alias public",
+      "legal name/contact staff-only until bilateral reveal",
+      "Donor #id on map",
+      "block symmetric",
+      "48h re-block cooldown",
+      "chapter posts as organization",
+      "staff room staff/admin only"
+    ]
+  },
+  "key_files": {
+    "app_root": "lib/main.dart",
+    "theme": "lib/theme.dart",
+    "models": "lib/core/models.dart",
+    "repository": "lib/core/repository.dart",
+    "eligibility": "lib/core/eligibility.dart",
+    "auth": "lib/core/auth.dart",
+    "geodata": "lib/core/digos_geodata.dart",
+    "credits": "lib/core/image_credits.dart",
+    "community_screens": "lib/screens/donor/",
+    "staff_screens": "lib/screens/admin/",
+    "shared_screens": "lib/screens/shared/",
+    "widgets": "lib/widgets/",
+    "tests": "test/",
+    "backend_guide": "docs/backend/BACKEND_GUIDE.md",
+    "backend_workbook": "docs/backend/TABANG_Backend_Guide.xlsx",
+    "backend_sql": "docs/backend/supabase_schema.sql"
+  },
+  "backend": {
+    "tables": [
+      "profiles",
+      "profile_tab_seen",
+      "notifications",
+      "barangays",
+      "facilities",
+      "blood_types",
+      "blood_components",
+      "document_requirements",
+      "donor_requirements",
+      "donor_screening_questions",
+      "chapter_settings",
+      "role_capabilities",
+      "tab_activity_rules",
+      "donor_directory",
+      "donations",
+      "donor_applications",
+      "account_warnings",
+      "blood_units",
+      "blood_units_public",
+      "inventory_removals",
+      "request_units",
+      "requests",
+      "request_public",
+      "request_documents",
+      "request_responses",
+      "request_status_history",
+      "blood_drives",
+      "drive_interests",
+      "content_items",
+      "chat_threads",
+      "chat_thread_members",
+      "chat_messages",
+      "user_blocks",
+      "user_reports",
+      "activity_events",
+      "moderation_keywords",
+      "readiness_targets",
+      "chapter_metrics"
+    ],
+    "views": [
+      "blood_type_stats",
+      "barangay_stats",
+      "donor_counts_by_barangay",
+      "open_requests_by_barangay",
+      "pending_applications_by_barangay",
+      "thread_unread_counts",
+      "thread_last_message",
+      "thread_moderation_summary",
+      "expiring_soon",
+      "critical_shortage_types"
+    ],
+    "design_rules": [
+      "auth.users is the only credential store",
+      "profiles owns role/status",
+      "public screens read donor_directory, blood_units_public, request_public",
+      "multi-row workflows are RPCs",
+      "RLS on every table; deny by default",
+      "no service_role in client",
+      "Realtime is a notification, not initial load",
+      "request documents in private Storage",
+      "UUID + legacy_id; never length+1",
+      "timestamptz in UTC, display Asia/Manila"
+    ],
+    "starter_status": "DDL is a starter; not executed against Supabase; some RPC bodies remain TODO"
+  },
+  "quality": {
+    "tests": 210,
+    "analyze": "clean at last check",
+    "release_assets": [
+      "TABANG-2.0.0-universal.apk",
+      "TABANG-2.0.0-arm64-v8a.apk",
+      "TABANG-2.0.0-armeabi-v7a.apk",
+      "TABANG-2.0.0-x86_64.apk",
+      "TABANG-2.0.0-web.zip",
+      "SHA256SUMS.txt"
+    ]
+  },
+  "known_gaps": [
+    "no live Supabase backend",
+    "no push notifications, voice calls, Google OAuth or production auth",
+    "no profile-picture upload",
+    "no clinical screening",
+    "donor medical-history answers are not persisted",
+    "Android release uses debug signing key",
+    "Firebase packages are unused",
+    "SQL starter not applied to a live project",
+    "some RPC bodies still TODO"
+  ],
+  "hard_constraints": [
+    "do not add Firebase",
+    "do not use service_role in client",
+    "do not expose PII",
+    "do not use length+1 IDs",
+    "do not split multi-row workflows across client writes",
+    "do not subscribe public screens to base tables with PII",
+    "do not rebuild/publish APKs unless asked",
+    "do not commit unrelated user changes",
+    "do not claim tests pass without running them"
+  ]
+}
