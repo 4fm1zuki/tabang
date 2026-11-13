@@ -47,6 +47,13 @@ resets when the process restarts. Supabase is intentionally **not** a
 dependency in this build; an unused client would imply a live connection that
 does not exist.
 
+**Backend migration plan:** see
+[`docs/backend/BACKEND_GUIDE.md`](docs/backend/BACKEND_GUIDE.md) for the
+Supabase schema, RLS, Realtime and sync blueprint. The companion workbook is
+[`docs/backend/TABANG_Backend_Guide.xlsx`](docs/backend/TABANG_Backend_Guide.xlsx)
+and the starter DDL is
+[`docs/backend/supabase_schema.sql`](docs/backend/supabase_schema.sql).
+
 ### Demo accounts
 
 Sign in with any of these. The login screen lists them too; click a row to
