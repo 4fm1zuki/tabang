@@ -43,6 +43,12 @@ class OperationsWorkspacePage extends StatefulWidget {
 class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
   late int _section = widget.initialSection.clamp(0, 2);
 
+  /// The Map / Inventory / Drives switch takes a full row above the content.
+  /// Staff who are staying in one section can fold it away and give the map or
+  /// queue that height back; a compact "Show sections" control remains so the
+  /// switch is never lost.
+  bool _sectionsVisible = true;
+
   /// Bumped when the map asks to land on the Inventory Requests tab.
   int _requestsTabToken = 0;
 
@@ -84,7 +90,59 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
             pad.right,
             TabangSpace.md,
           ),
-          child: _SectionBar(section: _section, onSelect: _select),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _sectionsVisible
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: _SectionBar(
+                          section: _section,
+                          onSelect: _select,
+                        ),
+                      ),
+                      const SizedBox(width: TabangSpace.sm),
+                      IconButton(
+                        key: const ValueKey('hideOperationSections'),
+                        onPressed: () =>
+                            setState(() => _sectionsVisible = false),
+                        tooltip: 'Hide section tabs',
+                        icon: const Icon(Icons.keyboard_arrow_up, size: 18),
+                        style: IconButton.styleFrom(
+                          foregroundColor: context.textMuted,
+                          side: BorderSide(color: context.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              TabangRadius.sm,
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          minimumSize: const Size(38, 38),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  )
+                : Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      key: const ValueKey('showOperationSections'),
+                      onPressed: () => setState(() => _sectionsVisible = true),
+                      icon: const Icon(Icons.keyboard_arrow_down, size: 16),
+                      label: const Text('Show sections'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: context.textMuted,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: TabangSpace.md,
+                          vertical: 4,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
         ),
         Expanded(
           child: IndexedStack(

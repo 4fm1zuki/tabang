@@ -760,6 +760,16 @@ void main() {
     expect(find.text('Open requests'), findsOneWidget);
     expect(find.byType(DigosVectorMap), findsOneWidget);
 
+    // The section switch can be folded away for more map/queue height, and the
+    // compact Show sections control brings it back.
+    await tester.tap(find.byKey(const ValueKey('hideOperationSections')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('hideOperationSections')), findsNothing);
+    expect(find.byKey(const ValueKey('showOperationSections')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('showOperationSections')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('hideOperationSections')), findsOneWidget);
+
     await tester.tap(find.text('Inventory'));
     await tester.pumpAndSettle();
     expect(find.text('Add unit'), findsOneWidget);
@@ -1129,6 +1139,42 @@ void main() {
     expect(find.text('REQ-007'), findsOneWidget);
     await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('request cards put status and urgency at the top right', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: RequestsPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.ancestor(
+      of: find.text('Patient 205'),
+      matching: find.byType(SurfaceCard),
+    );
+    final cardRect = tester.getRect(card);
+    final pills = find.descendant(of: card, matching: find.byType(StatusPill));
+    // Status and urgency both live in the header. The donor card may also show
+    // a Verified marker in its facts row, so match the first two.
+    expect(pills, findsAtLeastNWidgets(2));
+
+    // Both indicators sit in the upper-right quadrant, above the hospital and
+    // facts rows. The narrow card must still lay out without overflowing.
+    for (final element in pills.evaluate().take(2)) {
+      final rect = tester.getRect(find.byWidget(element.widget));
+      expect(rect.center.dx, greaterThan(cardRect.center.dx));
+      expect(rect.center.dy, lessThan(cardRect.center.dy));
+    }
     expect(tester.takeException(), isNull);
   });
 

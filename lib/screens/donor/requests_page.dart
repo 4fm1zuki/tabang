@@ -741,8 +741,9 @@ class _RequestsPageState extends State<RequestsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: one chip, one title, one urgency marker. The old row packed
-          // up to four pills next to the patient alias and read as noise.
+          // Header: one chip, one title, and the status + urgency markers in
+          // the top-right corner. The old row packed up to four pills next to
+          // the patient alias and read as noise.
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -794,10 +795,27 @@ class _RequestsPageState extends State<RequestsPage> {
                 ),
               ),
               const SizedBox(width: TabangSpace.sm),
-              StatusPill(
-                request.urgency.label,
-                tone: toneForUrgency(request.urgency),
-                dense: true,
+              // Status and urgency share the top-right corner, matching every
+              // other request card. The width cap keeps "Awaiting
+              // verification" from pushing the patient name out of view.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 132),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    StatusPill(
+                      request.status.label,
+                      tone: toneForRequest(request.status),
+                      dense: true,
+                    ),
+                    const SizedBox(height: 4),
+                    StatusPill(
+                      request.urgency.label,
+                      tone: toneForUrgency(request.urgency),
+                      dense: true,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

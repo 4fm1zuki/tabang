@@ -53,6 +53,7 @@ class RequestListCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
@@ -95,6 +96,30 @@ class RequestListCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: TabangSpace.sm),
+              // Status and urgency sit together at the top right, where they
+              // read as the card's headline state instead of being buried in
+              // the facts row. The width cap keeps a long lifecycle label
+              // ("Awaiting verification") from squeezing out the patient name.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 132),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    StatusPill(
+                      request.status.label,
+                      tone: toneForRequest(request.status),
+                      dense: true,
+                    ),
+                    const SizedBox(height: 4),
+                    StatusPill(
+                      request.urgency.label,
+                      tone: toneForUrgency(request.urgency),
+                      dense: true,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: TabangSpace.sm),
@@ -122,16 +147,6 @@ class RequestListCard extends StatelessWidget {
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              StatusPill(
-                request.status.label,
-                tone: toneForRequest(request.status),
-                dense: true,
-              ),
-              StatusPill(
-                request.urgency.label,
-                tone: toneForUrgency(request.urgency),
-                dense: true,
-              ),
               _fact(context, Icons.place_outlined, request.barangay),
               if (request.scheduledFor != null)
                 _fact(
