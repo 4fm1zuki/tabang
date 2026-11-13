@@ -532,7 +532,7 @@ void main() {
       );
       final first = repo.respondToRequest(
         requestId: request.id,
-        donorId: 'USR-001', // O+
+        donorId: 'USR-012', // O- — not restricted from whole blood
       )!;
       final second = repo.respondToRequest(
         requestId: request.id,
@@ -2133,6 +2133,129 @@ void main() {
         isNull,
         reason: 'community accounts cannot propose chapter drives',
       );
+    });
+  });
+
+  group('Donation-type limits and fulfilment undo', () {
+    test('staff can limit a donor to specific components', () {
+      // USR-019 is past every cooldown, so any block below is the staff limit.
+      final donor = repo.userById('USR-019')!;
+      expect(donor.allowedComponents, isNull);
+
+      expect(
+        repo.setDonorComponents(
+          'USR-019',
+          components: [BloodComponent.packedRbc, BloodComponent.plasma],
+          actorId: 'USR-010',
+        ),
+        isTrue,
+      );
+      final limited = repo.userById('USR-019')!;
+      expect(limited.allowsComponent(BloodComponent.packedRbc), isTrue);
+      expect(limited.allowsComponent(BloodComponent.wholeBlood), isFalse);
+
+      final blocked = EligibilityEngine.evaluate(
+        limited,
+        component: BloodComponent.wholeBlood,
+      );
+      expect(blocked.isEligible, isFalse);
+      expect(blocked.blocker, EligibilityBlocker.restricted);
+
+      // Community members can never set the limit.
+      expect(
+        repo.setDonorComponents(
+          'USR-019',
+          components: [BloodComponent.packedRbc],
+          actorId: 'USR-001',
+        ),
+        isFalse,
+      );
+
+      // Selecting every component clears the restriction.
+      expect(
+        repo.setDonorComponents(
+          'USR-019',
+          components: BloodComponent.values,
+          actorId: 'USR-010',
+        ),
+        isTrue,
+      );
+      expect(repo.userById('USR-019')!.allowedComponents, isNull);
+      expect(
+        EligibilityEngine.evaluate(
+          repo.userById('USR-019')!,
+          component: BloodComponent.wholeBlood,
+        ).isEligible,
+        isTrue,
+      );
+    });
+
+    test('an empty component list is refused', () {
+      expect(
+        repo.setDonorComponents(
+          'USR-019',
+          components: const [],
+          actorId: 'USR-010',
+        ),
+        isFalse,
+      );
+      expect(repo.userById('USR-019')!.allowedComponents, isNull);
+    });
+
+    test('the seeded demo donor is limited to red cells and plasma', () {
+      final juan = repo.userById('USR-001')!;
+      expect(juan.allowedComponents, isNotNull);
+      expect(juan.allowsComponent(BloodComponent.wholeBlood), isFalse);
+      expect(juan.allowsComponent(BloodComponent.platelets), isFalse);
+      expect(juan.allowsComponent(BloodComponent.packedRbc), isTrue);
+    });
+
+    test('marking a request fulfilled can be undone', () {
+      expect(repo.markRequestFulfilled('REQ-003', actorId: 'USR-010'), isTrue);
+      expect(
+        repo.requests.firstWhere((r) => r.id == 'REQ-003').status,
+        RequestStatus.fulfilled,
+      );
+
+      expect(
+        repo.reopenFulfilledRequest('REQ-003', actorId: 'USR-010'),
+        isTrue,
+      );
+      final reopened = repo.requests.firstWhere((r) => r.id == 'REQ-003');
+      expect(reopened.status, RequestStatus.matched);
+      expect(reopened.unitsFulfilled, 0);
+
+      // A community member cannot undo, and only a fulfilled request reopens.
+      expect(
+        repo.reopenFulfilledRequest('REQ-003', actorId: 'USR-009'),
+        isFalse,
+      );
+      expect(
+        repo.reopenFulfilledRequest('REQ-001', actorId: 'USR-010'),
+        isFalse,
+      );
+    });
+
+    test('the staff request queue lists exactly the request records', () {
+      expect(repo.staffRequestQueue.map((r) => r.id).toSet(), {
+        for (final request in repo.requests) request.id,
+      });
+      // Actionable requests sort before the closed records.
+      final lastActionable = repo.staffRequestQueue.lastIndexWhere(
+        (r) =>
+            r.status == RequestStatus.pendingReview ||
+            r.status == RequestStatus.open ||
+            r.status == RequestStatus.matched,
+      );
+      final firstClosed = repo.staffRequestQueue.indexWhere(
+        (r) =>
+            r.status == RequestStatus.fulfilled ||
+            r.status == RequestStatus.rejected ||
+            r.status == RequestStatus.cancelled,
+      );
+      if (lastActionable != -1 && firstClosed != -1) {
+        expect(lastActionable, lessThan(firstClosed));
+      }
     });
   });
 }

@@ -55,9 +55,14 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
   /// highlighted so the card still answers "what can I do here?".
   Widget _buildPermissionsCard(BuildContext context) {
     final current = widget.user?.role ?? UserRole.staff;
-    // Donors keep every community capability; they are described inside the
-    // Community User column rather than as a fourth console role.
-    const roles = [UserRole.user, UserRole.staff, UserRole.admin];
+    // Donors are a first-class position: they keep every community capability
+    // and add directory listing, response and Donor Hub tools on top.
+    const roles = [
+      UserRole.user,
+      UserRole.donor,
+      UserRole.staff,
+      UserRole.admin,
+    ];
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,7 +71,8 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
           const SizedBox(height: 4),
           Text(
             'You are signed in as ${current.label}. Community Users request '
-            'blood, message the network and can register as donors. Clinical '
+            'blood, message the network and can register as donors. Voluntary '
+            'Donors appear in the directory and answer open requests. Clinical '
             'Personnel run the chapter, and System Administrators add account '
             'and staff management on top.',
             style: TextStyle(
@@ -148,6 +154,7 @@ class _AdminOverviewPageState extends State<AdminOverviewPage> {
                 switch (role) {
                   UserRole.admin => Icons.admin_panel_settings_outlined,
                   UserRole.staff => Icons.medical_services_outlined,
+                  UserRole.donor => Icons.volunteer_activism_outlined,
                   _ => Icons.people_outline,
                 },
                 size: 16,

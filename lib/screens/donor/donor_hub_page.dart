@@ -756,8 +756,21 @@ class _DonorHubPageState extends State<DonorHubPage> {
       for (final component in BloodComponent.values)
         component: EligibilityEngine.evaluate(user, component: component),
     };
-    final selected = _eligibilityComponents.toList()
+    final allowed = user.allowedComponents;
+    bool offered(BloodComponent component) =>
+        allowed == null || allowed.contains(component);
+    // A staff limit removes those types from the comparison: a donor can never
+    // tick a type the chapter has closed. Keep at least one selection so the
+    // card still has something to show.
+    final selected = _eligibilityComponents.where(offered).toList()
       ..sort((a, b) => a.index.compareTo(b.index));
+    if (selected.isEmpty) {
+      selected.add(
+        allowed != null && allowed.isNotEmpty
+            ? allowed.first
+            : BloodComponent.packedRbc,
+      );
+    }
     final eligibleCount = selected.where((c) => results[c]!.isEligible).length;
     final allEligible = eligibleCount == selected.length;
     final tone = allEligible
@@ -810,19 +823,33 @@ class _DonorHubPageState extends State<DonorHubPage> {
             runSpacing: 6,
             children: [
               for (final component in BloodComponent.values)
-                FilterChip(
-                  label: Text(component.label),
-                  selected: _eligibilityComponents.contains(component),
-                  visualDensity: VisualDensity.compact,
-                  onSelected: (on) => setState(() {
-                    if (on) {
-                      _eligibilityComponents.add(component);
-                    } else if (_eligibilityComponents.length > 1) {
-                      // Keep at least one type selected: the card is a
-                      // comparison, not an empty multi-select.
-                      _eligibilityComponents.remove(component);
-                    }
-                  }),
+                Tooltip(
+                  message: offered(component)
+                      ? ''
+                      : 'Limited by chapter staff — not offered for this donor.',
+                  child: FilterChip(
+                    label: Text(component.label),
+                    selected: selected.contains(component),
+                    avatar: offered(component)
+                        ? null
+                        : Icon(
+                            Icons.lock_outline,
+                            size: 15,
+                            color: context.textMuted,
+                          ),
+                    visualDensity: VisualDensity.compact,
+                    onSelected: offered(component)
+                        ? (on) => setState(() {
+                            if (on) {
+                              _eligibilityComponents.add(component);
+                            } else if (_eligibilityComponents.length > 1) {
+                              // Keep at least one type selected: the card is a
+                              // comparison, not an empty multi-select.
+                              _eligibilityComponents.remove(component);
+                            }
+                          })
+                        : null,
+                  ),
                 ),
             ],
           ),
@@ -835,6 +862,44 @@ class _DonorHubPageState extends State<DonorHubPage> {
               color: context.textMuted,
             ),
           ),
+          if (allowed != null) ...[
+            const SizedBox(height: TabangSpace.sm),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(TabangSpace.sm),
+              decoration: BoxDecoration(
+                color: context.infoBg,
+                borderRadius: BorderRadius.circular(TabangRadius.xs),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: 15,
+                    color: context.isDark
+                        ? TabangColors.infoOnDark
+                        : TabangColors.info,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Chapter staff have limited this account to '
+                      '${allowed.map((c) => c.label).join(', ')}. Locked '
+                      'types stay unavailable until staff update your record '
+                      '— for example "red cells only" after a screening, or '
+                      '"no whole blood" after a recent full donation.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.45,
+                        color: context.textColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (user.lastDonationDate != null) ...[
             const SizedBox(height: TabangSpace.sm),
             Text(
@@ -864,6 +929,8 @@ class _DonorHubPageState extends State<DonorHubPage> {
         ? TabangColors.success
         : tone == Tone.warning
         ? TabangColors.warning
+        : tone == Tone.neutral
+        ? context.textMuted
         : TabangColors.danger;
 
     return Container(
@@ -876,7 +943,11 @@ class _DonorHubPageState extends State<DonorHubPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            result.isEligible ? Icons.check_circle_outline : Icons.schedule,
+            result.isEligible
+                ? Icons.check_circle_outline
+                : result.blocker == EligibilityBlocker.restricted
+                ? Icons.lock_outline
+                : Icons.schedule,
             size: 15,
             color: color,
           ),
@@ -902,7 +973,10 @@ class _DonorHubPageState extends State<DonorHubPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  result.eligibleFrom != null
+                  result.blocker == EligibilityBlocker.restricted
+                      ? 'Chapter staff have limited this account to other '
+                            'donation types.'
+                      : result.eligibleFrom != null
                       ? 'Eligible again '
                             '${formatDate(result.eligibleFrom!)} · '
                             '${result.daysRemaining} '

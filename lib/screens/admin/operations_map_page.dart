@@ -36,6 +36,7 @@ class OperationsMapPage extends StatefulWidget {
     super.key,
     required this.user,
     this.onOpenInventory,
+    this.onOpenRequests,
     this.onOpenUsers,
     this.onOpenMessages,
     this.embedded = false,
@@ -43,6 +44,11 @@ class OperationsMapPage extends StatefulWidget {
 
   final AppUser user;
   final VoidCallback? onOpenInventory;
+
+  /// Jumps to the Inventory page's Requests tab. The map request card opens
+  /// this instead of a detail sheet so the map and the request queue stay one
+  /// workflow.
+  final VoidCallback? onOpenRequests;
   final VoidCallback? onOpenUsers;
 
   /// Opens the shell's Messages tab on a conversation with the given user id.
@@ -157,12 +163,7 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
 
   List<BloodRequest> get _visibleRequests {
     final q = _query.trim().toLowerCase();
-    final list = _repo.requests.where((request) {
-      final actionable =
-          request.status == RequestStatus.pendingReview ||
-          request.status == RequestStatus.open ||
-          request.status == RequestStatus.matched;
-      if (!actionable) return false;
+    final list = _repo.staffRequestQueue.where((request) {
       if (_selected != null && request.barangay != _selected) return false;
       if (_bloodType != null && request.bloodType != _bloodType) return false;
       if (q.isEmpty) return true;
@@ -172,17 +173,6 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
           request.barangay.toLowerCase().contains(q) ||
           request.bloodType.label.toLowerCase().contains(q);
     }).toList();
-
-    int rank(BloodRequest r) => switch (r.status) {
-      RequestStatus.pendingReview => 0,
-      RequestStatus.open => 1,
-      RequestStatus.matched => 2,
-      _ => 3,
-    };
-    list.sort((a, b) {
-      final byRank = rank(a).compareTo(rank(b));
-      return byRank != 0 ? byRank : b.createdAt.compareTo(a.createdAt);
-    });
     return list;
   }
 
@@ -864,9 +854,11 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
   Widget _requestCard(BuildContext context, BloodRequest request) {
     return SurfaceCard(
       padding: const EdgeInsets.all(TabangSpace.md),
-      // The whole card opens the request; the separate Details button was
-      // pointing at the same sheet and only crowded the action row.
-      onTap: () => _showRequestDetails(context, request),
+      // Tapping a request hands off to the Requests tab, where the full record
+      // and every action live. The map is a scan-and-jump surface, not a second
+      // request manager with its own copy of the list.
+      onTap:
+          widget.onOpenRequests ?? () => _showRequestDetails(context, request),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -955,6 +947,21 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               // and the requester selects from the people who responded.
             ],
           ),
+          if (widget.onOpenRequests != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.open_in_new, size: 13, color: context.textMuted),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Opens the Requests tab for the full record',
+                    style: TextStyle(fontSize: 11, color: context.textMuted),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1138,6 +1145,16 @@ class _OperationsMapPageState extends State<OperationsMapPage> {
               : request.staffFulfilmentNote ??
                     '${request.id} cannot be fulfilled in its current state.',
         ),
+        duration: const Duration(seconds: 6),
+        action: ok
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _repo.reopenFulfilledRequest(
+                  request.id,
+                  actorId: widget.user.id,
+                ),
+              )
+            : null,
       ),
     );
   }

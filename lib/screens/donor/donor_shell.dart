@@ -111,7 +111,7 @@ class _DonorShellState extends State<DonorShell> {
   static const _destinations = <_Destination>[
     _Destination('Home', Icons.home_outlined, Icons.home),
     _Destination('Blood Bank', Icons.inventory_2_outlined, Icons.inventory_2),
-    _Destination('Find Donor', Icons.map_outlined, Icons.map),
+    _Destination('Community', Icons.map_outlined, Icons.map),
     _Destination('Requests', Icons.campaign_outlined, Icons.campaign),
     _Destination('Messages', Icons.forum_outlined, Icons.forum),
     _Destination(

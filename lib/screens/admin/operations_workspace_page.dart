@@ -43,6 +43,9 @@ class OperationsWorkspacePage extends StatefulWidget {
 class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
   late int _section = widget.initialSection.clamp(0, 2);
 
+  /// Bumped when the map asks to land on the Inventory Requests tab.
+  int _requestsTabToken = 0;
+
   @override
   void didUpdateWidget(OperationsWorkspacePage oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -54,6 +57,15 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
   void _select(int section) {
     if (_section == section) return;
     setState(() => _section = section);
+  }
+
+  /// The map's request card calls this: switch to Inventory and land on its
+  /// Requests tab so staff work the request where the full record lives.
+  void _openRequests() {
+    setState(() {
+      _section = 1;
+      _requestsTabToken++;
+    });
   }
 
   @override
@@ -77,12 +89,14 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
               OperationsMapPage(
                 user: widget.user,
                 embedded: true,
+                onOpenRequests: _openRequests,
                 onOpenUsers: widget.onOpenUsers,
                 onOpenMessages: widget.onOpenMessages,
               ),
               InventoryManagementPage(
                 currentUser: widget.user,
                 embedded: true,
+                openRequestsToken: _requestsTabToken,
               ),
               DriveManagementPage(currentUser: widget.user, embedded: true),
             ],

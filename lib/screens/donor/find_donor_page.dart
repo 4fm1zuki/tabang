@@ -192,18 +192,19 @@ class _FindDonorPageState extends State<FindDonorPage> {
     _donorCounts = _repo.donorCountsByBarangay(bloodType: _bloodType);
   }
 
-  /// Requests the community may see: the district's own donor-network requests
-  /// that still need donors.
+  /// Requests the community may see: the district's own donor-network requests.
   ///
   /// Blood-bank requests are excluded on purpose — the chapter processes those
-  /// itself and they were never offered to the community. The earlier filter
-  /// also demanded `postToDonorNetwork`, which emptied the list and its heat
-  /// because most seeded requests do not carry that flag; the source is what
-  /// decides whether a need belongs on the community map.
+  /// itself and they were never offered to the community. A freshly posted
+  /// request is included straight away, while it is still *Awaiting
+  /// verification*, so the requester sees their own post land in the Requests
+  /// list and the heat map; donors simply cannot respond until staff verify it
+  /// (`acceptsDonorResponses` still requires the open state).
   Iterable<BloodRequest> get _broadcastRequests => _repo.requests.where(
     (request) =>
         request.source == RequestSource.donorNetwork &&
-        (request.status == RequestStatus.open ||
+        (request.status == RequestStatus.pendingReview ||
+            request.status == RequestStatus.open ||
             request.status == RequestStatus.matched),
   );
 
@@ -1013,7 +1014,7 @@ class _FindDonorPageState extends State<FindDonorPage> {
           ? 'Upcoming drives'
           : 'Drives in $_selectedBarangay',
       _ => _selectedBarangay == null
-          ? 'Open requests'
+          ? 'Requests'
           : 'Requests in $_selectedBarangay',
     };
     final count = switch (_paneTab) {
@@ -1164,10 +1165,11 @@ class _FindDonorPageState extends State<FindDonorPage> {
               requests.isEmpty
                   ? EmptyState(
                       art: TabangArt.requests,
-                      title: 'Nothing open',
+                      title: 'No requests yet',
                       message: _selectedBarangay == null
-                          ? 'No request is open for donor responses right now.'
-                          : 'No request is open in '
+                          ? 'Community requests appear here as soon as they are '
+                                'posted to donors.'
+                          : 'No community request in '
                                 '$_selectedBarangay right now.',
                     )
                   : ListView.separated(

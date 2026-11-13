@@ -292,6 +292,12 @@ enum UserRole {
       'Work the request queue and confirm appointments',
       'Moderate chat, warnings and reports',
     ],
+    UserRole.donor => const [
+      'Everything a Community User can do',
+      'Appear in the donor directory while available',
+      'Answer open requests in the community app',
+      'Track eligibility and booked slots in Donor Hub',
+    ],
     _ => const [
       'Request blood for yourself or a patient',
       'Message donors and chapter staff',
@@ -343,6 +349,7 @@ class AppUser {
     this.notifyNews = true,
     this.onboardingCompleted = false,
     this.photoAsset,
+    this.allowedComponents,
   });
 
   final String id;
@@ -397,6 +404,18 @@ class AppUser {
 
   /// Whether the post-registration welcome guide has been shown.
   final bool onboardingCompleted;
+
+  /// Donation types chapter staff allow this donor to give. `null` means no
+  /// restriction — the donor may be considered for any component. When set, a
+  /// component outside the list is reported as
+  /// [EligibilityBlocker.restricted] instead of being matched, even if every
+  /// other rule passes. Staff set this after a screening (for example, a donor
+  /// cleared for red cells only).
+  final List<BloodComponent>? allowedComponents;
+
+  /// Whether [component] is open to this donor, respecting any staff limit.
+  bool allowsComponent(BloodComponent component) =>
+      allowedComponents == null || allowedComponents!.contains(component);
 
   String get initials {
     final parts = fullName.trim().split(RegExp(r'\s+'));
@@ -457,6 +476,8 @@ class AppUser {
     bool? notifyChat,
     bool? notifyNews,
     bool? onboardingCompleted,
+    List<BloodComponent>? allowedComponents,
+    bool clearAllowedComponents = false,
   }) {
     return AppUser(
       id: id,
@@ -488,6 +509,9 @@ class AppUser {
       notifyChat: notifyChat ?? this.notifyChat,
       notifyNews: notifyNews ?? this.notifyNews,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      allowedComponents: clearAllowedComponents
+          ? null
+          : (allowedComponents ?? this.allowedComponents),
     );
   }
 }

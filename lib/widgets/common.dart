@@ -755,6 +755,8 @@ class ProportionBar extends StatelessWidget {
 Tone toneForEligibility(EligibilityResult result) {
   if (result.isEligible) return Tone.success;
   if (result.blocker == EligibilityBlocker.cooldown) return Tone.warning;
+  // A staff limit is a deliberate decision, not a failure state.
+  if (result.blocker == EligibilityBlocker.restricted) return Tone.neutral;
   return Tone.danger;
 }
 

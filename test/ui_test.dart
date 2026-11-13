@@ -13,6 +13,7 @@ import 'package:tabang/screens/donor/chat_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_hub_page.dart';
 import 'package:tabang/screens/donor/find_donor_page.dart';
+import 'package:tabang/screens/shared/about_help_page.dart';
 import 'package:tabang/screens/shared/profile_page.dart';
 import 'package:tabang/theme.dart';
 import 'package:tabang/widgets/chapter_identity.dart';
@@ -920,6 +921,90 @@ void main() {
     expect(find.text('Account standing'), findsOneWidget);
     expect(find.text('2 of 3'), findsOneWidget);
     expect(find.text('What you can do now'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('donor hub locks a staff-restricted donation type', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    // Seeded demo account: limited to red cells and plasma.
+    final juan = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: DonorHubPage(user: juan)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Chapter staff have limited this account'),
+      findsOneWidget,
+    );
+    final locked = tester.widget<FilterChip>(
+      find.widgetWithText(FilterChip, BloodComponent.wholeBlood.label),
+    );
+    expect(
+      locked.onSelected,
+      isNull,
+      reason: 'a restricted type cannot be ticked',
+    );
+    final open = tester.widget<FilterChip>(
+      find.widgetWithText(FilterChip, BloodComponent.packedRbc.label),
+    );
+    expect(open.onSelected, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('about references group the stories and learn articles', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: const Scaffold(body: AboutHelpPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('About'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('References'), findsOneWidget);
+    expect(find.text('Stories'), findsWidgets);
+    expect(find.text('Learn & Prepare'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('permissions card includes the Voluntary Donor column', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final admin = repo.userById('USR-011')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: AdminOverviewPage(user: admin)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Roles & permissions'), findsOneWidget);
+    expect(find.text('Voluntary Donor'), findsWidgets);
+    expect(
+      find.text('Appear in the donor directory while available'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

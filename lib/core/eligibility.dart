@@ -12,7 +12,8 @@ enum EligibilityBlocker {
   unverified('Blood card not verified'),
   unavailable('Marked unavailable'),
   away('Away — no app activity for 30+ days'),
-  noBloodType('Blood type not recorded');
+  noBloodType('Blood type not recorded'),
+  restricted('Restricted by chapter staff');
 
   const EligibilityBlocker(this.label);
   final String label;
@@ -186,6 +187,17 @@ class EligibilityEngine {
       return EligibilityResult(
         isEligible: false,
         blocker: EligibilityBlocker.away,
+        donorType: donor.bloodType,
+      );
+    }
+
+    // A staff-imposed limit wins over the generic cooldown: the donor is
+    // simply not being matched for this component right now, whatever the
+    // interval says.
+    if (component != null && !donor.allowsComponent(component)) {
+      return EligibilityResult(
+        isEligible: false,
+        blocker: EligibilityBlocker.restricted,
         donorType: donor.bloodType,
       );
     }

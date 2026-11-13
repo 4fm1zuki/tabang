@@ -1170,6 +1170,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
               ),
             ),
           ),
+        if (isDonor)
+          OutlinedButton.icon(
+            onPressed: () => _editDonationTypes(context, user),
+            icon: const Icon(Icons.category_outlined, size: 14),
+            label: const Text('Donation types'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: TabangSpace.md,
+                vertical: TabangSpace.sm,
+              ),
+            ),
+          ),
         if (user.status == AccountStatus.unverified)
           ElevatedButton.icon(
             onPressed: () => _repo.verifyUser(user.id),
@@ -1479,6 +1491,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         dialogContext,
                         'Directory',
                         user.isAvailable ? 'Visible' : 'Hidden by donor',
+                      ),
+                      _detailRow(
+                        dialogContext,
+                        'Donation types',
+                        user.allowedComponents == null
+                            ? 'All types allowed'
+                            : user.allowedComponents!
+                                  .map((component) => component.label)
+                                  .join(', '),
                       ),
                       _detailRow(
                         dialogContext,
@@ -1828,6 +1849,97 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 );
               },
               child: const Text('Update window'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Staff decide which components a donor may give. Selecting everything
+  /// clears the limit; the donor's Donor Hub then locks the components that
+  /// were turned off.
+  void _editDonationTypes(BuildContext context, AppUser user) {
+    final current =
+        user.allowedComponents ??
+        List<BloodComponent>.of(BloodComponent.values);
+    final selected = <BloodComponent>{...current};
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Donation types · ${user.alias}'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Choose the components this donor may give. Everything else '
+                  'is shown as unavailable in their Donor Hub eligibility and '
+                  'is excluded from matching.',
+                  style: TextStyle(fontSize: 12.5, height: 1.5),
+                ),
+                const SizedBox(height: TabangSpace.xs),
+                for (final component in BloodComponent.values)
+                  CheckboxListTile(
+                    value: selected.contains(component),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(
+                      component.label,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    onChanged: (on) => setDialogState(() {
+                      if (on == true) {
+                        selected.add(component);
+                      } else if (selected.length > 1) {
+                        // Keep at least one type open: an empty list would
+                        // silently lock the donor out of every donation.
+                        selected.remove(component);
+                      }
+                    }),
+                  ),
+                Text(
+                  selected.length == BloodComponent.values.length
+                      ? 'All types allowed — no staff limit.'
+                      : 'Limited to ${selected.length} of '
+                            '${BloodComponent.values.length} types.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: dialogContext.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final ok = _repo.setDonorComponents(
+                  user.id,
+                  components: selected.toList(),
+                  actorId: widget.currentUser.id,
+                );
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  TabangSnackBar(
+                    content: Text(
+                      ok
+                          ? 'Donation types updated for ${user.alias}.'
+                          : 'Could not update the donation types.',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Save'),
             ),
           ],
         ),

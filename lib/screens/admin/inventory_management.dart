@@ -23,6 +23,7 @@ class InventoryManagementPage extends StatefulWidget {
     super.key,
     required this.currentUser,
     this.embedded = false,
+    this.openRequestsToken = 0,
   });
 
   final AppUser currentUser;
@@ -30,6 +31,11 @@ class InventoryManagementPage extends StatefulWidget {
   /// Embedded inside [OperationsWorkspacePage]: keeps the same tabs and
   /// actions but drops the large duplicate page header.
   final bool embedded;
+
+  /// Bumped by the Operations workspace when something (the map request card)
+  /// asks to land on the Requests tab. A counter rather than a bool so repeated
+  /// requests still switch the tab even when it is already the target.
+  final int openRequestsToken;
 
   @override
   State<InventoryManagementPage> createState() =>
@@ -53,6 +59,14 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   void dispose() {
     _repo.removeListener(_refresh);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(InventoryManagementPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.openRequestsToken != oldWidget.openRequestsToken) {
+      _tab = 1;
+    }
   }
 
   void _refresh() {
@@ -607,7 +621,9 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   }
 
   Widget _buildRequestsTab(BuildContext context) {
-    final requests = _repo.requests;
+    // Same queue and order as the Operations map panel, so the two lists can
+    // never disagree about which requests are open.
+    final requests = _repo.staffRequestQueue;
 
     if (requests.isEmpty) {
       return const EmptyState(
@@ -1061,6 +1077,16 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                     'Request ${request.id} cannot be fulfilled in its current '
                         'state.',
         ),
+        duration: const Duration(seconds: 6),
+        action: ok
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _repo.reopenFulfilledRequest(
+                  request.id,
+                  actorId: widget.currentUser.id,
+                ),
+              )
+            : null,
       ),
     );
   }

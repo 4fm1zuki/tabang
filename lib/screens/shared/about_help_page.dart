@@ -1468,13 +1468,28 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
     // Only photographs need attribution. Avatars, educational artwork and the
     // app icon are original TABANG artwork with no external author, so they are
     // not listed and no file paths are shown to users.
-    final photos = kImageCredits.where((c) => c.kind == 'photo').toList();
+    final photos = kImageCredits
+        .where((c) => c.kind == 'photo')
+        .toList(growable: false);
+
+    // Group the sources so the references for the Stories and Learn & Prepare
+    // articles are readable on their own, not mixed into one long grid.
+    final sections = <String, List<ImageCredit>>{};
+    for (final credit in photos) {
+      sections.putIfAbsent(_creditSection(credit), () => []).add(credit);
+    }
+    final order = [
+      'Stories',
+      'Learn & Prepare',
+      'Blood drives',
+      'Other photos',
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Photo credits',
+          'References',
           style: TextStyle(
             fontSize: 15.5,
             fontWeight: FontWeight.w800,
@@ -1484,31 +1499,56 @@ class _AboutHelpPageState extends State<AboutHelpPage> {
         ),
         const SizedBox(height: 2),
         Text(
-          'Every photograph is bundled locally and credited to its author. '
-          'Tap a credit for the licence and source.',
+          'Sources for the Stories and Learn & Prepare articles and the blood '
+          'drive photos. Every image is bundled locally; tap a credit for the '
+          'full licence and link.',
           style: TextStyle(fontSize: 12.5, color: context.textMuted),
         ),
-        const SizedBox(height: TabangSpace.md),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final columns = constraints.maxWidth > 820 ? 2 : 1;
-            const gap = TabangSpace.md;
-            final width =
-                (constraints.maxWidth - gap * (columns - 1)) / columns;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [
-                for (final credit in photos)
-                  SizedBox(width: width, child: _creditCard(context, credit)),
-              ],
-            );
-          },
-        ),
+        for (final section in order)
+          if (sections.containsKey(section)) ...[
+            const SizedBox(height: TabangSpace.lg),
+            Text(
+              section,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: context.textColor,
+              ),
+            ),
+            const SizedBox(height: TabangSpace.sm),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth > 820 ? 2 : 1;
+                const gap = TabangSpace.md;
+                final width =
+                    (constraints.maxWidth - gap * (columns - 1)) / columns;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    for (final credit in sections[section]!)
+                      SizedBox(
+                        width: width,
+                        child: _creditCard(context, credit),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
         const SizedBox(height: TabangSpace.md),
         const _ResearchGroupCard(),
       ],
     );
+  }
+
+  /// Which reference group a photograph belongs to, from its asset folder.
+  String _creditSection(ImageCredit credit) {
+    final asset = credit.asset;
+    if (asset.contains('Announcements & Stories/')) return 'Stories';
+    if (asset.contains('Learn & Prepare/')) return 'Learn & Prepare';
+    if (asset.contains('Blood Drives/')) return 'Blood drives';
+    return 'Other photos';
   }
 
   Widget _creditCard(BuildContext context, ImageCredit credit) {
@@ -1774,8 +1814,8 @@ class _ResearchGroupCard extends StatelessWidget {
           const SectionLabel('Research group'),
           const SizedBox(height: TabangSpace.xs),
           Text(
-            'College of Computer Studies, Cor Jesu College. '
-            'Alphabetical by surname.',
+            'Grade 12 STEM A & B — Senior High School Computer Studies, '
+            'Cor Jesu College. Alphabetical by surname.',
             style: TextStyle(fontSize: 11.5, color: context.textMuted),
           ),
           const SizedBox(height: TabangSpace.sm),

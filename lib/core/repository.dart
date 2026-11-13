@@ -373,6 +373,27 @@ class TabangRepository {
   List<BloodRequest> get donorNetworkRequests =>
       _requests.where((r) => r.acceptsDonorResponses).toList(growable: false);
 
+  /// The staff request queue, in the order the Operations map panel and the
+  /// Inventory Requests tab both show it.
+  ///
+  /// Requests that still need action come first (awaiting verification, open,
+  /// matched), then the closed records, newest first inside each group. One
+  /// source so the two surfaces can never list different requests.
+  List<BloodRequest> get staffRequestQueue {
+    final list = List<BloodRequest>.of(_requests);
+    int rank(BloodRequest r) => switch (r.status) {
+      RequestStatus.pendingReview => 0,
+      RequestStatus.open => 1,
+      RequestStatus.matched => 2,
+      _ => 3,
+    };
+    list.sort((a, b) {
+      final byRank = rank(a).compareTo(rank(b));
+      return byRank != 0 ? byRank : b.createdAt.compareTo(a.createdAt);
+    });
+    return List.unmodifiable(list);
+  }
+
   List<RequestResponse> responsesFor(String requestId) =>
       _responses.where((r) => r.requestId == requestId).toList(growable: false)
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
@@ -563,6 +584,44 @@ class TabangRepository {
     updateUser(
       user.copyWith(isAvailable: isAvailable, lastActiveAt: DateTime.now()),
     );
+  }
+
+  /// Staff record which donation types a donor may give.
+  ///
+  /// Selecting every component clears the limit (equivalent to "no
+  /// restriction"). An empty list is refused so a donor is never silently
+  /// locked out of everything, and the stored list keeps a stable component
+  /// order so the UI and the audit trail read consistently.
+  bool setDonorComponents(
+    String userId, {
+    required List<BloodComponent> components,
+    required String actorId,
+  }) {
+    final actor = userById(actorId);
+    final user = userById(userId);
+    if (actor == null || user == null) return false;
+    if (!actor.role.canVerifyDonors) return false;
+    if (user.role != UserRole.donor) return false;
+    final unique = components.toSet().toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+    if (unique.isEmpty) return false;
+    final unrestricted = unique.length == BloodComponent.values.length;
+    updateUser(
+      user.copyWith(
+        allowedComponents: unrestricted ? null : unique,
+        clearAllowedComponents: unrestricted,
+      ),
+    );
+    _logActivity(
+      kind: ActivityKind.verification,
+      actorId: actorId,
+      subjectId: userId,
+      summary: unrestricted
+          ? 'Cleared the donation-type limit for ${user.alias}'
+          : 'Limited ${user.alias} to '
+                '${unique.map((component) => component.label).join(', ')}',
+    );
+    return true;
   }
 
   void recordDonation(
@@ -1658,6 +1717,41 @@ class TabangRepository {
       status: RequestStatus.fulfilled,
       unitsFulfilled: request.unitsNeeded,
     );
+    _logActivity(
+      kind: ActivityKind.requestVerified,
+      actorId: actorId,
+      subjectId: request.requesterId,
+      summary: 'Marked request ${request.id} fulfilled',
+    );
+    _notify();
+    return true;
+  }
+
+  /// Reverses a mistaken "mark fulfilled" on a request.
+  ///
+  /// Fulfilment is the one step that closes a request and counts its units, so
+  /// staff need a way back. This returns a donor-network request to Matched or
+  /// a blood-bank request to Open — the states it could be fulfilled from — and
+  /// zeroes the fulfilled units without touching the donor responses.
+  bool reopenFulfilledRequest(String requestId, {required String actorId}) {
+    final request = _firstOrNull(_requests, (r) => r.id == requestId);
+    final actor = userById(actorId);
+    if (request == null || actor == null) return false;
+    if (!actor.role.canFulfillRequests) return false;
+    if (request.status != RequestStatus.fulfilled) return false;
+    final index = _requests.indexWhere((r) => r.id == requestId);
+    _requests[index] = request.copyWith(
+      status: request.source == RequestSource.donorNetwork
+          ? RequestStatus.matched
+          : RequestStatus.open,
+      unitsFulfilled: 0,
+    );
+    _logActivity(
+      kind: ActivityKind.requestVerified,
+      actorId: actorId,
+      subjectId: request.requesterId,
+      summary: 'Reopened fulfilled request ${request.id}',
+    );
     _notify();
     return true;
   }
@@ -2720,6 +2814,13 @@ class TabangRepository {
         lastDonationDate: daysAgo(140),
         totalDonations: 4,
         bloodCardVerified: true,
+        // Demo of the staff donation-type limit: the chapter has closed whole
+        // blood and platelets for Juan, so Donor Hub shows those locked
+        // ("red cells and plasma only") while red cells and plasma stay open.
+        allowedComponents: const [
+          BloodComponent.packedRbc,
+          BloodComponent.plasma,
+        ],
       ),
       AppUser(
         id: 'USR-002',
