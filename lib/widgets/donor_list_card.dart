@@ -85,10 +85,32 @@ class DonorListCard extends StatelessWidget {
                   ],
                 ),
               ),
-              StatusPill(
-                eligibility.isEligible ? 'Eligible' : 'Cooldown',
-                tone: toneForEligibility(eligibility),
-                dense: true,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 156),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    StatusPill(
+                      eligibility.isEligible ? 'Eligible' : 'Cooldown',
+                      tone: toneForEligibility(eligibility),
+                      dense: true,
+                    ),
+                    if (commitmentId != null) ...[
+                      const SizedBox(height: 4),
+                      Tooltip(
+                        message:
+                            'This donor is already selected for another active '
+                            'request. They stay visible, but cannot be reserved '
+                            'for two requests at once.',
+                        child: StatusPill(
+                          'Coordinating · $commitmentId',
+                          tone: Tone.info,
+                          dense: true,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -115,24 +137,8 @@ class DonorListCard extends StatelessWidget {
               ),
             ],
           ),
-          if (commitmentId != null) ...[
-            const SizedBox(height: TabangSpace.sm),
-            Tooltip(
-              message:
-                  'This donor is already selected for another active '
-                  'request. They stay visible, but cannot be reserved for '
-                  'two requests at once.',
-              child: StatusPill(
-                'Coordinating · $commitmentId',
-                tone: Tone.info,
-                dense: true,
-              ),
-            ),
-          ],
           if (actions.isNotEmpty) ...[
             const SizedBox(height: TabangSpace.sm),
-            // The coordinating pill sits on its own line above, so the action
-            // buttons share one row instead of wrapping raggedly around it.
             Wrap(
               spacing: 6,
               runSpacing: 6,

@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tabang/core/eligibility.dart';
 import 'package:tabang/core/image_credits.dart';
 import 'package:tabang/core/models.dart';
 import 'package:tabang/core/repository.dart';
@@ -24,6 +25,7 @@ import 'package:tabang/theme.dart';
 import 'package:tabang/widgets/chapter_identity.dart';
 import 'package:tabang/widgets/common.dart';
 import 'package:tabang/widgets/digos_vector_map.dart';
+import 'package:tabang/widgets/donor_list_card.dart';
 import 'package:tabang/widgets/illustrations.dart';
 import 'package:tabang/widgets/photo.dart';
 import 'package:tabang/widgets/request_document_list.dart';
@@ -760,15 +762,20 @@ void main() {
     expect(find.text('Open requests'), findsOneWidget);
     expect(find.byType(DigosVectorMap), findsOneWidget);
 
-    // The section switch can be folded away for more map/queue height, and the
-    // compact Show sections control brings it back.
+    // The section switch folds away for more map/queue height. The collapsed
+    // state is just a small chevron: it must not leave a "Show sections" label
+    // or any part of the switch behind, and it must bring the tabs back.
     await tester.tap(find.byKey(const ValueKey('hideOperationSections')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('hideOperationSections')), findsNothing);
+    expect(find.text('Show sections'), findsNothing);
+    expect(find.byTooltip('Show section tabs'), findsOneWidget);
+    expect(find.text('Inventory'), findsNothing);
     expect(find.byKey(const ValueKey('showOperationSections')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('showOperationSections')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('hideOperationSections')), findsOneWidget);
+    expect(find.text('Inventory'), findsOneWidget);
 
     await tester.tap(find.text('Inventory'));
     await tester.pumpAndSettle();
@@ -1175,6 +1182,48 @@ void main() {
       expect(rect.center.dx, greaterThan(cardRect.center.dx));
       expect(rect.center.dy, lessThan(cardRect.center.dy));
     }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('donor card keeps the coordinating request in the top right', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(TabangSpace.lg),
+            child: DonorListCard(
+              donor: donor,
+              eligibility: EligibilityEngine.evaluate(donor),
+              commitmentId: 'REQ-003',
+              actions: [
+                TextButton(onPressed: () {}, child: const Text('Message')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = find.byType(DonorListCard);
+    final cardRect = tester.getRect(card);
+    final coordinating = find.text('Coordinating · REQ-003');
+    expect(coordinating, findsOneWidget);
+
+    // The commitment pill sits with the eligibility pill in the header, not
+    // down in the action row, and the narrow card still lays out cleanly.
+    final pillRect = tester.getRect(coordinating);
+    expect(pillRect.center.dx, greaterThan(cardRect.center.dx));
+    expect(pillRect.center.dy, lessThan(cardRect.center.dy));
+    expect(pillRect.bottom, lessThan(tester.getRect(find.text('Message')).top));
     expect(tester.takeException(), isNull);
   });
 

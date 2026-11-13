@@ -45,8 +45,8 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
 
   /// The Map / Inventory / Drives switch takes a full row above the content.
   /// Staff who are staying in one section can fold it away and give the map or
-  /// queue that height back; a compact "Show sections" control remains so the
-  /// switch is never lost.
+  /// queue that height back; a compact chevron remains so the switch is never
+  /// lost.
   bool _sectionsVisible = true;
 
   /// Bumped when the map asks to land on the Inventory Requests tab.
@@ -86,9 +86,9 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
         Padding(
           padding: EdgeInsets.fromLTRB(
             pad.left,
-            pad.top,
+            _sectionsVisible ? pad.top : 2,
             pad.right,
-            TabangSpace.md,
+            _sectionsVisible ? TabangSpace.md : 0,
           ),
           child: AnimatedSize(
             duration: const Duration(milliseconds: 180),
@@ -127,17 +127,19 @@ class _OperationsWorkspacePageState extends State<OperationsWorkspacePage> {
                   )
                 : Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      key: const ValueKey('showOperationSections'),
-                      onPressed: () => setState(() => _sectionsVisible = true),
-                      icon: const Icon(Icons.keyboard_arrow_down, size: 16),
-                      label: const Text('Show sections'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: context.textMuted,
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: TabangSpace.md,
-                          vertical: 4,
+                    child: Tooltip(
+                      message: 'Show section tabs',
+                      child: InkWell(
+                        key: const ValueKey('showOperationSections'),
+                        onTap: () => setState(() => _sectionsVisible = true),
+                        borderRadius: BorderRadius.circular(TabangRadius.xs),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 18,
+                            color: context.textMuted,
+                          ),
                         ),
                       ),
                     ),
