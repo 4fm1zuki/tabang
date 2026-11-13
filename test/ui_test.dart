@@ -12,6 +12,7 @@ import 'package:tabang/screens/admin/inventory_management.dart';
 import 'package:tabang/screens/admin/operations_map_page.dart';
 import 'package:tabang/screens/admin/operations_workspace_page.dart';
 import 'package:tabang/screens/admin/user_management_page.dart';
+import 'package:tabang/screens/donor/blood_bank_page.dart';
 import 'package:tabang/screens/donor/chat_page.dart';
 import 'package:tabang/screens/donor/discover_page.dart';
 import 'package:tabang/screens/donor/donor_hub_page.dart';
@@ -26,6 +27,7 @@ import 'package:tabang/widgets/digos_vector_map.dart';
 import 'package:tabang/widgets/illustrations.dart';
 import 'package:tabang/widgets/photo.dart';
 import 'package:tabang/widgets/request_document_list.dart';
+import 'package:tabang/widgets/tabang_dropdown.dart';
 
 /// Flutter decodes JPEG, PNG and WebP. A download named `.jpg` whose bytes are
 /// actually AVIF (or HEIC) is not an error the loader reports: it silently draws
@@ -1283,6 +1285,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('request filters estimate results for every option', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: RequestsPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Finder inSheet(String text) =>
+        find.descendant(of: find.byType(ListView), matching: find.text(text));
+
+    // The donor serve board holds nine community requests, with no urgency
+    // filter yet: All 9, Critical 2, Urgent 3, Routine 4.
+    await tester.tap(find.text('All urgencies'));
+    await tester.pumpAndSettle();
+    expect(inSheet('9'), findsOneWidget);
+    expect(inSheet('2'), findsOneWidget);
+    expect(inSheet('3'), findsOneWidget);
+    expect(inSheet('4'), findsOneWidget);
+
+    await tester.tap(inSheet('Critical'));
+    await tester.pumpAndSettle();
+
+    // The state dropdown ignores its own value and counts inside Critical:
+    // All 2, Open 2, and zero for every closed or unverified state.
+    await tester.tap(find.text('Any state'));
+    await tester.pumpAndSettle();
+    expect(inSheet('2'), findsNWidgets(2));
+    expect(inSheet('0'), findsNWidgets(5));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('inventory tabs each carry filters', (tester) async {
     tester.view.physicalSize = const Size(1280, 1200);
     tester.view.devicePixelRatio = 1;
@@ -1324,6 +1366,68 @@ void main() {
     await tester.tap(find.text('Removed units'));
     await tester.pumpAndSettle();
     expect(find.text('Ledger state'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('every filter dropdown carries a result estimate', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    // The dropdown is generic, so match every instantiation and check the
+    // shared count callback rather than one concrete type.
+    void expectCounts() {
+      final dropdowns = tester
+          .widgetList(find.byWidgetPredicate((w) => w is TabangDropdown))
+          .toList();
+      expect(dropdowns, isNotEmpty);
+      for (final dropdown in dropdowns) {
+        expect((dropdown as dynamic).countFor, isNotNull);
+      }
+    }
+
+    final staff = repo.userById('USR-010')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: InventoryManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expectCounts(); // Blood units: type + status.
+
+    await tester.tap(find.text('Requests'));
+    await tester.pumpAndSettle();
+    expectCounts(); // Requests: type + urgency + status.
+
+    await tester.tap(find.text('Booked slots'));
+    await tester.pumpAndSettle();
+    expectCounts(); // Booked slots: type + slot state.
+
+    await tester.tap(find.text('Removed units'));
+    await tester.pumpAndSettle();
+    expectCounts(); // Removed units: ledger state.
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: UserManagementPage(currentUser: staff)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expectCounts(); // Users: status + role.
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: BloodBankPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expectCounts(); // Blood Bank: type + recipient + component + status.
     expect(tester.takeException(), isNull);
   });
 

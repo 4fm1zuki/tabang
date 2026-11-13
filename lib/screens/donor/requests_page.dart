@@ -162,11 +162,11 @@ class _RequestsPageState extends State<RequestsPage> {
 
   bool get _isDonor => _user.role == UserRole.donor;
 
-  List<BloodRequest> get _visible {
+  List<BloodRequest> get _baseRequests {
     final own = _repo.requests
         .where((r) => r.requesterId == _user.id)
         .toList(growable: false);
-    var list = _isDonor
+    return _isDonor
         ? _donorTab == _DonorRequestsTab.mine
               ? own
               // The serve tab shows the same community requests the map lists,
@@ -183,6 +183,22 @@ class _RequestsPageState extends State<RequestsPage> {
             ...own,
             ..._repo.communityRequests.where((r) => r.requesterId != _user.id),
           ];
+  }
+
+  /// Faceted count: applies the candidate value for one of the two filters
+  /// while keeping the other one at its current setting. Counting the
+  /// dropdown's own current value would make every choice look like the whole
+  /// board.
+  int _requestCount({RequestUrgency? urgency, RequestStatus? status}) {
+    return _baseRequests.where((r) {
+      if (urgency != null && r.urgency != urgency) return false;
+      if (status != null && r.status != status) return false;
+      return true;
+    }).length;
+  }
+
+  List<BloodRequest> get _visible {
+    var list = _baseRequests;
 
     if (_urgencyFilter != null) {
       list = list.where((r) => r.urgency == _urgencyFilter).toList();
@@ -307,6 +323,10 @@ class _RequestsPageState extends State<RequestsPage> {
                               ],
                               onChanged: (v) =>
                                   setState(() => _urgencyFilter = v),
+                              countFor: (value) => _requestCount(
+                                urgency: value,
+                                status: _statusFilter,
+                              ),
                             ),
                             TabangDropdown<RequestStatus?>(
                               initialValue: _statusFilter,
@@ -333,6 +353,10 @@ class _RequestsPageState extends State<RequestsPage> {
                               ],
                               onChanged: (v) =>
                                   setState(() => _statusFilter = v),
+                              countFor: (value) => _requestCount(
+                                urgency: _urgencyFilter,
+                                status: value,
+                              ),
                             ),
                           ],
                         ),

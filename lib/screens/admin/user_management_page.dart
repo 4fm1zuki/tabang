@@ -67,21 +67,33 @@ class _UserManagementPageState extends State<UserManagementPage> {
     if (mounted) setState(() {});
   }
 
+  bool _matchesUser(AppUser user, {AccountStatus? status, UserRole? role}) {
+    if (status != null && user.status != status) return false;
+    if (role != null && user.role != role) return false;
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      final matches =
+          user.fullName.toLowerCase().contains(q) ||
+          user.alias.toLowerCase().contains(q) ||
+          user.email.toLowerCase().contains(q) ||
+          user.barangay.toLowerCase().contains(q);
+      if (!matches) return false;
+    }
+    return true;
+  }
+
+  /// Faceted count: the candidate replaces this dropdown's own filter while
+  /// the other filter and the search term stay applied.
+  int _userCount({AccountStatus? status, UserRole? role}) {
+    return _repo.users
+        .where((u) => _matchesUser(u, status: status, role: role))
+        .length;
+  }
+
   List<AppUser> get _users {
-    return _repo.users.where((u) {
-      if (_statusFilter != null && u.status != _statusFilter) return false;
-      if (_roleFilter != null && u.role != _roleFilter) return false;
-      if (_query.isNotEmpty) {
-        final q = _query.toLowerCase();
-        final matches =
-            u.fullName.toLowerCase().contains(q) ||
-            u.alias.toLowerCase().contains(q) ||
-            u.email.toLowerCase().contains(q) ||
-            u.barangay.toLowerCase().contains(q);
-        if (!matches) return false;
-      }
-      return true;
-    }).toList();
+    return _repo.users
+        .where((u) => _matchesUser(u, status: _statusFilter, role: _roleFilter))
+        .toList();
   }
 
   /// Self-service and privilege escalation guard.
@@ -582,6 +594,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   ),
                 ],
                 onChanged: (v) => setState(() => _statusFilter = v),
+                countFor: (value) =>
+                    _userCount(status: value, role: _roleFilter),
               ),
               TabangDropdown<UserRole?>(
                 initialValue: _roleFilter,
@@ -604,6 +618,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   ),
                 ],
                 onChanged: (v) => setState(() => _roleFilter = v),
+                countFor: (value) =>
+                    _userCount(status: _statusFilter, role: value),
               ),
             ],
           ),

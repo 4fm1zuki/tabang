@@ -37,6 +37,7 @@ class TabangDropdown<T> extends StatefulWidget {
     this.searchHint = 'Search',
     this.emptyLabel = 'No matches',
     this.title,
+    this.countFor,
     // Accepted and ignored so a call site written for the stock control does
     // not have to drop its styling arguments: the panel look is fixed here.
     this.menuMaxHeight,
@@ -80,6 +81,14 @@ class TabangDropdown<T> extends StatefulWidget {
 
   /// Optional heading for the picker sheet.
   final String? title;
+
+  /// Estimated number of results behind each option, given the other active
+  /// filters. Returning null hides the badge for that option.
+  ///
+  /// The count is a facet: the page should ignore this dropdown's own value
+  /// while counting, so the option the user is about to pick still shows how
+  /// many results it would leave.
+  final int? Function(T? value)? countFor;
 
   /// Accepted for call-site compatibility; the panel styling is fixed.
   final double? menuMaxHeight;
@@ -129,6 +138,7 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
         searchThreshold: widget.searchThreshold,
         searchHint: widget.searchHint,
         emptyLabel: widget.emptyLabel,
+        countFor: widget.countFor,
       ),
     );
     if (!mounted) return;
@@ -152,7 +162,10 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
       builder: (field) {
         final current = field.value ?? selected;
         final chosen = widget.items.where((item) => item.value == current);
-        final label = chosen.isEmpty ? null : chosen.first.child;
+        final chosenItem = chosen.isEmpty ? null : chosen.first;
+        final count = chosenItem == null
+            ? null
+            : widget.countFor?.call(current);
         final hasError = field.errorText != null;
         final caption = decoration.labelText;
 
@@ -190,20 +203,38 @@ class _TabangDropdownState<T> extends State<TabangDropdown<T>> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: DefaultTextStyle.merge(
-                        style: (widget.style ?? const TextStyle(fontSize: 13.5))
-                            .copyWith(
-                              color: current == null
-                                  ? context.textMuted
-                                  : context.textColor,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DefaultTextStyle.merge(
+                              style:
+                                  (widget.style ??
+                                          const TextStyle(fontSize: 13.5))
+                                      .copyWith(
+                                        color: current == null
+                                            ? context.textMuted
+                                            : context.textColor,
+                                      ),
+                              child: chosenItem == null
+                                  ? widget.hint ??
+                                        Text(
+                                          decoration.hintText ?? 'Select',
+                                          style: TextStyle(
+                                            color: context.textMuted,
+                                          ),
+                                        )
+                                  : Text(
+                                      _labelOf(chosenItem),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                             ),
-                        child:
-                            label ??
-                            widget.hint ??
-                            Text(
-                              decoration.hintText ?? 'Select',
-                              style: TextStyle(color: context.textMuted),
-                            ),
+                          ),
+                          if (count != null) ...[
+                            const SizedBox(width: 6),
+                            _CountBadge(count),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -254,7 +285,8 @@ class _Picked<T> {
 }
 
 /// The option list: search first (for long lists), then the rows.
-class _Picker<T> extends StatefulWidget {  const _Picker({
+class _Picker<T> extends StatefulWidget {
+  const _Picker({
     required this.items,
     required this.labelOf,
     required this.selected,
@@ -262,6 +294,7 @@ class _Picker<T> extends StatefulWidget {  const _Picker({
     required this.searchThreshold,
     required this.searchHint,
     required this.emptyLabel,
+    this.countFor,
   });
 
   final List<DropdownMenuItem<T>> items;
@@ -271,6 +304,7 @@ class _Picker<T> extends StatefulWidget {  const _Picker({
   final int searchThreshold;
   final String searchHint;
   final String emptyLabel;
+  final int? Function(T? value)? countFor;
 
   @override
   State<_Picker<T>> createState() => _PickerState<T>();
@@ -293,7 +327,9 @@ class _PickerState<T> extends State<_Picker<T>> {
     final items = query.isEmpty
         ? widget.items
         : widget.items
-              .where((item) => widget.labelOf(item).toLowerCase().contains(query))
+              .where(
+                (item) => widget.labelOf(item).toLowerCase().contains(query),
+              )
               .toList();
 
     return SafeArea(
@@ -355,6 +391,7 @@ class _PickerState<T> extends State<_Picker<T>> {
                         itemBuilder: (context, index) {
                           final item = items[index];
                           final isSelected = item.value == widget.selected;
+                          final count = widget.countFor?.call(item.value);
                           return InkWell(
                             onTap: () =>
                                 Navigator.pop(context, _Picked<T>(item.value)),
@@ -378,17 +415,27 @@ class _PickerState<T> extends State<_Picker<T>> {
                                   ),
                                 ),
                               ),
-                              child: DefaultTextStyle.merge(
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                  color: isSelected
-                                      ? TabangColors.crimson
-                                      : context.textColor,
-                                ),
-                                child: item.child,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: DefaultTextStyle.merge(
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
+                                        color: isSelected
+                                            ? TabangColors.crimson
+                                            : context.textColor,
+                                      ),
+                                      child: item.child,
+                                    ),
+                                  ),
+                                  if (count != null) ...[
+                                    const SizedBox(width: TabangSpace.sm),
+                                    _CountBadge(count, selected: isSelected),
+                                  ],
+                                ],
                               ),
                             ),
                           );
@@ -396,6 +443,52 @@ class _PickerState<T> extends State<_Picker<T>> {
                       ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The result estimate beside a dropdown option.
+///
+/// It is deliberately quiet — a small pill in the muted palette — so the
+/// labels stay the thing being scanned, and it is announced to screen readers
+/// with the unit ("3 results") the bare number would lose.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge(this.count, {this.selected = false});
+
+  final int count;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? TabangColors.crimson : context.textMuted;
+    return Semantics(
+      label: '$count result${count == 1 ? '' : 's'}',
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? TabangColors.crimson.withValues(alpha: 0.10)
+              : context.surfaceAlt,
+          borderRadius: BorderRadius.circular(TabangRadius.pill),
+          border: Border.all(
+            color: selected
+                ? TabangColors.crimson.withValues(alpha: 0.28)
+                : context.border,
+          ),
+        ),
+        child: ExcludeSemantics(
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
           ),
         ),
       ),

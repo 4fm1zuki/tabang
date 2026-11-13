@@ -81,32 +81,73 @@ class _BloodBankPageState extends State<BloodBankPage> {
 
   bool get _canRequest => widget.user.role.canRequestBlood;
 
+  bool _matchesUnit(
+    BloodUnit unit, {
+    required DateTime now,
+    BloodType? unitType,
+    BloodType? recipientType,
+    BloodComponent? component,
+    UnitStatus? status,
+  }) {
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      final matches =
+          unit.barcode.toLowerCase().contains(q) ||
+          unit.product.toLowerCase().contains(q) ||
+          unit.storageBay.toLowerCase().contains(q);
+      if (!matches) return false;
+    }
+    if (unitType != null && unit.bloodType != unitType) return false;
+    if (component != null && unit.component != component) return false;
+    if (status != null && unit.effectiveStatus(now) != status) return false;
+    if (recipientType != null &&
+        !Compatibility.canDonateComponentTo(
+          unit.bloodType,
+          recipientType,
+          unit.component,
+        )) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Faceted count: the candidate replaces this dropdown's own filter while
+  /// the other filters and the search term stay applied.
+  int _unitCount({
+    BloodType? unitType,
+    BloodType? recipientType,
+    BloodComponent? component,
+    UnitStatus? status,
+  }) {
+    final now = DateTime.now();
+    return _repo.units
+        .where(
+          (unit) => _matchesUnit(
+            unit,
+            now: now,
+            unitType: unitType,
+            recipientType: recipientType,
+            component: component,
+            status: status,
+          ),
+        )
+        .length;
+  }
+
   List<BloodUnit> get _filtered {
     final now = DateTime.now();
-    return _repo.units.where((unit) {
-      if (_query.isNotEmpty) {
-        final q = _query.toLowerCase();
-        final matches =
-            unit.barcode.toLowerCase().contains(q) ||
-            unit.product.toLowerCase().contains(q) ||
-            unit.storageBay.toLowerCase().contains(q);
-        if (!matches) return false;
-      }
-      if (_unitType != null && unit.bloodType != _unitType) return false;
-      if (_component != null && unit.component != _component) return false;
-      if (_status != null && unit.effectiveStatus(now) != _status) {
-        return false;
-      }
-      if (_recipientType != null &&
-          !Compatibility.canDonateComponentTo(
-            unit.bloodType,
-            _recipientType!,
-            unit.component,
-          )) {
-        return false;
-      }
-      return true;
-    }).toList();
+    return _repo.units
+        .where(
+          (unit) => _matchesUnit(
+            unit,
+            now: now,
+            unitType: _unitType,
+            recipientType: _recipientType,
+            component: _component,
+            status: _status,
+          ),
+        )
+        .toList();
   }
 
   @override
@@ -620,6 +661,12 @@ class _BloodBankPageState extends State<BloodBankPage> {
             ),
           ],
           onChanged: (v) => setState(() => _unitType = v),
+          countFor: (value) => _unitCount(
+            unitType: value,
+            recipientType: _recipientType,
+            component: _component,
+            status: _status,
+          ),
         ),
         _dropdown<BloodType?>(
           context,
@@ -638,6 +685,12 @@ class _BloodBankPageState extends State<BloodBankPage> {
             ),
           ],
           onChanged: (v) => setState(() => _recipientType = v),
+          countFor: (value) => _unitCount(
+            unitType: _unitType,
+            recipientType: value,
+            component: _component,
+            status: _status,
+          ),
         ),
         _dropdown<BloodComponent?>(
           context,
@@ -656,6 +709,12 @@ class _BloodBankPageState extends State<BloodBankPage> {
             ),
           ],
           onChanged: (v) => setState(() => _component = v),
+          countFor: (value) => _unitCount(
+            unitType: _unitType,
+            recipientType: _recipientType,
+            component: value,
+            status: _status,
+          ),
         ),
         _dropdown<UnitStatus?>(
           context,
@@ -672,6 +731,12 @@ class _BloodBankPageState extends State<BloodBankPage> {
             ),
           ],
           onChanged: (v) => setState(() => _status = v),
+          countFor: (value) => _unitCount(
+            unitType: _unitType,
+            recipientType: _recipientType,
+            component: _component,
+            status: value,
+          ),
         ),
       ],
     );
@@ -683,6 +748,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
     required T value,
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
+    int? Function(T? value)? countFor,
   }) {
     return TabangDropdown<T>(
       initialValue: value,
@@ -691,6 +757,7 @@ class _BloodBankPageState extends State<BloodBankPage> {
       style: TextStyle(fontSize: 12.5, color: context.textColor),
       items: items,
       onChanged: onChanged,
+      countFor: countFor,
     );
   }
 

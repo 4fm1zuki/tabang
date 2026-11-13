@@ -5,7 +5,8 @@ import 'package:tabang/widgets/tabang_dropdown.dart';
 
 void main() {
   List<DropdownMenuItem<String>> items(List<String> values) => [
-    for (final value in values) DropdownMenuItem(value: value, child: Text(value)),
+    for (final value in values)
+      DropdownMenuItem(value: value, child: Text(value)),
   ];
 
   testWidgets('opens, shows a search box for long lists, and selects', (
@@ -109,10 +110,7 @@ void main() {
           body: TabangDropdown<String?>(
             initialValue: 'Open',
             items: const [
-              DropdownMenuItem<String?>(
-                value: null,
-                child: Text('All states'),
-              ),
+              DropdownMenuItem<String?>(value: null, child: Text('All states')),
               DropdownMenuItem<String?>(value: 'Open', child: Text('Open')),
             ],
             decoration: const InputDecoration(labelText: 'State'),
@@ -148,10 +146,7 @@ void main() {
           body: TabangDropdown<String?>(
             initialValue: 'Open',
             items: const [
-              DropdownMenuItem<String?>(
-                value: null,
-                child: Text('All states'),
-              ),
+              DropdownMenuItem<String?>(value: null, child: Text('All states')),
               DropdownMenuItem<String?>(value: 'Open', child: Text('Open')),
             ],
             decoration: const InputDecoration(labelText: 'State'),
@@ -169,6 +164,60 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(calls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows a count in the field and beside every option', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 240,
+              child: TabangDropdown<String?>(
+                initialValue: 'Open',
+                items: const [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('All states'),
+                  ),
+                  DropdownMenuItem<String?>(value: 'Open', child: Text('Open')),
+                  DropdownMenuItem<String?>(
+                    value: 'Closed',
+                    child: Text('Closed'),
+                  ),
+                ],
+                countFor: (value) => switch (value) {
+                  null => 9,
+                  'Open' => 4,
+                  'Closed' => 0,
+                  _ => null,
+                },
+                decoration: const InputDecoration(labelText: 'State'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The closed field carries the estimate for the current selection.
+    expect(find.text('Open'), findsOneWidget);
+    expect(find.text('4'), findsOneWidget);
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    Finder inSheet(String text) =>
+        find.descendant(of: find.byType(ListView), matching: find.text(text));
+    // Every row carries its own estimate, including a zero-result choice.
+    expect(inSheet('9'), findsOneWidget);
+    expect(inSheet('4'), findsOneWidget);
+    expect(inSheet('0'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

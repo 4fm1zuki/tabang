@@ -158,6 +158,60 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     return units;
   }
 
+  /// Faceted count for one unit filter: the candidate value replaces that
+  /// facet, while the other active filter still applies.
+  int _unitCount({BloodType? type, UnitStatus? status}) {
+    final now = DateTime.now();
+    return _repo.units.where((u) {
+      if (type != null && u.bloodType != type) return false;
+      if (status != null && u.effectiveStatus(now) != status) return false;
+      return true;
+    }).length;
+  }
+
+  /// Faceted count for the Requests tab filters.
+  int _requestCount({
+    BloodType? type,
+    RequestStatus? status,
+    RequestUrgency? urgency,
+  }) {
+    return _repo.staffRequestQueue.where((r) {
+      if (type != null && r.bloodType != type) return false;
+      if (status != null && r.status != status) return false;
+      if (urgency != null && r.urgency != urgency) return false;
+      return true;
+    }).length;
+  }
+
+  /// Whether a booked slot belongs to one of the slot-state buckets.
+  bool _matchesSlotFilter(BloodRequest request, _SlotFilter filter) {
+    switch (filter) {
+      case _SlotFilter.all:
+        return true;
+      case _SlotFilter.awaiting:
+        return request.isAwaitingReview;
+      case _SlotFilter.confirmed:
+        return !request.isAwaitingReview &&
+            request.status != RequestStatus.fulfilled;
+      case _SlotFilter.fulfilled:
+        return request.status == RequestStatus.fulfilled;
+    }
+  }
+
+  /// Faceted count for the Booked slots filters.
+  int _slotCount({BloodType? type, required _SlotFilter state}) {
+    return _repo.scheduledRequests.where((r) {
+      if (type != null && r.bloodType != type) return false;
+      return _matchesSlotFilter(r, state);
+    }).length;
+  }
+
+  int _removedCount(bool? restored) {
+    return _repo.removedUnits
+        .where((record) => restored == null || record.restored == restored)
+        .length;
+  }
+
   @override
   Widget build(BuildContext context) {
     final pad = context.pagePadding;
@@ -323,6 +377,8 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 ),
               ],
               onChanged: (v) => setState(() => _typeFilter = v),
+              countFor: (value) =>
+                  _unitCount(type: value, status: _statusFilter),
             ),
             TabangDropdown<UnitStatus?>(
               initialValue: _statusFilter,
@@ -345,6 +401,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 ),
               ],
               onChanged: (v) => setState(() => _statusFilter = v),
+              countFor: (value) => _unitCount(type: _typeFilter, status: value),
             ),
           ],
         ),
@@ -730,6 +787,11 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               label: 'Blood type',
               value: _requestTypeFilter,
               onChanged: (v) => setState(() => _requestTypeFilter = v),
+              countFor: (value) => _requestCount(
+                type: value,
+                status: _requestStatusFilter,
+                urgency: _requestUrgencyFilter,
+              ),
             ),
             TabangDropdown<RequestUrgency?>(
               initialValue: _requestUrgencyFilter,
@@ -752,6 +814,11 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 ),
               ],
               onChanged: (v) => setState(() => _requestUrgencyFilter = v),
+              countFor: (value) => _requestCount(
+                type: _requestTypeFilter,
+                status: _requestStatusFilter,
+                urgency: value,
+              ),
             ),
             TabangDropdown<RequestStatus?>(
               initialValue: _requestStatusFilter,
@@ -774,6 +841,11 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 ),
               ],
               onChanged: (v) => setState(() => _requestStatusFilter = v),
+              countFor: (value) => _requestCount(
+                type: _requestTypeFilter,
+                status: value,
+                urgency: _requestUrgencyFilter,
+              ),
             ),
           ],
         ),
@@ -811,6 +883,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
     required String label,
     required BloodType? value,
     required ValueChanged<BloodType?> onChanged,
+    int? Function(BloodType? value)? countFor,
   }) {
     return TabangDropdown<BloodType?>(
       initialValue: value,
@@ -827,6 +900,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
         ),
       ],
       onChanged: onChanged,
+      countFor: countFor,
     );
   }
 
@@ -1228,6 +1302,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
                 DropdownMenuItem<bool?>(value: true, child: Text('Restored')),
               ],
               onChanged: (v) => setState(() => _removedRestoredFilter = v),
+              countFor: (value) => _removedCount(value),
             ),
           ],
         ),
@@ -1357,19 +1432,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           if (_slotTypeFilter != null && r.bloodType != _slotTypeFilter) {
             return false;
           }
-          switch (_slotFilter) {
-            case _SlotFilter.all:
-              break;
-            case _SlotFilter.awaiting:
-              if (!r.isAwaitingReview) return false;
-            case _SlotFilter.confirmed:
-              if (r.isAwaitingReview || r.status == RequestStatus.fulfilled) {
-                return false;
-              }
-            case _SlotFilter.fulfilled:
-              if (r.status != RequestStatus.fulfilled) return false;
-          }
-          return true;
+          return _matchesSlotFilter(r, _slotFilter);
         })
         .toList(growable: false);
     final pending = all.where((r) => r.isAwaitingReview).length;
@@ -1385,6 +1448,7 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               label: 'Blood type',
               value: _slotTypeFilter,
               onChanged: (v) => setState(() => _slotTypeFilter = v),
+              countFor: (value) => _slotCount(type: value, state: _slotFilter),
             ),
             TabangDropdown<_SlotFilter>(
               initialValue: _slotFilter,
@@ -1403,6 +1467,10 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               ],
               onChanged: (v) =>
                   setState(() => _slotFilter = v ?? _SlotFilter.all),
+              countFor: (value) => _slotCount(
+                type: _slotTypeFilter,
+                state: value ?? _SlotFilter.all,
+              ),
             ),
           ],
         ),
