@@ -6,8 +6,8 @@
     "description": "A centralized donor-management and blood-request research prototype for Digos City, Davao del Sur.",
     "institution": "Cor Jesu College, Inc.",
     "status": "base research prototype; simulated data; no live backend",
-    "release": "v2.0.0",
-    "release_commit": "c54125c"
+    "release": "v2.1.0",
+    "release_commit": ""
   },
   "stack": {
     "framework": "Flutter 3.47.5",
@@ -573,6 +573,7 @@
     ],
     "request": [
       "starts pending review",
+      "unverified submission is private to requester/staff; community board only shows verified open/matched",
       "3 required documents",
       "slot inside published blood-bank hours",
       "staff verify/reject",
@@ -703,14 +704,14 @@
     "starter_status": "DDL is a starter; not executed against Supabase; some RPC bodies remain TODO"
   },
   "quality": {
-    "tests": 210,
+    "tests": 213,
     "analyze": "clean at last check",
     "release_assets": [
-      "TABANG-2.0.0-universal.apk",
-      "TABANG-2.0.0-arm64-v8a.apk",
-      "TABANG-2.0.0-armeabi-v7a.apk",
-      "TABANG-2.0.0-x86_64.apk",
-      "TABANG-2.0.0-web.zip",
+      "TABANG-2.1.0-universal.apk",
+      "TABANG-2.1.0-arm64-v8a.apk",
+      "TABANG-2.1.0-armeabi-v7a.apk",
+      "TABANG-2.1.0-x86_64.apk",
+      "TABANG-2.1.0-web.zip",
       "SHA256SUMS.txt"
     ]
   },
@@ -729,6 +730,8 @@
     "do not add Firebase",
     "do not use service_role in client",
     "do not expose PII",
+    "do not expose unverified requests or their documents",
+    "do not expose clinical notes on public request cards",
     "do not use length+1 IDs",
     "do not split multi-row workflows across client writes",
     "do not subscribe public screens to base tables with PII",

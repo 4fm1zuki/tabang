@@ -373,18 +373,19 @@ class TabangRepository {
   List<BloodRequest> get donorNetworkRequests =>
       _requests.where((r) => r.acceptsDonorResponses).toList(growable: false);
 
-  /// Every request the community can see: donor-network requests that are
-  /// awaiting verification, open or matched, ordered by priority.
+  /// Every request the community can see: donor-network requests that chapter
+  /// staff have verified (open or matched), ordered by priority.
   ///
-  /// Blood-bank requests are handled by the chapter and are never broadcast, so
-  /// they are excluded. This single list backs both the community map's request
-  /// list and the Requests board, so the two can never show different counts.
+  /// Blood-bank requests are handled by the chapter and are never broadcast, and
+  /// an unverified submission stays private to the requester and staff: its
+  /// documents, notes and even its existence are not exposed to the community
+  /// board or map. This single list backs both the community map's request list
+  /// and the Requests board, so the two can never show different counts.
   List<BloodRequest> get communityRequests => prioritizedRequests(
     _requests.where(
       (request) =>
           request.source == RequestSource.donorNetwork &&
-          (request.status == RequestStatus.pendingReview ||
-              request.status == RequestStatus.open ||
+          (request.status == RequestStatus.open ||
               request.status == RequestStatus.matched),
     ),
   );

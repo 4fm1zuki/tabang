@@ -63,10 +63,11 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
   Widget build(BuildContext context) {
     final pad = context.pagePadding;
     final pending = _repo.pendingDrives;
-    final scheduled = _repo.allDrives
-        .where((d) => d.approval == DriveApproval.approved)
-        .toList()
-      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    final scheduled =
+        _repo.allDrives
+            .where((d) => d.approval == DriveApproval.approved)
+            .toList()
+          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
     final cancelled = _repo.cancelledDrives;
     final rejected = _repo.allDrives
         .where((d) => d.approval == DriveApproval.rejected)
@@ -92,6 +93,16 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
                     icon: const Icon(Icons.add, size: 15),
                     label: const Text('Add drive'),
                   ),
+                const HelpTip(
+                  title: 'Drive approval',
+                  message:
+                      'Staff propose a drive; it stays Awaiting approval until '
+                      'an admin approves it. Only approved drives reach the '
+                      'donor Home page, drive list and map pins.\n\n'
+                      'An admin can reject a proposal with a reason, or cancel '
+                      'an approved drive if the venue falls through. Rejected '
+                      'and cancelled drives stay here so they can be restored.',
+                ),
               ],
             )
           else
@@ -110,6 +121,17 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
                     icon: const Icon(Icons.add, size: 15),
                     label: const Text('Add drive'),
                   ),
+                const SizedBox(width: TabangSpace.sm),
+                const HelpTip(
+                  title: 'Drive approval',
+                  message:
+                      'Staff propose a drive; it stays Awaiting approval until '
+                      'an admin approves it. Only approved drives reach the '
+                      'donor Home page, drive list and map pins.\n\n'
+                      'An admin can reject a proposal with a reason, or cancel '
+                      'an approved drive if the venue falls through. Rejected '
+                      'and cancelled drives stay here so they can be restored.',
+                ),
               ],
             ),
           const SizedBox(height: TabangSpace.lg),
@@ -125,7 +147,8 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
             const EmptyState(
               art: TabangArt.inventory,
               title: 'No drives scheduled',
-              message: 'Approved drives appear here and on the donor Home page.',
+              message:
+                  'Approved drives appear here and on the donor Home page.',
             )
           else
             for (final drive in scheduled) _scheduledCard(context, drive),
@@ -167,7 +190,11 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
             Row(
               children: [
                 Expanded(child: _driveTitle(context, drive)),
-                StatusPill(drive.approval.label, tone: Tone.warning, dense: true),
+                StatusPill(
+                  drive.approval.label,
+                  tone: Tone.warning,
+                  dense: true,
+                ),
               ],
             ),
             _driveFacts(context, drive),
@@ -357,7 +384,9 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
     );
     _report(
       context,
-      approved ? '${drive.title} is scheduled.' : 'That drive is no longer pending.',
+      approved
+          ? '${drive.title} is scheduled.'
+          : 'That drive is no longer pending.',
       undo: approved
           ? () => _repo.undoDriveApproval(
               drive.id,
@@ -414,7 +443,9 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
     );
     _report(
       context,
-      rejected ? '${drive.title} was rejected.' : 'That drive is no longer pending.',
+      rejected
+          ? '${drive.title} was rejected.'
+          : 'That drive is no longer pending.',
       undo: rejected
           ? () => _repo.undoDriveRejection(
               drive.id,
@@ -442,7 +473,9 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
     );
     _report(
       context,
-      cancelled ? '${drive.title} was cancelled.' : 'That drive is not scheduled.',
+      cancelled
+          ? '${drive.title} was cancelled.'
+          : 'That drive is not scheduled.',
       undo: cancelled
           ? () => _repo.undoDriveCancellation(
               drive.id,
@@ -507,7 +540,9 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
                 onPressed: () {
                   undo();
                   if (undone != null) {
-                    messenger.showSnackBar(TabangSnackBar(content: Text(undone)));
+                    messenger.showSnackBar(
+                      TabangSnackBar(content: Text(undone)),
+                    );
                   }
                 },
               ),
@@ -536,8 +571,10 @@ class _DriveManagementPageState extends State<DriveManagementPage> {
           _report(
             context,
             '${drive.title} was sent for approval.',
-            undo: () =>
-                _repo.withdrawDriveProposal(drive.id, actorId: widget.currentUser.id),
+            undo: () => _repo.withdrawDriveProposal(
+              drive.id,
+              actorId: widget.currentUser.id,
+            ),
             undone: 'Proposal withdrawn.',
           );
           return true;
@@ -757,7 +794,9 @@ class _AddDriveDialogState extends State<_AddDriveDialog> {
                             context: context,
                             initialTime: _startTime,
                           );
-                          if (picked != null) setState(() => _startTime = picked);
+                          if (picked != null) {
+                            setState(() => _startTime = picked);
+                          }
                         },
                       ),
                     ),
@@ -959,10 +998,7 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
                         : _barangay == null
                         ? 'Pinned — that point is outside a barangay.'
                         : 'Pinned in $_barangay.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: context.textColor,
-                    ),
+                    style: TextStyle(fontSize: 12.5, color: context.textColor),
                   ),
                 ),
               ],
@@ -978,10 +1014,7 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
         FilledButton(
           onPressed: _pin == null
               ? null
-              : () => Navigator.pop(
-                  context,
-                  _PickResult(_pin!, _barangay),
-                ),
+              : () => Navigator.pop(context, _PickResult(_pin!, _barangay)),
           child: const Text('Use this location'),
         ),
       ],

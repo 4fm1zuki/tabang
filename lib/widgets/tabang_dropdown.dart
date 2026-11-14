@@ -14,7 +14,8 @@ import '../theme.dart';
 /// * a rounded, shadowed panel with the options;
 /// * the selected row carries a crimson bar and bold text;
 /// * a search box appears once the list passes [searchThreshold] items, which
-///   the barangay and moderation-keyword lists need.
+///   the barangay and moderation-keyword lists need. Small enum lists such as
+///   blood type, component, urgency and request state stay search-free.
 ///
 /// The options open in a sheet rather than an inline overlay: it keeps its
 /// place on a phone keyboard, needs no anchor maths, and behaves identically on
@@ -33,7 +34,7 @@ class TabangDropdown<T> extends StatefulWidget {
     this.isDense,
     this.hint,
     this.autovalidateMode,
-    this.searchThreshold = 8,
+    this.searchThreshold = 12,
     this.searchHint = 'Search',
     this.emptyLabel = 'No matches',
     this.title,
@@ -363,7 +364,7 @@ class _PickerState<T> extends State<_Picker<T>> {
                   padding: const EdgeInsets.only(bottom: TabangSpace.sm),
                   child: TextField(
                     controller: _search,
-                    autofocus: true,
+                    autofocus: false,
                     onChanged: (value) => setState(() => _query = value),
                     style: const TextStyle(fontSize: 13.5),
                     decoration: InputDecoration(

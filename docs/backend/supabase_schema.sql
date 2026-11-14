@@ -912,7 +912,10 @@ begin
          units_fulfilled, hospital, barangay, urgency, status, source,
          scheduled_for, post_to_donor_network, created_at, updated_at
   from public.requests
-  where id = p_request and deleted_at is null
+  where id = p_request
+    and deleted_at is null
+    and source = 'donor_network'
+    and status in ('open','matched')
   on conflict (id) do update set
     legacy_id = excluded.legacy_id,
     patient_alias = excluded.patient_alias,
@@ -933,7 +936,10 @@ begin
   where p.id = p_request
     and not exists (
       select 1 from public.requests r
-      where r.id = p_request and r.deleted_at is null
+      where r.id = p_request
+        and r.deleted_at is null
+        and r.source = 'donor_network'
+        and r.status in ('open','matched')
     );
 end;
 $$;

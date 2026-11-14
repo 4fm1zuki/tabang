@@ -198,10 +198,9 @@ class _FindDonorPageState extends State<FindDonorPage> {
   /// Requests the community may see, straight from the shared repository list
   /// so the map matches the Requests board exactly.
   ///
-  /// Blood-bank requests are excluded there; a freshly posted request is
-  /// included while it is still *Awaiting verification*, and donors simply
-  /// cannot respond until staff verify it (`acceptsDonorResponses` still
-  /// requires the open state).
+  /// Community requests are only the donor-network requests chapter staff have
+  /// verified. A freshly posted submission stays private to its requester and
+  /// staff until verification; once open, compatible donors can respond.
   Iterable<BloodRequest> get _broadcastRequests => _repo.communityRequests;
 
   /// Broadcast requests per barangay: the community's request heat layer.

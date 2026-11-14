@@ -172,6 +172,21 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                           tone: flaggedTotal > 0 ? Tone.danger : Tone.success,
                           dense: true,
                         ),
+                        const SizedBox(width: 2),
+                        const HelpTip(
+                          title: 'Moderation console',
+                          message:
+                              'Flags come from the keyword lists, not a hidden '
+                              'AI judgement. Open a thread to see which phrase '
+                              'matched, then clear the flag or escalate it to '
+                              'a formal warning.\n\n'
+                              'User reports carry the reporter\'s explanation. '
+                              'Resolving a report records the outcome for both '
+                              'sides; suspending removes the account from the '
+                              'donor directory until it is reinstated.\n\n'
+                              'Warnings are capped at three. Muting a thread '
+                              'stops new messages without deleting history.',
+                        ),
                       ],
                     ),
                     const SizedBox(height: TabangSpace.sm),
@@ -589,6 +604,21 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                     '$flaggedTotal flagged',
                     tone: flaggedTotal > 0 ? Tone.danger : Tone.success,
                     dense: true,
+                  ),
+                  const SizedBox(width: 2),
+                  const HelpTip(
+                    title: 'Moderation console',
+                    message:
+                        'Flags come from the keyword lists, not a hidden AI '
+                        'judgement. Open a thread to see which phrase matched, '
+                        'then clear the flag or escalate it to a formal '
+                        'warning.\n\n'
+                        'User reports carry the reporter\'s explanation. '
+                        'Resolving a report records the outcome for both '
+                        'sides; suspending removes the account from the donor '
+                        'directory until it is reinstated.\n\n'
+                        'Warnings are capped at three. Muting a thread stops '
+                        'new messages without deleting history.',
                   ),
                 ],
               ),
@@ -1216,8 +1246,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                 Wrap(
                                   spacing: TabangSpace.sm,
                                   runSpacing: 4,
-                                  crossAxisAlignment:
-                                      WrapCrossAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     FilledButton.tonal(
                                       onPressed: () {
@@ -1235,8 +1264,7 @@ class _ChatModerationPageState extends State<ChatModerationPage> {
                                       child: const Text('Resolve'),
                                     ),
                                     TextButton.icon(
-                                      onPressed: () =>
-                                          _escalateReport(report),
+                                      onPressed: () => _escalateReport(report),
                                       icon: const Icon(
                                         Icons.report_gmailerrorred_outlined,
                                         size: 16,

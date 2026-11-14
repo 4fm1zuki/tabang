@@ -2,7 +2,7 @@ name: tabang
 description: "TABANG - Transfusion Access, Blood Availability and Network Guidance. A centralized donor management system for Digos City."
 publish_to: 'none'
 
-version: 2.0.0+2
+version: 2.1.0+3
 
 environment:
   sdk: ^3.13.0

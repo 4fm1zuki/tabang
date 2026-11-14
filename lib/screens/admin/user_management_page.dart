@@ -572,6 +572,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       ),
               ),
             ),
+            trailing: const HelpTip(
+              title: 'User filters',
+              message:
+                  'Search matches the account name, public alias, email or '
+                  'barangay.\n\n'
+                  'Status separates unverified, verified, warned and suspended '
+                  'accounts. Role separates community users, donors, recipients, '
+                  'staff and admins.\n\n'
+                  'Counts beside each option show how many accounts match the '
+                  'other active filter.',
+            ),
             filters: [
               TabangDropdown<AccountStatus?>(
                 initialValue: _statusFilter,

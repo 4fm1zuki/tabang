@@ -61,7 +61,9 @@ class _RequestsPageState extends State<RequestsPage> {
   RequestUrgency? _urgencyFilter;
 
   /// Lifecycle filter: All, Awaiting verification, Open or Matched. The board
-  /// now lists every community request, so staff and donors need to narrow it.
+  /// lists verified community requests; a user's own unverified submissions
+  /// stay in Mine, and staff review them in Operations. The filter still lets
+  /// the requester narrow their own records.
   RequestStatus? _statusFilter;
 
   /// Donors get three tabs: requests they can serve, requests they posted
@@ -288,106 +290,93 @@ class _RequestsPageState extends State<RequestsPage> {
                 const SizedBox(height: TabangSpace.lg),
 
                 // Dropdown filters, matching the staff Inventory filter bars.
-                // One guide button sits at the end of the row and explains
+                // One guide button sits at the end of the toolbar and explains
                 // both controls; two separate tips floated above the filters
                 // and broke the toolbar rhythm.
                 if (!_isDonor || _donorTab != _DonorRequestsTab.donate)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: TabangFilterBar(
-                          filters: [
-                            TabangDropdown<RequestUrgency?>(
-                              initialValue: _urgencyFilter,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Urgency',
-                                isDense: true,
-                              ),
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: context.textColor,
-                              ),
-                              items: [
-                                const DropdownMenuItem<RequestUrgency?>(
-                                  value: null,
-                                  child: Text('All urgencies'),
-                                ),
-                                ...RequestUrgency.values.map(
-                                  (u) => DropdownMenuItem<RequestUrgency?>(
-                                    value: u,
-                                    child: Text(u.label),
-                                  ),
-                                ),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _urgencyFilter = v),
-                              countFor: (value) => _requestCount(
-                                urgency: value,
-                                status: _statusFilter,
-                              ),
+                  TabangFilterBar(
+                    trailing: const HelpTip(
+                      title: 'Urgency & request states',
+                      message:
+                          'Urgency\n'
+                          'Critical — the patient needs units now; the '
+                          'request is released as soon as a compatible unit '
+                          'or donor is confirmed (minutes to a few hours).\n\n'
+                          'Urgent — needed within 24–48 hours; the chapter '
+                          'schedules the next available slot or drive.\n\n'
+                          'Routine — planned use (for example before '
+                          'surgery), usually three or more days out.\n\n'
+                          'Urgency is chosen when the request is posted and '
+                          'chapter staff can adjust it.\n\n'
+                          'Request states\n'
+                          'Awaiting verification — posted, but chapter staff '
+                          'have not checked the documents and booked slot '
+                          'yet; donors cannot respond until it is verified.\n\n'
+                          'Open — verified and broadcast to the donor '
+                          'network; compatible donors can respond.\n\n'
+                          'Matched — the requester has chosen donor(s); the '
+                          'chapter records the donation and marks it '
+                          'fulfilled.\n\n'
+                          'Fulfilled, Rejected and Cancelled are the closed '
+                          'records.',
+                    ),
+                    filters: [
+                      TabangDropdown<RequestUrgency?>(
+                        initialValue: _urgencyFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Urgency',
+                          isDense: true,
+                        ),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: context.textColor,
+                        ),
+                        items: [
+                          const DropdownMenuItem<RequestUrgency?>(
+                            value: null,
+                            child: Text('All urgencies'),
+                          ),
+                          ...RequestUrgency.values.map(
+                            (u) => DropdownMenuItem<RequestUrgency?>(
+                              value: u,
+                              child: Text(u.label),
                             ),
-                            TabangDropdown<RequestStatus?>(
-                              initialValue: _statusFilter,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'State',
-                                isDense: true,
-                              ),
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: context.textColor,
-                              ),
-                              items: [
-                                const DropdownMenuItem<RequestStatus?>(
-                                  value: null,
-                                  child: Text('Any state'),
-                                ),
-                                ...RequestStatus.values.map(
-                                  (s) => DropdownMenuItem<RequestStatus?>(
-                                    value: s,
-                                    child: Text(s.label),
-                                  ),
-                                ),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _statusFilter = v),
-                              countFor: (value) => _requestCount(
-                                urgency: _urgencyFilter,
-                                status: value,
-                              ),
-                            ),
-                          ],
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _urgencyFilter = v),
+                        countFor: (value) => _requestCount(
+                          urgency: value,
+                          status: _statusFilter,
                         ),
                       ),
-                      const SizedBox(width: TabangSpace.sm),
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 2),
-                        child: HelpTip(
-                          title: 'Urgency & request states',
-                          message:
-                              'Urgency\n'
-                              'Critical — the patient needs units now; the '
-                              'request is released as soon as a compatible unit '
-                              'or donor is confirmed (minutes to a few hours).\n\n'
-                              'Urgent — needed within 24–48 hours; the chapter '
-                              'schedules the next available slot or drive.\n\n'
-                              'Routine — planned use (for example before '
-                              'surgery), usually three or more days out.\n\n'
-                              'Urgency is chosen when the request is posted and '
-                              'chapter staff can adjust it.\n\n'
-                              'Request states\n'
-                              'Awaiting verification — posted, but chapter staff '
-                              'have not checked the documents and booked slot '
-                              'yet; donors cannot respond until it is verified.\n\n'
-                              'Open — verified and broadcast to the donor '
-                              'network; compatible donors can respond.\n\n'
-                              'Matched — the requester has chosen donor(s); the '
-                              'chapter records the donation and marks it '
-                              'fulfilled.\n\n'
-                              'Fulfilled, Rejected and Cancelled are the closed '
-                              'records.',
+                      TabangDropdown<RequestStatus?>(
+                        initialValue: _statusFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'State',
+                          isDense: true,
+                        ),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: context.textColor,
+                        ),
+                        items: [
+                          const DropdownMenuItem<RequestStatus?>(
+                            value: null,
+                            child: Text('Any state'),
+                          ),
+                          ...RequestStatus.values.map(
+                            (s) => DropdownMenuItem<RequestStatus?>(
+                              value: s,
+                              child: Text(s.label),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _statusFilter = v),
+                        countFor: (value) => _requestCount(
+                          urgency: _urgencyFilter,
+                          status: value,
                         ),
                       ),
                     ],
@@ -914,7 +903,10 @@ class _RequestsPageState extends State<RequestsPage> {
             ),
           ],
 
-          if (request.note != null) ...[
+          // The clinical note is part of the private medical record. It is
+          // shown to the requester here and to chapter staff in the review
+          // queue, never to another community user reading the board.
+          if (isOwn && request.note != null) ...[
             const SizedBox(height: TabangSpace.md),
             Container(
               width: double.infinity,
@@ -1112,6 +1104,10 @@ class _RequestsPageState extends State<RequestsPage> {
     final myResponse = _isDonor
         ? _repo.responseForDonor(request.id, _user.id)
         : null;
+    // Medical documents, staff review text and the requester's clinical note
+    // are private to the requester and chapter staff. A donor browsing the
+    // community board must never be able to open another person's uploads.
+    final canSeePrivate = isOwn || _user.role.isAdminSide;
     final canRespond =
         _isDonor &&
         !isOwn &&
@@ -1172,7 +1168,45 @@ class _RequestsPageState extends State<RequestsPage> {
                   'Posted',
                   formatRelative(request.createdAt),
                 ),
-                if (request.documents.isNotEmpty) ...[
+                if (!canSeePrivate &&
+                    (request.documents.isNotEmpty ||
+                        (request.note != null && request.note!.isNotEmpty) ||
+                        (request.reviewNote != null &&
+                            request.reviewNote!.isNotEmpty))) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(TabangSpace.md),
+                    decoration: BoxDecoration(
+                      color: dialogContext.surfaceAlt,
+                      borderRadius: BorderRadius.circular(TabangRadius.sm),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          size: 16,
+                          color: dialogContext.textMuted,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Medical documents and the requester\'s private '
+                            'notes are visible only to the requester and '
+                            'chapter staff.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.45,
+                              color: dialogContext.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (canSeePrivate && request.documents.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     'Documents',
@@ -1188,7 +1222,8 @@ class _RequestsPageState extends State<RequestsPage> {
                     dense: true,
                   ),
                 ],
-                if (request.reviewNote != null &&
+                if (canSeePrivate &&
+                    request.reviewNote != null &&
                     request.reviewNote!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -1223,7 +1258,9 @@ class _RequestsPageState extends State<RequestsPage> {
                             'eligible donor'
                             '${compatibleDonors == 1 ? '' : 's'}',
                 ),
-                if (request.note != null && request.note!.isNotEmpty) ...[
+                if (canSeePrivate &&
+                    request.note != null &&
+                    request.note!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
                     'Clinical note',

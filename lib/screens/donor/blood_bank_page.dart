@@ -633,8 +633,24 @@ class _BloodBankPageState extends State<BloodBankPage> {
                 ),
         ),
       ),
-      trailing: hasFilters
-          ? TextButton.icon(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const HelpTip(
+            title: 'Blood bank filters',
+            message:
+                'Blood type filters the unit on the shelf. Recipient type '
+                'filters what can be transfused into a patient, so it uses the '
+                'compatibility rules rather than an exact type match.\n\n'
+                'Component narrows the product (whole blood, red cells, '
+                'platelets or plasma). Status shows whether a bag is available, '
+                'reserved, quarantined or expired.\n\n'
+                'Counts beside each option show how many units remain under the '
+                'other active filters.',
+          ),
+          if (hasFilters) ...[
+            const SizedBox(width: 2),
+            TextButton.icon(
               onPressed: () => setState(() {
                 _unitType = null;
                 _recipientType = null;
@@ -643,8 +659,10 @@ class _BloodBankPageState extends State<BloodBankPage> {
               }),
               icon: const Icon(Icons.filter_alt_off, size: 15),
               label: const Text('Clear'),
-            )
-          : null,
+            ),
+          ],
+        ],
+      ),
       filters: [
         _dropdown<BloodType?>(
           context,

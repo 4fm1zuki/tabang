@@ -627,6 +627,11 @@ void main() {
         isNot(contains(created.id)),
       );
       expect(
+        repo.communityRequests.map((r) => r.id),
+        isNot(contains(created.id)),
+        reason: 'an unverified submission is private to requester and staff',
+      );
+      expect(
         repo.respondToRequest(requestId: created.id, donorId: 'USR-012'),
         isNull,
       );
@@ -2287,7 +2292,7 @@ void main() {
   });
 
   group('Community request visibility', () {
-    test('a posted donor request appears before review, a bank one never does', () {
+    test('a posted donor request stays private until review', () {
       final created = repo.addRequest(
         requesterId: 'USR-009',
         patientAlias: 'Community post',
@@ -2303,9 +2308,13 @@ void main() {
       expect(created.status, RequestStatus.pendingReview);
       expect(
         repo.communityRequests.map((r) => r.id),
-        contains(created.id),
-        reason: 'a request posted to donors shows in the Requests board at once',
+        isNot(contains(created.id)),
+        reason: 'unverified submissions are not exposed to the community board',
       );
+
+      // Staff verify it, then it becomes a community request.
+      expect(repo.verifyRequest(created.id, actorId: 'USR-010'), isTrue);
+      expect(repo.communityRequests.map((r) => r.id), contains(created.id));
 
       final bank = repo.addRequest(
         requesterId: 'USR-009',
@@ -2333,11 +2342,7 @@ void main() {
         expect(request.source, RequestSource.donorNetwork);
         expect(
           request.status,
-          anyOf(
-            RequestStatus.pendingReview,
-            RequestStatus.open,
-            RequestStatus.matched,
-          ),
+          anyOf(RequestStatus.open, RequestStatus.matched),
         );
       }
       // Everything the Requests board can show is present, so the board and the
@@ -2345,8 +2350,7 @@ void main() {
       final actionable = repo.requests.where(
         (r) =>
             r.source == RequestSource.donorNetwork &&
-            (r.status == RequestStatus.pendingReview ||
-                r.status == RequestStatus.open ||
+            (r.status == RequestStatus.open ||
                 r.status == RequestStatus.matched),
       );
       expect(

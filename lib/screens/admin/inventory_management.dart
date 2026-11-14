@@ -273,25 +273,30 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
   /// The Blood units / Requests / Booked slots / Removed units strip. Rendered
   /// on its own line on a full page, and beside "Add unit" when embedded.
   Widget _tabStrip(BuildContext context) {
-    return Wrap(
-      spacing: TabangSpace.sm,
-      runSpacing: TabangSpace.sm,
-      children: [
-        _tabButton(context, 0, 'Blood units', _repo.units.length),
-        _tabButton(context, 1, 'Requests', _repo.requests.length),
-        _tabButton(
-          context,
-          2,
-          'Booked slots',
-          _repo.pendingScheduledRequests.length,
-        ),
-        _tabButton(
-          context,
-          3,
-          'Removed units',
-          _repo.removedUnits.where((record) => !record.restored).length,
-        ),
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _tabButton(context, 0, 'Blood units', _repo.units.length),
+          const SizedBox(width: TabangSpace.sm),
+          _tabButton(context, 1, 'Requests', _repo.requests.length),
+          const SizedBox(width: TabangSpace.sm),
+          _tabButton(
+            context,
+            2,
+            'Booked slots',
+            _repo.pendingScheduledRequests.length,
+          ),
+          const SizedBox(width: TabangSpace.sm),
+          _tabButton(
+            context,
+            3,
+            'Removed units',
+            _repo.removedUnits.where((record) => !record.restored).length,
+          ),
+        ],
+      ),
     );
   }
 
@@ -344,6 +349,13 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _statusLegend(UnitStatus status, String description) {
+    return Tooltip(
+      message: description,
+      child: StatusPill(status.label, tone: toneForUnit(status), dense: true),
     );
   }
 
@@ -406,16 +418,47 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
           ],
         ),
         const SizedBox(height: TabangSpace.sm),
-        // One-line legend so staff and volunteers read the same statuses.
-        Text(
-          'Available — ready for allocation · Reserved — held for a patient '
-          'or verified request · Quarantined — screening or safety hold · '
-          'Expired — past shelf life and never usable.',
-          style: TextStyle(
-            fontSize: 11.5,
-            height: 1.45,
-            color: context.textMuted,
-          ),
+        // A compact legend with the same pills used on the cards, plus one
+        // guide button for the full status meaning. The old run-on sentence
+        // wrapped differently at every width and was hard to scan.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Wrap(
+                spacing: TabangSpace.sm,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _statusLegend(UnitStatus.available, 'Ready for allocation'),
+                  _statusLegend(
+                    UnitStatus.reserved,
+                    'Held for a patient or verified request',
+                  ),
+                  _statusLegend(
+                    UnitStatus.quarantined,
+                    'Screening or safety hold',
+                  ),
+                  _statusLegend(
+                    UnitStatus.expired,
+                    'Past shelf life and never usable',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: TabangSpace.sm),
+            const HelpTip(
+              title: 'Unit statuses',
+              message:
+                  'Available - ready for allocation.\n\n'
+                  'Reserved - held for a patient or a verified request; staff '
+                  'still confirm the release.\n\n'
+                  'Quarantined - kept out of allocation for screening or a '
+                  'safety hold.\n\n'
+                  'Expired - past the component shelf life and never usable, '
+                  'even if the stored status was not changed.',
+            ),
+          ],
         ),
         const SizedBox(height: TabangSpace.md),
         if (units.isEmpty)
@@ -848,6 +891,18 @@ class _InventoryManagementPageState extends State<InventoryManagementPage> {
               ),
             ),
           ],
+          trailing: const HelpTip(
+            title: 'Request queue',
+            message:
+                'This is the same queue, in the same order, as the Operations '
+                'map panel. Awaiting verification, open and matched requests '
+                'come first; closed records follow.\n\n'
+                'Counts beside each option show how many requests remain under '
+                'the other active filters.\n\n'
+                'Open a card for the attachments, donor responses and full '
+                'record. Staff can reject any active request, and mark it '
+                'fulfilled after the donation is recorded.',
+          ),
         ),
         const SizedBox(height: TabangSpace.md),
         Text(

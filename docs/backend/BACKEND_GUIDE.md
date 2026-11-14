@@ -1,7 +1,7 @@
 # TABANG — Backend & Sync Guide
 
 **Status:** pre-Supabase migration blueprint  
-**Baseline:** TABANG 2.0.0 base app, commit `c54125c`  
+**Baseline:** TABANG 2.1.0 base app  
 **Audience:** the developer who will replace the in-memory `TabangRepository` with Supabase
 
 This guide is the narrative companion to:
@@ -138,7 +138,7 @@ Use physical projection tables:
 
 - `donor_directory` — public donor card fields, no email/phone/full name.
 - `blood_units_public` — stock without `reserved_by` or `reservation_note`.
-- `request_public` — board/map fields without `requester_id`, `note` or `review_note`.
+- `request_public` - verified donor-network requests only; no requester identity, notes, review data or unverified submissions.
 
 They are maintained by triggers and refreshed by a scheduled job. Community screens subscribe to these, not the base tables. Staff screens use the base tables under staff RLS.
 
@@ -173,7 +173,7 @@ Several values are deliberately not columns. They are computed in one place and 
 |---|---|
 | Unit effective status / expiry | `blood_units_public.effective_status`, `expires_on` |
 | Donor eligibility, blocker, days remaining | `donor_directory` projection + eligibility function/job |
-| Public request fields | `request_public` |
+| Public request fields | `request_public` (verified open/matched donor-network requests only) |
 | Public stock fields | `blood_units_public` |
 | Chapter KPIs and readiness score | `chapter_metrics` |
 | Donations vs requests per blood type | `blood_type_stats` view |
@@ -559,7 +559,7 @@ Target demo parity: 15 eligible donors, 2 away donors, 15 recipients, the commun
 6. **Storage** — upload, signed preview, cleanup.
 7. **Realtime** — targeted subscriptions, reconnect refresh.
 8. **Derived data** — projections, `chapter_metrics`, eligibility job, expiry job, notifications.
-9. **Seed & QA** — 210-test parity, backend integration tests, two-device checks.
+9. **Seed & QA** - 213-test parity, backend integration tests, two-device checks.
 10. **Cutover** — backup, freeze writes, deploy web, rebuild APK, rollback plan.
 
 Do not start with Realtime. A correct schema and transactional RPCs matter more than a live cursor.

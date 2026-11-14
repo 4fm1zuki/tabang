@@ -57,10 +57,7 @@ class TabangFilterBar extends StatelessWidget {
               );
         final cellWidth = columns == 0
             ? 0.0
-            : math.min(
-                maxFilterWidth,
-                (width - gap * (columns - 1)) / columns,
-              );
+            : math.min(maxFilterWidth, (width - gap * (columns - 1)) / columns);
 
         final rows = <Widget>[];
         for (var start = 0; start < filters.length; start += columns) {
@@ -91,7 +88,14 @@ class TabangFilterBar extends StatelessWidget {
                   if (search != null) Expanded(child: search!),
                   if (search != null && trailing != null)
                     const SizedBox(width: TabangSpace.sm),
-                  if (trailing != null) trailing!,
+                  if (trailing != null) ...[
+                    // With no search field the trailing action starts on the
+                    // left, which put a lone guide button above the first
+                    // dropdown instead of at the end of the toolbar. Push it
+                    // to the right edge so every filter bar reads the same.
+                    if (search == null) const Spacer(),
+                    trailing!,
+                  ],
                 ],
               ),
             if (search != null && filters.isNotEmpty) SizedBox(height: gap),

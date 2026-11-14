@@ -1,8 +1,8 @@
 # TABANG — AI Handoff Context
 
 **Version:** 1.0  
-**Baseline:** TABANG 2.0.0 base app  
-**Last updated:** 2026-11-13  
+**Baseline:** TABANG 2.1.0 base app  
+**Last updated:** 2026-11-14  
 **Purpose:** Give this file to another AI so it understands the whole TABANG project before changing anything.
 
 > **How to use this file**
@@ -60,11 +60,11 @@ The app supports:
 | Base app | Complete |
 | Data layer | In-memory `TabangRepository`; resets on restart |
 | Backend | **Not connected**; Supabase plan exists in `docs/backend/` |
-| Tests | **210 tests**, all passing at the last check |
+| Tests | **213 tests**, all passing at the last check |
 | Analyze | Clean at the last check |
 | Android | Release APKs built (universal + per-ABI) |
 | Web | Release web bundle built |
-| Release | `v2.0.0`, tagged at `c54125c` |
+| Release | `v2.1.0` |
 | Web host | Static bundle intended for Cloudflare Pages |
 | Backend guide | `docs/backend/` (committed) |
 | Android signing | Debug key (research demo only) |
@@ -147,7 +147,7 @@ Staff and admin may manage the chapter console. Only admin may manage another st
 | `lib/screens/admin/` | Admin shell, Overview, Operations, Inventory, Drives, Users, Moderation |
 | `lib/screens/shared/` | Profile, Settings, Guides & Help / About |
 | `lib/widgets/` | Shared UI: cards, pills, dropdowns, map, dialogs, filters |
-| `test/` | 210 behaviour tests |
+| `test/` | 213 behaviour tests |
 | `docs/backend/` | Supabase schema, RLS, Realtime, sync guide and workbook |
 | `android/`, `web/`, `ios/`, `macos/`, `linux/`, `windows/` | Platform scaffolding |
 
@@ -286,14 +286,15 @@ A missing weight blocks matching. An unverified donor never appears as matchable
 
 1. Requester fills: patient alias, blood type, component, units (1–20), hospital, barangay, urgency, clinical note, 3 required documents, optional typing result, and a blood-bank slot.
 2. Request starts `pendingReview`.
-3. Staff verify → `open`; blood-bank requests may hold compatible units. Donor-network requests become visible to donors.
-4. Donor responds → `pending` response.
-5. Requester selects a donor only after **both sides have exchanged at least one human message**.
-6. A donor can have only one active commitment.
-7. When enough responses are selected, request becomes `matched`; remaining offers are declined.
-8. Staff record fulfilment → `fulfilled`. Only staff/admin can fulfil.
-9. Reject requires a reason. Rejection releases holds and declines pending offers.
-10. Verification/rejection can be undone only from the expected state. Fulfilment can be reopened by staff.
+3. **An unverified submission is private to the requester and chapter staff.** Its documents, clinical note, review note and even its presence on the community board/map stay hidden. The community board only shows donor-network requests that staff have verified (`open` or `matched`).
+4. Staff verify → `open`; blood-bank requests may hold compatible units. Donor-network requests become visible to donors.
+5. Donor responds → `pending` response.
+6. Requester selects a donor only after **both sides have exchanged at least one human message**.
+7. A donor can have only one active commitment.
+8. When enough responses are selected, request becomes `matched`; remaining offers are declined.
+9. Staff record fulfilment → `fulfilled`. Only staff/admin can fulfil.
+10. Reject requires a reason. Rejection releases holds and declines pending offers.
+11. Verification/rejection can be undone only from the expected state. Fulfilment can be reopened by staff.
 
 ### Inventory
 
@@ -439,7 +440,7 @@ flutter analyze --no-pub
 flutter test --no-pub
 ```
 
-Current suite: **210 tests**. It covers:
+Current suite: **213 tests**. It covers:
 
 - eligibility and ABO/Rh compatibility
 - expiry and effective status

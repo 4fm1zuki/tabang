@@ -33,7 +33,7 @@ For backend work, also give:
 
 ## Current baseline
 
-- App: TABANG 2.0.0
-- Tests: 210
-- Release tag: `v2.0.0` at `c54125c`
+- App: TABANG 2.1.0
+- Tests: 213
+- Release tag: `v2.1.0`
 - Backend docs: `docs/backend/`

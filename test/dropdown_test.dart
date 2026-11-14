@@ -31,6 +31,10 @@ void main() {
                   'Seven',
                   'Eight',
                   'Nine',
+                  'Ten',
+                  'Eleven',
+                  'Twelve',
+                  'Thirteen',
                 ]),
                 onChanged: (value) => picked = value,
                 decoration: const InputDecoration(labelText: 'Pick one'),
@@ -47,8 +51,10 @@ void main() {
 
     await tester.tap(find.text('Select'));
     await tester.pumpAndSettle();
-    // Nine items is past the threshold, so the list is searchable.
+    // Thirteen items is past the threshold, so the list is searchable.
     expect(find.byType(TextField), findsOneWidget);
+    // Opening the sheet must not raise the keyboard or steal focus.
+    expect(tester.testTextInput.isVisible, isFalse);
 
     await tester.enterText(find.byType(TextField), 'Nine');
     await tester.pumpAndSettle();
@@ -63,6 +69,40 @@ void main() {
     expect(picked, 'Nine');
     // The chosen value is now the field's label.
     expect(find.text('Nine'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('enum-sized lists such as blood type stay search-free', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(
+          body: TabangDropdown<String>(
+            items: items(const [
+              'All types',
+              'O−',
+              'O+',
+              'A−',
+              'A+',
+              'B−',
+              'B+',
+              'AB−',
+              'AB+',
+            ]),
+            decoration: const InputDecoration(labelText: 'Blood type'),
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Select'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('All types'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

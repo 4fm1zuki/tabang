@@ -1149,6 +1149,75 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('another user cannot open a request private documents', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final donor = repo.userById('USR-001')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: RequestsPage(user: donor)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // A pending submission from another account stays out of the community
+    // board until staff verify it.
+    expect(find.text('Patient 055'), findsNothing);
+
+    // The clinical note is private medical context, not a public caption.
+    const privateNote =
+        'Trauma case in the emergency room; universal donor needed.';
+    expect(find.text(privateNote), findsNothing);
+
+    // REQ-007 belongs to USR-029. A donor may read the community need, but the
+    // uploaded medical documents and the requester's private notes stay with
+    // the requester and chapter staff.
+    await tester.tap(
+      find.ancestor(
+        of: find.text('Patient 205'),
+        matching: find.byType(SurfaceCard),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RequestDocumentList), findsNothing);
+    expect(find.text('Documents'), findsNothing);
+    expect(find.text(privateNote), findsNothing);
+    expect(find.text('Chapter review note'), findsNothing);
+    expect(find.text('Clinical note'), findsNothing);
+    expect(
+      find.textContaining('Medical documents and the requester'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a requester still sees their own clinical note', (tester) async {
+    tester.view.physicalSize = const Size(1000, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final requester = repo.userById('USR-029')!;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: TabangTheme.light,
+        home: Scaffold(body: RequestsPage(user: requester)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Trauma case in the emergency room; universal donor needed.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('request cards put status and urgency at the top right', (
     tester,
   ) async {
@@ -1399,14 +1468,14 @@ void main() {
     Finder inSheet(String text) =>
         find.descendant(of: find.byType(ListView), matching: find.text(text));
 
-    // The donor serve board holds nine community requests, with no urgency
-    // filter yet: All 9, Critical 2, Urgent 3, Routine 4.
+    // The donor serve board holds six verified community requests, with no
+    // urgency filter yet: All 6, Critical 2, Urgent 3, Routine 1.
     await tester.tap(find.text('All urgencies'));
     await tester.pumpAndSettle();
-    expect(inSheet('9'), findsOneWidget);
+    expect(inSheet('6'), findsOneWidget);
     expect(inSheet('2'), findsOneWidget);
     expect(inSheet('3'), findsOneWidget);
-    expect(inSheet('4'), findsOneWidget);
+    expect(inSheet('1'), findsOneWidget);
 
     await tester.tap(inSheet('Critical'));
     await tester.pumpAndSettle();

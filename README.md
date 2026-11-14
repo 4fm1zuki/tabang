@@ -61,6 +61,11 @@ values, ID/cardinality constraints and a gap-closure log.
 machine-readable version and ready-to-paste prompts are in
 [`docs/ai/`](docs/ai/).
 
+**Release 2.1.0:** privacy, filter and layout fixes plus the orientation pack.
+See [`docs/releases/2.1.0.md`](docs/releases/2.1.0.md) and the video guide and
+script at
+[`docs/presentation/TABANG_VIDEO_ORIENTATION.md`](docs/presentation/TABANG_VIDEO_ORIENTATION.md).
+
 ### Demo accounts
 
 Sign in with any of these. The login screen lists them too; click a row to
@@ -224,9 +229,11 @@ were bypassed.
   blood-bank slots (Mon–Fri 8–11 AM and 1–3 PM, Sat 8–11 AM), and the dialog also
   checks participating-facility stock and explains each urgency as a response
   window (critical = same day, urgent = 24–48 h, routine = planned). The
-  request starts as **Awaiting verification** and is invisible to donors until
-  chapter staff inspect the uploaded files, confirm the booked slot and verify
-  it — or reject it with a written reason the requester can read. Donors get
+  request starts as **Awaiting verification** and is private to the requester and
+  chapter staff: it does not appear on the community board or map, and its
+  uploaded documents, clinical note and review note cannot be opened by other
+  users. Staff inspect the files, confirm the booked slot and verify it — or
+  reject it with a written reason the requester can read. Donors get
   three tabs — **Requests** (open donor-network requests their
   blood type and component can serve, with their own posted request excluded),
   **Mine** (requests they posted, the review status and rejection reason, donor
@@ -744,7 +751,7 @@ connection to the simulated records.
 flutter test
 ```
 
-**210 tests** cover:
+**213 tests** cover:
 
 - **Seed data** — exactly 15 currently eligible donors (plus two deliberately
   away donors), 15 recipients, the community demo account, and a unique bundled
@@ -762,7 +769,10 @@ flutter test
 - **Request verification** — a submission without every required uploaded file
   or outside the published blood-bank schedule is refused; a checklist entry
   without bytes does not count; uploaded files are stored with the request and
-  previewed by staff; requests stay hidden from donors until staff verify them;
+  previewed by staff; an unverified request stays private to its requester and
+  staff instead of appearing on the community board; another user's clinical
+  note and uploaded documents stay hidden from the board card and details
+  dialog; requests stay hidden from donors until staff verify them;
   rejection carries a written reason; verifying a blood-bank request holds the
   assigned units for the requester. The requester's card then shows a
   **Verified** pill and a confirmation notice, and the staff request queue uses
